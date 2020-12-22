@@ -166,6 +166,6 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'neuralprocesses', u'Neural Processes Documentation',
-     author, 'neuralprocesses', 'A framework for composing Neural Processes in n Python',
+     author, 'neuralprocesses', 'A framework for composing Neural Processes in Python',
      'Miscellaneous'),
 ]
