@@ -1,4 +1,4 @@
-from . import _dispatch
+# from . import _dispatch
 
 
 __all__ = ["Chain"]
@@ -14,6 +14,12 @@ class Chain:
         return x
 
 
-@_dispatch()
-def code():
-    pass
+@_dispatch(Chain, B.Numeric, B.Numeric, B.Numeric)
+def code(c, xz, z, x, **kw_args):
+    for ci in c.links:
+            xz, z = code(ci, xz, z, x, **kw_args)
+    return xz, z
+
+
+
+
