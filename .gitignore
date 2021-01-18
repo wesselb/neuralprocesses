@@ -19,3 +19,4 @@ cover
 # Other
 .DS_Store
 *.swp
+.vscode/*

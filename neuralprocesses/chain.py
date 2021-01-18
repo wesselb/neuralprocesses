@@ -8,7 +8,7 @@ class Chain:
     """A chain of links.
 
     Args:
-        *links (function): Links of the chain.
+        *links (tuple): Links of the chain.
     """
 
     def __init__(self, *links):
@@ -21,7 +21,7 @@ class Chain:
 
 
 @_dispatch(Chain, object, object, object)
-def code(chain, xz, z, x):
+def code(chain, xz, z, x, **kw_args):
     for link in chain.links:
-        xz, z = code(link, xz, z, x)
+        xz, z = code(link, xz, z, x, **kw_args)
     return xz, z
