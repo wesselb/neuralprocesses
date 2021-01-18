@@ -12,4 +12,3 @@ def test_chain():
     assert c(3) == 4
     c = nps.Chain(lambda x: x ** 2, lambda x: x - 1)
     assert c(3) == 8
-

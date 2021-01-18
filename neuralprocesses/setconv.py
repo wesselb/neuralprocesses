@@ -26,7 +26,6 @@ class SetConvPD(nn.Module):
     pass
 
 
-
 @_dispatch(SetConv, B.Numeric, B.Numeric, B.Numeric)
 def code(layer, xz, z, x, **kw_args):
     pass
@@ -41,8 +40,3 @@ def code(layer, xz, z, x, **kw_args):
         feature_size(x),
         layer.num_channels,
     )
-
-
-
-
-
