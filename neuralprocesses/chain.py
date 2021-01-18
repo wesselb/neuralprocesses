@@ -5,6 +5,12 @@ __all__ = ["Chain"]
 
 
 class Chain:
+    """A chain of links.
+
+    Args:
+        *links (function): Links of the chain.
+    """
+
     def __init__(self, *links):
         self.links = links
 
@@ -14,6 +20,8 @@ class Chain:
         return x
 
 
-@_dispatch()
-def code():
-    pass
+@_dispatch(Chain, object, object, object)
+def code(chain, xz, z, x):
+    for link in chain.links:
+        xz, z = code(link, xz, z, x)
+    return xz, z
