@@ -1,10 +1,11 @@
 import abc
+import multiprocessing
 
+import lab as B
 import numpy as np
 import stheno
 import torch
-import lab as B
-
+from threadpoolctl import threadpool_limits
 
 __all__ = ["GPGenerator"]
 
@@ -143,6 +144,24 @@ class DataGenerator(metaclass=abc.ABCMeta):
         """
         return LambdaIterator(lambda: self.generate_batch(device), self.num_batches)
 
+    def pregen_epoch(self):
+        # Distribute the batches over the CPUs.
+        num_cpus = multiprocessing.cpu_count()
+        num_batches_per_cpu = [self.num_batches // num_cpus] * (num_cpus - 1)
+        num_batches_per_cpu.append(self.num_batches - sum(num_batches_per_cpu))
+
+        # Perform the pregeneration.
+        with multiprocessing.Pool(processes=num_cpus) as pool:
+            args = [(self, num) for num in num_batches_per_cpu]
+            batches = sum(pool.starmap(_generate_batches, args), [])
+
+        return batches
+
+
+def _generate_batches(self, num_batches):
+    with threadpool_limits(limits=1, user_api="blas"):
+        return [self.generate_batch("cpu") for _ in range(num_batches)]
+
 
 class GPGenerator(DataGenerator):
     """Generate samples from a GP with a given kernel.
@@ -155,8 +174,9 @@ class GPGenerator(DataGenerator):
     """
 
     def __init__(self, kernel=stheno.EQ().stretch(0.25), **kw_args):
-        self.gp = stheno.GP(kernel)
+        self.kernel = kernel
         DataGenerator.__init__(self, **kw_args)
 
     def sample(self, x):
-        return B.squeeze(self.gp(x).sample())
+        gp = stheno.GP(self.kernel)
+        return B.squeeze(gp(x).sample())
