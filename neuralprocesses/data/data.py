@@ -78,11 +78,8 @@ class DataGenerator(metaclass=abc.ABCMeta):
             vector: Sample at inputs `x`.
         """
 
-    def generate_batch(self, device):
+    def generate_batch(self):
         """Generate a batch.
-
-        Args:
-            device (device): Device.
 
         Returns:
             dict: A task, which is a dictionary with keys `x`, `y`, `x_context`,
@@ -122,14 +119,7 @@ class DataGenerator(metaclass=abc.ABCMeta):
             task["y_target"].append(y[inds_test])
 
         # Stack batch and convert to PyTorch.
-        task = {
-            k: torch.tensor(
-                B.uprank(B.stack(*v, axis=0), rank=3),
-                dtype=torch.float32,
-                device=device,
-            )
-            for k, v in task.items()
-        }
+        task = {k: B.uprank(B.stack(*v, axis=0), rank=3) for k, v in task.items()}
 
         return task
 
