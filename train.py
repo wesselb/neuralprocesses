@@ -1,6 +1,7 @@
 import lab.torch as B
 import numpy as np
 import torch
+import stheno
 
 from neuralprocesses.data import GPGenerator
 from neuralprocesses.gnp import GNP
@@ -11,7 +12,7 @@ else:
     device = "cpu"
 
 
-gen = GPGenerator()
+gen = GPGenerator(kernel=stheno.EQ().stretch(0.25) + 0.05 ** 2 * stheno.Delta())
 model = GNP().to(device)
 
 opt = torch.optim.Adam(model.parameters(), lr=5e-4)
