@@ -18,19 +18,17 @@ model = GNP().to(device)
 opt = torch.optim.Adam(model.parameters(), lr=5e-4)
 
 
-class MovingAverage:
-    def __init__(self, size=200):
-        self.stack = []
-        self.size = size
+def gp_loss(batch):
+    total = 0
+    for i in range(gen.batch_size):
+        m = stheno.Measure()
+        p = stheno.GP(stheno.EQ().stretch(0.25), measure=m)
+        e1 = 0.05 * stheno.GP(stheno.Delta(), measure=m)
+        e2 = 0.05 * stheno.GP(stheno.Delta(), measure=m)
+        post = m | ((p + e1)(batch["x_context"][i, :, 0]), batch["y_context"][i, :, 0])
+        total += post(p + e2)(batch["x_target"][i, :, 0]).logpdf(batch["y_target"][i, :, 0])
+    return -total / gen.batch_size / gen.max_test_points
 
-    def record(self, value):
-        self.stack.append(B.to_numpy(value))
-        while len(self.stack) > self.size:
-            self.stack.pop(0)
-        print(B.mean(np.array(self.stack)))
-
-
-ma = MovingAverage()
 
 while True:
     print("New epoch!")
@@ -41,9 +39,7 @@ while True:
             -B.mean(dist.log_prob(batch["y_target"][:, :, 0]))
             / B.shape(batch["y_target"])[1]
         )
-
-        ma.record(loss)
-
+        print(loss - gp_loss(batch))
         loss.backward()
         opt.step()
         opt.zero_grad()
