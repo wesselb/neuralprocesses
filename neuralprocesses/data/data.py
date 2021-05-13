@@ -98,7 +98,7 @@ class DataGenerator(metaclass=abc.ABCMeta):
 
         # Determine number of test and train points.
         num_train_points = np.random.randint(3, self.max_train_points + 1)
-        num_test_points = np.random.randint(3, self.max_test_points + 1)
+        num_test_points = self.max_test_points
         num_points = num_train_points + num_test_points
 
         for i in range(self.batch_size):
