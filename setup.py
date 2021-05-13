@@ -1,6 +1,12 @@
 from setuptools import find_packages, setup
 
-requirements = ["numpy>=1.16", "torch", "backends", "plum-dispatch"]
+requirements = [
+    "numpy>=1.16",
+    "torch",
+    "backends>=1",
+    "stheno>=1",
+    "plum-dispatch>=1",
+]
 
 setup(
     packages=find_packages(exclude=["docs"]),
