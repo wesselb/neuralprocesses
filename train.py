@@ -18,7 +18,7 @@ opt = torch.optim.Adam(model.parameters(), lr=5e-4)
 
 
 class MovingAverage:
-    def __init__(self, size=50):
+    def __init__(self, size=200):
         self.stack = []
         self.size = size
 
@@ -31,16 +31,18 @@ class MovingAverage:
 
 ma = MovingAverage()
 
-for batch in gen.epoch(device):
-    mean, cov = model(batch["x_context"], batch["y_context"], batch["x_target"])
-    dist = torch.distributions.MultivariateNormal(loc=mean, covariance_matrix=cov)
-    loss = (
-        -B.mean(dist.log_prob(batch["y_target"][:, :, 0]))
-        / B.shape(batch["y_target"])[1]
-    )
+while True:
+    print("New epoch!")
+    for batch in gen.epoch(device):
+        mean, cov = model(batch["x_context"], batch["y_context"], batch["x_target"])
+        dist = torch.distributions.MultivariateNormal(loc=mean, covariance_matrix=cov)
+        loss = (
+            -B.mean(dist.log_prob(batch["y_target"][:, :, 0]))
+            / B.shape(batch["y_target"])[1]
+        )
 
-    ma.record(loss)
+        ma.record(loss)
 
-    loss.backward()
-    opt.step()
-    opt.zero_grad()
+        loss.backward()
+        opt.step()
+        opt.zero_grad()
