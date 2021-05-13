@@ -26,7 +26,9 @@ def gp_loss(batch):
         e1 = 0.05 * stheno.GP(stheno.Delta(), measure=m)
         e2 = 0.05 * stheno.GP(stheno.Delta(), measure=m)
         post = m | ((p + e1)(batch["x_context"][i, :, 0]), batch["y_context"][i, :, 0])
-        total += post(p + e2)(batch["x_target"][i, :, 0]).logpdf(batch["y_target"][i, :, 0])
+        total += post(p + e2)(batch["x_target"][i, :, 0]).logpdf(
+            batch["y_target"][i, :, 0]
+        )
     return -total / gen.batch_size / gen.max_test_points
 
 

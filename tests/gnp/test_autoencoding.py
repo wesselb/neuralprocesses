@@ -2,6 +2,7 @@ import lab as B
 import pytest
 
 import neuralprocesses.gnp as gnp
+
 # noinspection PyUnresolvedReferences
 from .util import context_set, target_set
 
