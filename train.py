@@ -18,7 +18,7 @@ opt = torch.optim.Adam(model.parameters(), lr=5e-4)
 for batch in gen.epoch(device):
     mean, cov = model(batch["x_context"], batch["y_context"], batch["x_target"])
     dist = torch.distributions.MultivariateNormal(loc=mean, covariance_matrix=cov)
-    loss = -B.mean(dist.log_prob(batch["y_target"])) / B.shape(batch["y_target"])[1]
+    loss = -B.mean(dist.log_prob(batch["y_target"][:, :, 0])) / B.shape(batch["y_target"])[1]
     print(loss)
 
     loss.backward()

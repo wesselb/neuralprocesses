@@ -85,7 +85,4 @@ class GNP(nn.Module):
         with B.device(B.device(cov)):
             cov = cov + B.eye(cov) * B.exp(self.log_sigma)
 
-        return torch.distributions.MultivariateNormal(
-            loc=mean,
-            covariance_matrix=cov,
-        )
+        return mean, cov

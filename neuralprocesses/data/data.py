@@ -113,7 +113,7 @@ class DataGenerator(metaclass=abc.ABCMeta):
             inds_test = sorted(inds[num_train_points:num_points])
 
             # Record to task.
-            task["x"].append(sorted(x))
+            task["x"].append(np.sort(x))
             task["y"].append(y[np.argsort(x)])
             task["x_context"].append(x[inds_train])
             task["y_context"].append(y[inds_train])

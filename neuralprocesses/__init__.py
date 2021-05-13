@@ -5,4 +5,3 @@ import plum
 _dispatch = plum.Dispatcher()
 
 from .chain import *
-from .setconv import *

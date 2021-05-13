@@ -20,8 +20,8 @@ class Chain:
         return x
 
 
-@_dispatch(Chain, object, object, object)
-def code(chain, xz, z, x, **kw_args):
+@_dispatch
+def code(chain: Chain, xz, z, x, **kw_args):
     for link in chain.links:
         xz, z = code(link, xz, z, x, **kw_args)
     return xz, z

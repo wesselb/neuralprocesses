@@ -19,22 +19,22 @@ class Parallel:
         return Parallel(*(e(x) for e in self.elements))
 
 
-@_dispatch(Parallel, B.Numeric, B.Numeric, B.Numeric)
-def code(p, xz, z, x, **kw_args):
+@_dispatch
+def code(p: Parallel, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
     xz, z = zip([code(pi, xz, z, x, **kw_args) for pi in p.elements])
     return Parallel(xz), Parallel(z)
 
 
-@_dispatch(Parallel, B.Numeric, Parallel, B.Numeric)
-def code(p, xz, z, x, **kw_args):
+@_dispatch
+def code(p: Parallel, xz: B.Numeric, z: Parallel, x: B.Numeric, **kw_args):
     xz, z = zip(
         [code(pi, xz, zi, x, **kw_args) for (pi, zi) in zip(p.elements, z.elements)]
     )
     return Parallel(xz), Parallel(z)
 
 
-@_dispatch(Parallel, Parallel, Parallel, B.Numeric)
-def code(p, xz, z, x, **kw_args):
+@_dispatch
+def code(p: Parallel, xz: Parallel, z: Parallel, x: B.Numeric, **kw_args):
     xz, z = zip(
         [
             code(pi, xzi, zi, x, **kw_args)
