@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 
-__all__ = ["SetConv1dEncoder", "SetConv2dEncoder"]
+__all__ = ["SetConv1dEncoder", "SetConv1dPDEncoder"]
 
 
 class SetConv1dEncoder(nn.Module):
@@ -40,7 +40,7 @@ class SetConv1dEncoder(nn.Module):
         return x_grid, z
 
 
-class SetConv2dEncoder(nn.Module):
+class SetConv1dPDEncoder(nn.Module):
     def __init__(self, discretisation):
         nn.Module.__init__(self)
         self.log_scale = nn.Parameter(

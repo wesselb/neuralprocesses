@@ -2,10 +2,11 @@ import lab.torch as B
 import torch
 import torch.nn as nn
 
-from .decoder import SetConv1dDecoder, SetConv2dDecoder
+from .decoder import SetConv1dDecoder, SetConv1dPDDecoder
 from .discretisation import Discretisation1d
-from .encoder import SetConv1dEncoder, SetConv2dEncoder
+from .encoder import SetConv1dEncoder, SetConv1dPDEncoder
 from .unet import UNet
+from .util import convert_batched_data
 
 __all__ = ["GNP"]
 
@@ -48,11 +49,11 @@ class GNP(nn.Module):
 
         # Construct encoders:
         self.encoder_mean = SetConv1dEncoder(self.disc_mean)
-        self.encoder_kernel = SetConv2dEncoder(self.disc_kernel)
+        self.encoder_kernel = SetConv1dPDEncoder(self.disc_kernel)
 
         # Construct decoders:
         self.decoder_mean = SetConv1dDecoder(self.disc_mean)
-        self.decoder_kernel = SetConv2dDecoder(self.disc_kernel)
+        self.decoder_kernel = SetConv1dPDDecoder(self.disc_kernel)
 
         # Learnable observation noise:
         self.log_sigma = nn.Parameter(
@@ -66,6 +67,11 @@ class GNP(nn.Module):
                 raise ValueError("Must provide target inputs")
             else:
                 x_target = self.x_target
+
+        # Ensure that the shapes are right.
+        x_context = convert_batched_data(x_context)
+        y_context = convert_batched_data(y_context)
+        x_target = convert_batched_data(x_target)
 
         # Run mean architecture:
         xz, z = self.encoder_mean(x_context, y_context, x_target)

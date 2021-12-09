@@ -1,4 +1,5 @@
 from . import _dispatch
+from matrix.util import indent
 
 
 __all__ = ["Chain"]
@@ -18,6 +19,19 @@ class Chain:
         for link in self.links:
             x = link(x)
         return x
+
+    def __iter__(self):
+        return iter(self.links)
+
+    def __getitem__(self, item):
+        return self.links[item]
+
+    def __repr__(self):
+        return (
+            "Chain(\n"
+            + "".join([indent(repr(e).strip(), " " * 4) + ",\n" for e in self])
+            + ")\n"
+        )
 
 
 @_dispatch

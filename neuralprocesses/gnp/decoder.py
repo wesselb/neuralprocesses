@@ -2,7 +2,7 @@ import lab.torch as B
 import torch
 import torch.nn as nn
 
-__all__ = ["SetConv1dDecoder", "SetConv2dDecoder"]
+__all__ = ["SetConv1dDecoder", "SetConv1dPDDecoder"]
 
 
 class SetConv1dDecoder(nn.Module):
@@ -27,7 +27,7 @@ class SetConv1dDecoder(nn.Module):
         return xz, z
 
 
-class SetConv2dDecoder(nn.Module):
+class SetConv1dPDDecoder(nn.Module):
     def __init__(self, discretisation):
         nn.Module.__init__(self)
         self.log_scale = nn.Parameter(

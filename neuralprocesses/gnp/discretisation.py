@@ -13,8 +13,9 @@ class Discretisation1d:
         self.margin = margin
 
     def __call__(self, *args):
-        grid_min = min(*[B.to_numpy(B.min(x)) for x in args]) - self.margin
-        grid_max = max(*[B.to_numpy(B.max(x)) for x in args]) + self.margin
+        args = [arg for arg in args if B.length(arg) > 0]
+        grid_min = min([B.to_numpy(B.min(x)) for x in args]) - self.margin
+        grid_max = max([B.to_numpy(B.max(x)) for x in args]) + self.margin
 
         # Account for snapping to the grid (below).
         grid_min -= self.resolution

@@ -1,60 +1,46 @@
-import abc
-import multiprocessing
-
-import lab as B
-import numpy as np
+import lab.torch as B
 import stheno
 import torch
-from threadpoolctl import threadpool_limits
 
 __all__ = ["GPGenerator"]
 
 
-class LambdaIterator:
-    """Iterator that repeatedly generates elements from a lambda.
+class GPGenerator:
+    """GP generator.
 
     Args:
-        generator (function): Function that generates an element.
-        num_elements (int): Number of elements to generate.
-    """
-
-    def __init__(self, generator, num_elements):
-        self.generator = generator
-        self.num_elements = num_elements
-        self.index = 0
-
-    def __next__(self):
-        self.index += 1
-        if self.index <= self.num_elements:
-            return self.generator()
-        else:
-            raise StopIteration()
-
-    def __iter__(self):
-        return self
-
-
-class DataGenerator(metaclass=abc.ABCMeta):
-    """Data generator.
-
-    Args:
+        kernel (:class:`stheno.Kernel`, optional): Kernel of the GP. Defaults to an
+            EQ kernel with length scale `0.25`.
+        noise (float, optional): Observation noise. Defaults to `5e-2`.
+        seed (int, optional): Seed. Defaults to `0`.
         batch_size (int, optional): Batch size. Defaults to 16.
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
         x_range (tuple[float, float], optional): Range of the inputs. Defaults to
             [-2, 2].
-        max_train_points (int, optional): Number of training points. Defaults to 50.
-        max_test_points (int, optional): Number of testing points. Defaults to 50.
+        num_context_points (int or tuple[int, int], optional): A fixed number of context
+            points or a lower and upper bound. Defaults to the range `(1, 50)`.
+        num_target_points (int or tuple[int, int], optional): A fixed number of target
+            points or a lower and upper bound. Defaults to the fixed number `50`.
+        device (str, optional): Device on which to generate data. If no device is given,
+            it will try to use the GPU.
     """
 
     def __init__(
         self,
+        kernel=stheno.EQ().stretch(0.25),
+        noise=5e-2,
+        seed=0,
         batch_size=16,
         num_tasks=2 ** 14,
         x_range=(-2, 2),
-        max_train_points=50,
-        max_test_points=50,
+        num_context_points=(1, 50),
+        num_target_points=50,
+        device=None,
     ):
+        self.kernel = kernel
+        self.noise = noise
+
         self.batch_size = batch_size
         self.num_tasks = num_tasks
         self.num_batches = num_tasks // batch_size
@@ -64,109 +50,70 @@ class DataGenerator(metaclass=abc.ABCMeta):
                 f"the batch size {batch_size}."
             )
         self.x_range = x_range
-        self.max_train_points = max_train_points
-        self.max_test_points = max_test_points
 
-    @abc.abstractmethod
-    def sample(self, x):
-        """Sample at inputs `x`.
+        # Ensure that `num_context_points` and `num_target_points` are tuples of lower
+        # bounds and upper bounds.
+        if not isinstance(num_context_points, tuple):
+            num_context_points = (num_context_points, num_context_points)
+        if not isinstance(num_target_points, tuple):
+            num_target_points = (num_target_points, num_target_points)
 
-        Args:
-            x (vector): Inputs to sample at.
+        self.num_context_points = num_context_points
+        self.num_target_points = num_target_points
 
-        Returns:
-            vector: Sample at inputs `x`.
-        """
+        if device is None:
+            if torch.cuda.is_available():
+                self.device = "cuda"
+            else:
+                self.device = "cpu"
+        else:
+            self.device = device
+
+        # The random state must be created on the right device.
+        with B.on_device(self.device):
+            self.state = B.create_random_state(torch.float32, seed)
 
     def generate_batch(self):
         """Generate a batch.
 
         Returns:
-            dict: A task, which is a dictionary with keys `x`, `y`, `x_context`,
-                `y_context`, `x_target`, and `y_target.
+            dict: A task, which is a dictionary with keys `x_context`, `y_context`,
+                `x_target`, and `y_target`.
         """
-        task = {
-            "x": [],
-            "y": [],
-            "x_context": [],
-            "y_context": [],
-            "x_target": [],
-            "y_target": [],
+        # Sample number of context and target points.
+        lower, upper = self.num_context_points
+        num_context_points = torch.randint(
+            lower, upper + 1, (), generator=self.state, device=self.device
+        )
+        lower, upper = self.num_target_points
+        num_target_points = torch.randint(
+            lower, upper + 1, (), generator=self.state, device=self.device
+        )
+
+        with B.on_device(self.device):
+            # Sample context and target set.
+            lower, upper = self.x_range
+            shape = (self.batch_size, int(num_context_points + num_target_points), 1)
+            self.state, rand = B.rand(self.state, torch.float32, *shape)
+            x = lower + rand * (upper - lower)
+            noise = B.to_active_device(self.noise)
+            self.state, y = stheno.GP(self.kernel)(x, noise).sample(self.state)
+
+        return {
+            "x_context": x[:, :num_context_points, :],
+            "y_context": y[:, :num_context_points, :],
+            "x_target": x[:, num_context_points:, :],
+            "y_target": y[:, num_context_points:, :],
         }
 
-        # Determine number of test and train points.
-        num_train_points = np.random.randint(3, self.max_train_points + 1)
-        num_test_points = self.max_test_points
-        num_points = num_train_points + num_test_points
-
-        for i in range(self.batch_size):
-            # Sample inputs and outputs.
-            lower, upper = self.x_range
-            x = lower + np.random.rand(num_points) * (upper - lower)
-            y = self.sample(x)
-
-            # Determine indices for train and test set.
-            inds = np.random.permutation(x.shape[0])
-            inds_train = sorted(inds[:num_train_points])
-            inds_test = sorted(inds[num_train_points:num_points])
-
-            # Record to task.
-            task["x"].append(np.sort(x))
-            task["y"].append(y[np.argsort(x)])
-            task["x_context"].append(x[inds_train])
-            task["y_context"].append(y[inds_train])
-            task["x_target"].append(x[inds_test])
-            task["y_target"].append(y[inds_test])
-
-        # Stack batch and convert to PyTorch.
-        task = {k: B.uprank(B.stack(*v, axis=0), rank=3) for k, v in task.items()}
-
-        return task
-
-    def epoch(self, device):
+    def epoch(self):
         """Construct a generator for an epoch.
-
-        Args:
-            device (device): Device.
 
         Returns:
             generator: Generator for an epoch.
         """
-        return LambdaIterator(lambda: self.generate_batch(device), self.num_batches)
 
-    def pregen_epoch(self):
-        # Distribute the batches over the CPUs.
-        num_cpus = multiprocessing.cpu_count()
-        num_batches_per_cpu = [self.num_batches // num_cpus] * (num_cpus - 1)
-        num_batches_per_cpu.append(self.num_batches - sum(num_batches_per_cpu))
+        def lazy_gen_batch():
+            return self.generate_batch()
 
-        # Perform the pregeneration.
-        with multiprocessing.Pool(processes=num_cpus) as pool:
-            args = [(self, num) for num in num_batches_per_cpu]
-            batches = sum(pool.starmap(_generate_batches, args), [])
-
-        return batches
-
-
-def _generate_batches(self, num_batches):
-    with threadpool_limits(limits=1, user_api="blas"):
-        return [self.generate_batch("cpu") for _ in range(num_batches)]
-
-
-class GPGenerator(DataGenerator):
-    """Generate samples from a GP with a given kernel.
-
-    Further takes in keyword arguments for :class:`.data.DataGenerator`.
-
-    Args:
-        kernel (:class:`stheno.Kernel`, optional): Kernel to sample from.
-            Defaults to an EQ kernel with length scale `0.25`.
-    """
-
-    def __init__(self, kernel=stheno.EQ().stretch(0.25), **kw_args):
-        self.kernel = kernel
-        DataGenerator.__init__(self, **kw_args)
-
-    def sample(self, x):
-        gp = stheno.GP(self.kernel)
-        return B.squeeze(gp(x).sample())
+        return (lazy_gen_batch() for _ in range(self.num_batches))
