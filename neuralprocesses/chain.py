@@ -1,11 +1,13 @@
-from . import _dispatch
 from matrix.util import indent
 
+from . import _dispatch
+from .util import abstract
 
-__all__ = ["Chain"]
+__all__ = ["AbstractChain"]
 
 
-class Chain:
+@abstract
+class AbstractChain:
     """A chain of links.
 
     Args:
@@ -26,16 +28,19 @@ class Chain:
     def __getitem__(self, item):
         return self.links[item]
 
+    def __str__(self):
+        return repr(self)
+
     def __repr__(self):
         return (
             "Chain(\n"
             + "".join([indent(repr(e).strip(), " " * 4) + ",\n" for e in self])
-            + ")\n"
+            + ")"
         )
 
 
 @_dispatch
-def code(chain: Chain, xz, z, x, **kw_args):
-    for link in chain.links:
+def code(chain: AbstractChain, xz, z, x, **kw_args):
+    for link in chain:
         xz, z = code(link, xz, z, x, **kw_args)
     return xz, z

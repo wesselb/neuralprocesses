@@ -2,13 +2,13 @@ import lab as B
 import matrix  # noqa
 
 from . import _dispatch
-from .parallel import Parallel
+from .util import abstract
 
-__all__ = ["InputsCoder", "DeepSet"]
+__all__ = ["InputsCoder", "AbstractDeepSet"]
 
 
 class InputsCoder:
-    pass
+    """Encode with the target inputs."""
 
 
 @_dispatch
@@ -16,7 +16,16 @@ def code(coder: InputsCoder, xz, z, x):
     return x, x
 
 
-class DeepSet:
+@abstract
+class AbstractDeepSet:
+    """Deep set.
+
+    Args:
+        phi (function): Pre-aggregation function.
+        rho (function): Post-aggregation function.
+        agg (function, optional): Aggregation function. Defaults to taking the mean.
+    """
+
     def __init__(
         self,
         phi,
@@ -29,7 +38,7 @@ class DeepSet:
 
 
 @_dispatch
-def code(coder: DeepSet, xz, z, x):
+def code(coder: AbstractDeepSet, xz, z, x):
     z = B.concat(xz, z, axis=1)
     z = coder.phi(z)
     z = coder.agg(z)  # This aggregates over the data dimension.

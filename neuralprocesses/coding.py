@@ -2,7 +2,7 @@ import lab as B
 import matrix  # noqa
 
 from . import _dispatch
-from .parallel import Parallel
+from .parallel import AbstractParallel
 
 __all__ = ["code", "Materialise"]
 
@@ -18,7 +18,7 @@ def _merge(z: B.Numeric):
 
 
 @_dispatch
-def _merge(zs: Parallel):
+def _merge(zs: AbstractParallel):
     return _merge(*zs)
 
 
@@ -42,7 +42,7 @@ def _repeat_concat(z: B.Numeric):
 
 
 @_dispatch
-def _repeat_concat(zs: Parallel):
+def _repeat_concat(zs: AbstractParallel):
     return _repeat_concat(*zs)
 
 

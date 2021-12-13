@@ -1,12 +1,14 @@
 import lab as B
-import torch
+from matrix.util import indent
 
 from .coding import code
+from .util import abstract
 
-__all__ = ["Model"]
+__all__ = ["AbstractModel"]
 
 
-class Model(torch.nn.Module):
+@abstract
+class AbstractModel:
     def __init__(self, encoder, decoder):
         self.encoder = encoder
         self.decoder = decoder
@@ -25,3 +27,21 @@ class Model(torch.nn.Module):
         xz, z = code(self.encoder, xc, yc, xt, **kw_args)
         _, d = code(self.decoder, xz, z, xt, **kw_args)
         return d
+
+    def __str__(self):
+        return (
+            f"Model(\n"
+            + indent(str(self.encoder), " " * 4)
+            + ",\n"
+            + indent(str(self.decoder), " " * 4)
+            + "\n)"
+        )
+
+    def __repr__(self):
+        return (
+            f"Model(\n"
+            + indent(repr(self.encoder), " " * 4)
+            + ",\n"
+            + indent(repr(self.decoder), " " * 4)
+            + "\n)"
+        )
