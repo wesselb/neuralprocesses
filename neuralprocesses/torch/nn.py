@@ -77,7 +77,7 @@ class Interface:
 
     @staticmethod
     def Parameter(x, dtype=None):
-        dtype = dtype or B.dtype(x)
+        dtype = dtype or torch.float32
         dtype = convert(dtype, B.TorchDType)
         if not isinstance(x, B.TorchNumeric):
             x = torch.tensor(x, dtype=dtype)

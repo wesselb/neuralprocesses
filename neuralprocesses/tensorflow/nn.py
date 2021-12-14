@@ -111,7 +111,7 @@ class Interface:
 
     @staticmethod
     def Parameter(x, dtype=None):
-        dtype = dtype or B.dtype(x)
+        dtype = dtype or tf.float32
         dtype = convert(dtype, B.TFDType)
         return tf.Variable(x, dtype=dtype)
 
