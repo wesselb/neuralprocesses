@@ -16,6 +16,7 @@ class MLP:
         dim_out: int,
         num_layers: int,
         nonlinearity=None,
+        dtype=None,
     ):
         # Default to ReLUs.
         if nonlinearity is None:
@@ -23,14 +24,14 @@ class MLP:
 
         # Build layers.
         if num_layers == 1:
-            layers = self.nn.Linear(dim_in, dim_out)
+            layers = self.nn.Linear(dim_in, dim_out, dtype=dtype)
         else:
-            layers = [self.nn.Linear(dim_in, dim_hidden)]
+            layers = [self.nn.Linear(dim_in, dim_hidden, dtype=dtype)]
             for _ in range(num_layers - 2):
                 layers.append(nonlinearity)
-                layers.append(self.nn.Linear(dim_hidden, dim_hidden))
+                layers.append(self.nn.Linear(dim_hidden, dim_hidden, dtype=dtype))
             layers.append(nonlinearity)
-            layers.append(self.nn.Linear(dim_hidden, dim_out))
+            layers.append(self.nn.Linear(dim_hidden, dim_out, dtype=dtype))
         self.net = self.nn.Sequential(*layers)
 
     def __call__(self, x):
@@ -48,6 +49,7 @@ class UNet:
         in_channels: int,
         out_channels: int,
         channels: Tuple[int, ...] = (8, 16, 16, 32, 32, 64),
+        dtype=None,
     ):
         self.activation = self.nn.ReLU()
         self.num_halving_layers = len(channels)
@@ -60,6 +62,7 @@ class UNet:
             in_channels=in_channels,
             out_channels=channels[0],
             kernel_size=1,
+            dtype=dtype,
         )
 
         # Final linear layer:
@@ -67,6 +70,7 @@ class UNet:
             in_channels=channels[0],
             out_channels=out_channels,
             kernel_size=1,
+            dtype=dtype,
         )
 
         # Before turn layers:
@@ -78,6 +82,7 @@ class UNet:
                     out_channels=channels[i],
                     kernel_size=kernel_size,
                     stride=2,
+                    dtype=dtype,
                 )
                 for i in range(len(channels))
             ]
@@ -101,6 +106,7 @@ class UNet:
                     kernel_size=kernel_size,
                     stride=2,
                     output_padding=1,
+                    dtype=dtype,
                 )
                 for i in range(len(channels))
             ]

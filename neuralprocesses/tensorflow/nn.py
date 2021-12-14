@@ -4,6 +4,7 @@ from typing import Optional
 import lab.tensorflow as B
 import numpy as np
 import tensorflow as tf
+from plum import convert
 
 from .. import _dispatch
 
@@ -40,6 +41,7 @@ def ConvNd(
     bias: bool = True,
     transposed: bool = False,
     output_padding: Optional[int] = None,
+    dtype=None,
 ):
     # Only set `output_padding` if it is given.
     additional_args = {}
@@ -68,12 +70,19 @@ def ConvNd(
         groups=groups,
         use_bias=bias,
         data_format=data_format,
+        dtype=dtype,
         **additional_args,
     )
     if data_format == "channels_first":
         return conv_layer
     else:
-        return tf.keras.Sequential([ChannelsToLast(), conv_layer, ChannelsToFirst()])
+        return tf.keras.Sequential(
+            [
+                ChannelsToLast(dtype=dtype),
+                conv_layer,
+                ChannelsToFirst(dtype=dtype),
+            ]
+        )
 
 
 class Interface:
@@ -89,8 +98,8 @@ class Interface:
         return list(x)
 
     @staticmethod
-    def Linear(dim_in, dim_out):
-        return tf.keras.layers.Dense(dim_out, input_shape=(None, dim_in))
+    def Linear(dim_in, dim_out, dtype=None):
+        return tf.keras.layers.Dense(dim_out, input_shape=(None, dim_in), dtype=dtype)
 
     Conv1d = partial(ConvNd, dim=1)
     Conv2d = partial(ConvNd, dim=2)
@@ -101,8 +110,10 @@ class Interface:
     ConvTransposed3d = partial(ConvNd, dim=3, transposed=True)
 
     @staticmethod
-    def Parameter(x):
-        return tf.Variable(x, dtype=tf.float32)
+    def Parameter(x, dtype=None):
+        dtype = dtype or B.dtype(x)
+        dtype = convert(dtype, B.TFDType)
+        return tf.Variable(x, dtype=dtype)
 
 
 interface = Interface()

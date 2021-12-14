@@ -11,6 +11,7 @@ def create_construct_cnp(ns):
         dim_embedding=64,
         num_enc_layers=6,
         num_dec_layers=6,
+        dtype=None,
     ):
         encoder = ns.Chain(
             ns.Parallel(
@@ -21,12 +22,14 @@ def create_construct_cnp(ns):
                         dim_hidden=dim_embedding,
                         dim_out=dim_embedding,
                         num_layers=num_enc_layers,
+                        dtype=dtype,
                     ),
                     ns.MLP(
                         dim_in=dim_embedding,
                         dim_hidden=dim_embedding,
                         dim_out=dim_embedding,
                         num_layers=num_enc_layers,
+                        dtype=dtype,
                     ),
                 ),
             ),
@@ -38,6 +41,7 @@ def create_construct_cnp(ns):
                 dim_hidden=dim_embedding,
                 dim_out=2 * dim_y,
                 num_layers=num_dec_layers,
+                dtype=dtype,
             ),
             ns.HeterogeneousGaussianLikelihood(),
         )

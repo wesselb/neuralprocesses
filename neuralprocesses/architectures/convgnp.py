@@ -1,5 +1,3 @@
-import numpy as np
-
 from ..util import register_model
 
 __all__ = ["create_construct_convgnp"]
@@ -14,6 +12,7 @@ def create_construct_convgnp(ns):
         margin=0.1,
         likelihood="het",
         num_basis_functions=64,
+        dtype=None,
     ):
         if likelihood == "het":
             unet_out_channels = 2 * dim_y
@@ -27,6 +26,7 @@ def create_construct_convgnp(ns):
             dim=dim_x,
             in_channels=dim_y + 1,
             out_channels=unet_out_channels,
+            dtype=dtype,
         )
         disc = ns.Discretisation(
             points_per_unit=points_per_unit,
@@ -36,12 +36,12 @@ def create_construct_convgnp(ns):
         )
         return ns.Model(
             ns.FunctionalCoder(
-                disc=disc,
-                coder=ns.SetConv(disc.points_per_unit, density_channel=True),
+                disc,
+                ns.SetConv(disc.points_per_unit, density_channel=True, dtype=dtype),
             ),
             ns.Chain(
                 unet,
-                ns.SetConv(disc.points_per_unit),
+                ns.SetConv(disc.points_per_unit, dtype=dtype),
                 likelihood,
             ),
         )

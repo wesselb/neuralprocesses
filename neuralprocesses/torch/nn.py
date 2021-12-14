@@ -1,9 +1,10 @@
 from functools import partial
 from typing import Optional
 
-import lab
+import lab.torch as B
 import numpy as np
 import torch
+from plum import convert
 
 from .. import _dispatch
 
@@ -26,6 +27,7 @@ def ConvNd(
     bias: bool = True,
     transposed: bool = False,
     output_padding: Optional[int] = None,
+    dtype=None,
 ):
     # Only set `output_padding` if it is given.
     additional_args = {}
@@ -51,6 +53,7 @@ def ConvNd(
         dilation=dilation,
         groups=groups,
         bias=bias,
+        dtype=dtype,
         **additional_args,
     )
 
@@ -73,9 +76,13 @@ class Interface:
     ConvTransposed3d = partial(ConvNd, dim=3, transposed=True)
 
     @staticmethod
-    def Parameter(x):
-        if not isinstance(x, lab.TorchNumeric):
-            x = torch.tensor(x)
+    def Parameter(x, dtype=None):
+        dtype = dtype or B.dtype(x)
+        dtype = convert(dtype, B.TorchDType)
+        if not isinstance(x, B.TorchNumeric):
+            x = torch.tensor(x, dtype=dtype)
+        else:
+            x = B.cast(dtype, x)
         return torch.nn.Parameter(x, requires_grad=True)
 
 

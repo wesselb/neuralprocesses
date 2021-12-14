@@ -10,8 +10,8 @@ __all__ = ["SetConv"]
 
 @register_module
 class SetConv:
-    def __init__(self, points_per_unit, density_channel=False):
-        self.log_scale = self.nn.Parameter(B.log(2 / points_per_unit))
+    def __init__(self, points_per_unit, density_channel=False, dtype=None):
+        self.log_scale = self.nn.Parameter(B.log(2 / points_per_unit), dtype=dtype)
         self.density_channel = density_channel
 
 

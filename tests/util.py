@@ -15,12 +15,18 @@ import neuralprocesses.tensorflow as nps_tf
 import neuralprocesses.torch as nps_torch
 
 nps_torch.dtype = torch.float32
+nps_torch.dtype32 = torch.float32
+nps_torch.dtype64 = torch.float64
 nps_tf.dtype = tf.float32
+nps_tf.dtype32 = tf.float32
+nps_tf.dtype64 = tf.float64
 
 
 @pytest.fixture(params=[nps_torch, nps_tf])
 def nps(request):
-    return request.param
+    nps = request.param
+    nps.dtype = nps.dtype32  # Reset data type to `float32`s.
+    return nps
 
 
 def generate_data(nps, batch_size=4, dim_x=1, dim_y=1, n_context=5, n_target=7):
