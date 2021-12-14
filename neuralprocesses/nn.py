@@ -71,15 +71,17 @@ class UNet:
 
         # Before turn layers:
         kernel_size = 5
-        self.before_turn_layers = self.nn.ModuleList([
-            Conv(
-                in_channels=channels[max(i - 1, 0)],
-                out_channels=channels[i],
-                kernel_size=kernel_size,
-                stride=2,
-            )
-            for i in range(len(channels))
-        ])
+        self.before_turn_layers = self.nn.ModuleList(
+            [
+                Conv(
+                    in_channels=channels[max(i - 1, 0)],
+                    out_channels=channels[i],
+                    kernel_size=kernel_size,
+                    stride=2,
+                )
+                for i in range(len(channels))
+            ]
+        )
 
         # After turn layers:
 
@@ -91,16 +93,18 @@ class UNet:
                 # Add the skip connection.
                 return 2 * channels[i]
 
-        self.after_turn_layers = self.nn.ModuleList([
-            ConvTranspose(
-                in_channels=get_num_in_channels(i),
-                out_channels=channels[max(i - 1, 0)],
-                kernel_size=kernel_size,
-                stride=2,
-                output_padding=1,
-            )
-            for i in range(len(channels))
-        ])
+        self.after_turn_layers = self.nn.ModuleList(
+            [
+                ConvTranspose(
+                    in_channels=get_num_in_channels(i),
+                    out_channels=channels[max(i - 1, 0)],
+                    kernel_size=kernel_size,
+                    stride=2,
+                    output_padding=1,
+                )
+                for i in range(len(channels))
+            ]
+        )
 
     def __call__(self, x):
         h = self.initial_linear(x)
