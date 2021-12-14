@@ -11,7 +11,7 @@ from .chain import *
 from .likelihood import *
 from .model import *
 from .setconv import *
-from .discretisation import *
+from .disc import *
 
 from .architectures import *
 

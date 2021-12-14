@@ -1,5 +1,6 @@
 import lab as B
 from plum import Dispatcher
+from lab.shape import unwrap_dimension
 
 from .dist import MultiOutputNormal
 
@@ -18,10 +19,7 @@ class HeterogeneousGaussianLikelihood:
         return "HeterogeneousGaussianLikelihood()"
 
     def __call__(self, z):
-        i = B.shape(z, 1)
-        if i % 2 != 0:
-            raise ValueError("Must give an even number of channels.")
-        dim_y = i // 2
+        dim_y = B.shape(z, 1) // 2
         return MultiOutputNormal.diagonal(
             z[:, :dim_y, :],
             B.softplus(z[:, dim_y:, :]),
@@ -39,20 +37,17 @@ class LowRankGaussianLikelihood:
     """
 
     @_dispatch
-    def __init__(self, rank: int):
+    def __init__(self, rank: B.Int):
         self.rank = rank
 
     def __str__(self):
         return repr(self)
 
     def __repr__(self):
-        return f"LowRankGaussianLikelihood({self.rank}])"
+        return f"LowRankGaussianLikelihood({self.rank})"
 
     def __call__(self, z):
-        i = B.shape(z, 1)
-        if i % (2 + self.rank) != 0:
-            raise ValueError("Must provide `(2 + rank) * dim_y` channels.")
-        dim_y = i // (2 + self.rank)
+        dim_y = B.shape(z, 1) // (2 + self.rank)
         return MultiOutputNormal.lowrank(
             z[:, :dim_y, :],
             B.softplus(z[:, dim_y : 2 * dim_y, :]),

@@ -25,7 +25,7 @@ class MultiOutputNormal:
     """
 
     @_dispatch
-    def __init__(self, normal: Normal, num_outputs: int):
+    def __init__(self, normal: Normal, num_outputs: B.Int):
         self.normal = normal
         self.num_outputs = num_outputs
 
