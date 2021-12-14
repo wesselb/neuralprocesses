@@ -2,6 +2,7 @@ import math
 
 import lab as B
 from lab.shape import Dimension
+from .util import register_module
 
 __all__ = ["AbstractDiscretisation", "Discretisation"]
 
@@ -10,6 +11,7 @@ class AbstractDiscretisation:
     pass
 
 
+@register_module
 class Discretisation(AbstractDiscretisation):
     def __init__(self, points_per_unit, multiple=1, margin=0.1, dim=None):
         self.points_per_unit = points_per_unit

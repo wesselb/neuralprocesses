@@ -1,13 +1,13 @@
 from matrix.util import indent
 
 from . import _dispatch
-from .util import abstract
+from .util import register_module
 
-__all__ = ["AbstractChain"]
+__all__ = ["Chain"]
 
 
-@abstract
-class AbstractChain:
+@register_module
+class Chain:
     """A chain of links.
 
     Args:
@@ -15,7 +15,10 @@ class AbstractChain:
     """
 
     def __init__(self, *links):
-        self.links = links
+        try:
+            self.links = self.nn.ModuleList(links)
+        except AttributeError:
+            self.links = links
 
     def __call__(self, x):
         for link in self.links:
@@ -40,7 +43,7 @@ class AbstractChain:
 
 
 @_dispatch
-def code(chain: AbstractChain, xz, z, x, **kw_args):
+def code(chain: Chain, xz, z, x, **kw_args):
     for link in chain:
         xz, z = code(link, xz, z, x, **kw_args)
     return xz, z

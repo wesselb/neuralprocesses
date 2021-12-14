@@ -1,27 +1,27 @@
 import lab as B
 
 __all__ = [
-    "abstract_modules",
-    "abstract",
-    "model_constructors",
+    "modules",
+    "register_module",
+    "models",
     "register_model",
     "batch_size",
     "feature_size",
 ]
 
-abstract_modules = []
+modules = []
 
 
-def abstract(module):
-    abstract_modules.append(module)
+def register_module(module):
+    modules.append(module)
     return module
 
 
-model_constructors = []
+models = []
 
 
 def register_model(model):
-    model_constructors.append(model)
+    models.append(model)
     return model
 
 

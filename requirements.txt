@@ -6,3 +6,6 @@ pytest
 pytest-cov
 coveralls
 black
+torch
+tensorflow
+tensorflow-probability

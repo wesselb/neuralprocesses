@@ -1,14 +1,15 @@
 import lab as B
 from plum import Dispatcher
-from lab.shape import unwrap_dimension
 
 from .dist import MultiOutputNormal
+from .util import register_module
 
 __all__ = ["HeterogeneousGaussianLikelihood", "LowRankGaussianLikelihood"]
 
 _dispatch = Dispatcher()
 
 
+@register_module
 class HeterogeneousGaussianLikelihood:
     """Gaussian likelihood with heterogeneous noise."""
 
@@ -26,6 +27,7 @@ class HeterogeneousGaussianLikelihood:
         )
 
 
+@register_module
 class LowRankGaussianLikelihood:
     """Gaussian likelihood with low-rank noise.
 

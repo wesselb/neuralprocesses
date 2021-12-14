@@ -2,9 +2,17 @@ from functools import partial
 from typing import Optional
 
 import lab
+import numpy as np
 import torch
 
-__all__ = ["Module"]
+from .. import _dispatch
+
+__all__ = ["num_params", "Module"]
+
+
+@_dispatch
+def num_params(x: torch.nn.Module):
+    return sum([int(np.prod(p.shape)) for p in x.parameters()])
 
 
 def ConvNd(
@@ -51,6 +59,8 @@ class Interface:
     ReLU = torch.nn.ReLU
 
     Sequential = torch.nn.Sequential
+
+    ModuleList = torch.nn.ModuleList
 
     Linear = torch.nn.Linear
 

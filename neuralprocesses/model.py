@@ -2,13 +2,13 @@ import lab as B
 from matrix.util import indent
 
 from .coding import code
-from .util import abstract
+from .util import register_module
 
-__all__ = ["AbstractModel"]
+__all__ = ["Model"]
 
 
-@abstract
-class AbstractModel:
+@register_module
+class Model:
     def __init__(self, encoder, decoder):
         self.encoder = encoder
         self.decoder = decoder

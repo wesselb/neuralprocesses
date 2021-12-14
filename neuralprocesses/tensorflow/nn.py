@@ -2,9 +2,17 @@ from functools import partial
 from typing import Optional
 
 import lab.tensorflow as B
+import numpy as np
 import tensorflow as tf
 
-__all__ = ["Module"]
+from .. import _dispatch
+
+__all__ = ["num_params", "Module"]
+
+
+@_dispatch
+def num_params(x: tf.keras.Model):
+    return sum([int(np.prod(p.shape)) for p in x.variables])
 
 
 class ChannelsToFirst(tf.keras.Model):
@@ -74,6 +82,11 @@ class Interface:
     @staticmethod
     def Sequential(*x):
         return tf.keras.Sequential(x)
+
+    @staticmethod
+    def ModuleList(x):
+        # TensorFlow tracks regular lists just fine.
+        return list(x)
 
     @staticmethod
     def Linear(dim_in, dim_out):

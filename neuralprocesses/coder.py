@@ -2,11 +2,12 @@ import lab as B
 import matrix  # noqa
 
 from . import _dispatch
-from .util import abstract
+from .util import register_module
 
-__all__ = ["InputsCoder", "AbstractFunctionalCoder", "AbstractDeepSet"]
+__all__ = ["InputsCoder", "FunctionalCoder", "DeepSet"]
 
 
+@register_module
 class InputsCoder:
     """Encode with the target inputs."""
 
@@ -16,8 +17,8 @@ def code(coder: InputsCoder, xz, z, x, **kw_args):
     return x, x
 
 
-@abstract
-class AbstractFunctionalCoder:
+@register_module
+class FunctionalCoder:
     """A coder that codes to a discretisation for a functional representation.
 
     Args:
@@ -31,13 +32,13 @@ class AbstractFunctionalCoder:
 
 
 @_dispatch
-def code(coder: AbstractFunctionalCoder, xz, z, x, **kw_args):
+def code(coder: FunctionalCoder, xz, z, x, **kw_args):
     x = coder.disc(xz, x, **kw_args)
     return code(coder.coder, xz, z, x, **kw_args)
 
 
-@abstract
-class AbstractDeepSet:
+@register_module
+class DeepSet:
     """Deep set.
 
     Args:
@@ -58,7 +59,7 @@ class AbstractDeepSet:
 
 
 @_dispatch
-def code(coder: AbstractDeepSet, xz, z, x):
+def code(coder: DeepSet, xz, z, x):
     z = B.concat(xz, z, axis=1)
     z = coder.phi(z)
     z = coder.agg(z)  # This aggregates over the data dimension.

@@ -2,13 +2,13 @@ from typing import Tuple
 
 import lab as B
 
-from .util import abstract
+from .util import register_module
 
-__all__ = ["AbstractMLP", "AbstractUNet"]
+__all__ = ["MLP", "UNet"]
 
 
-@abstract
-class AbstractMLP:
+@register_module
+class MLP:
     def __init__(
         self,
         dim_in: int,
@@ -40,8 +40,8 @@ class AbstractMLP:
         return x
 
 
-@abstract
-class AbstractUNet:
+@register_module
+class UNet:
     def __init__(
         self,
         dim: int,
@@ -71,7 +71,7 @@ class AbstractUNet:
 
         # Before turn layers:
         kernel_size = 5
-        self.before_turn_layers = [
+        self.before_turn_layers = self.nn.ModuleList([
             Conv(
                 in_channels=channels[max(i - 1, 0)],
                 out_channels=channels[i],
@@ -79,7 +79,7 @@ class AbstractUNet:
                 stride=2,
             )
             for i in range(len(channels))
-        ]
+        ])
 
         # After turn layers:
 
@@ -91,7 +91,7 @@ class AbstractUNet:
                 # Add the skip connection.
                 return 2 * channels[i]
 
-        self.after_turn_layers = [
+        self.after_turn_layers = self.nn.ModuleList([
             ConvTranspose(
                 in_channels=get_num_in_channels(i),
                 out_channels=channels[max(i - 1, 0)],
@@ -100,7 +100,7 @@ class AbstractUNet:
                 output_padding=1,
             )
             for i in range(len(channels))
-        ]
+        ])
 
     def __call__(self, x):
         h = self.initial_linear(x)

@@ -2,10 +2,10 @@ from setuptools import find_packages, setup
 
 requirements = [
     "numpy>=1.16",
-    "torch",
     "backends>=1.4.14",
-    "stheno>=1",
     "plum-dispatch>=1",
+    "stheno>=1.3.1",
+    "wbml",
 ]
 
 setup(

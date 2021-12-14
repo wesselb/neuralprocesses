@@ -30,6 +30,7 @@ pip install neuralprocesses
 ```python
 import lab as B
 import tensorflow as tf
+
 import neuralprocesses.tensorflow as nps
 
 cnp = nps.construct_cnp(dim_x=2, dim_y=3)
@@ -70,6 +71,7 @@ print(dist.entropy())
 ```python
 import lab as B
 import torch
+
 import neuralprocesses.torch as nps
 
 cnp = nps.construct_cnp(dim_x=2, dim_y=3)
@@ -88,6 +90,7 @@ print(dist.entropy())
 ```python
 import lab as B
 import torch
+
 import neuralprocesses.torch as nps
 
 cnp = nps.construct_convgnp(dim_x=2, dim_y=3, likelihood="lowrank")

@@ -2,13 +2,13 @@ import lab as B
 from matrix.util import indent
 
 from . import _dispatch
-from .util import abstract
+from .util import register_module
 
-__all__ = ["AbstractParallel"]
+__all__ = ["Parallel"]
 
 
-@abstract
-class AbstractParallel:
+@register_module
+class Parallel:
     """A parallel of elements.
 
     Args:
@@ -16,10 +16,13 @@ class AbstractParallel:
     """
 
     def __init__(self, *elements):
-        self.elements = elements
+        try:
+            self.elements = self.nn.ModuleList(elements)
+        except AttributeError:
+            self.elements = elements
 
     def __call__(self, x):
-        return AbstractParallel(*(e(x) for e in self.elements))
+        return Parallel(*(e(x) for e in self.elements))
 
     def __iter__(self):
         return iter(self.elements)
@@ -39,36 +42,18 @@ class AbstractParallel:
 
 
 @_dispatch
-def code(
-    p: AbstractParallel,
-    xz: B.Numeric,
-    z: B.Numeric,
-    x: B.Numeric,
-    **kw_args,
-):
+def code(p: Parallel, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
     xz, z = zip(*[code(pi, xz, z, x, **kw_args) for pi in p])
-    return AbstractParallel(*xz), AbstractParallel(*z)
+    return Parallel(*xz), Parallel(*z)
 
 
 @_dispatch
-def code(
-    p: AbstractParallel,
-    xz: B.Numeric,
-    z: AbstractParallel,
-    x: B.Numeric,
-    **kw_args,
-):
+def code(p: Parallel, xz: B.Numeric, z: Parallel, x: B.Numeric, **kw_args):
     xz, z = zip(*[code(pi, xz, zi, x, **kw_args) for (pi, zi) in zip(p, z)])
-    return AbstractParallel(*xz), AbstractParallel(*z)
+    return Parallel(*xz), Parallel(*z)
 
 
 @_dispatch
-def code(
-    p: AbstractParallel,
-    xz: AbstractParallel,
-    z: AbstractParallel,
-    x: B.Numeric,
-    **kw_args,
-):
+def code(p: Parallel, xz: Parallel, z: Parallel, x: B.Numeric, **kw_args):
     xz, z = zip(*[code(pi, xzi, zi, x, **kw_args) for (pi, xzi, zi) in zip(p, xz, z)])
-    return AbstractParallel(*xz), AbstractParallel(*z)
+    return Parallel(*xz), Parallel(*z)

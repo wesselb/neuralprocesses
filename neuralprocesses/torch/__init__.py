@@ -1,8 +1,8 @@
 import lab.torch  # noqa
 
-from .nn import Module
+from .nn import *
 from .. import *  # noqa
-from ..util import abstract_modules, model_constructors
+from ..util import modules, models
 
 
 def create_init(module):
@@ -20,8 +20,8 @@ def create_forward(Module):
     return forward
 
 
-for module in abstract_modules:
-    name = module.__name__[len("Abstract") :]
+for module in modules:
+    name = module.__name__
     globals()[name] = type(
         name,
         (module, Module),
@@ -36,6 +36,6 @@ class Namespace:
 ns = Namespace()
 ns.__dict__.update(globals())
 
-for model in model_constructors:
+for model in models:
     name = "_".join(model.__name__.split("_")[1:])
     globals()[name] = model(ns)

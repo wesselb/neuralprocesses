@@ -3,20 +3,20 @@ from string import ascii_lowercase as letters
 import lab as B
 
 from . import _dispatch
-from .util import abstract
+from .util import register_module
 
-__all__ = ["AbstractSetConv"]
+__all__ = ["SetConv"]
 
 
-@abstract
-class AbstractSetConv:
+@register_module
+class SetConv:
     def __init__(self, points_per_unit, density_channel=False):
         self.log_scale = self.nn.Parameter(B.log(2 / points_per_unit))
         self.density_channel = density_channel
 
 
 @_dispatch
-def code(encoder: AbstractSetConv, xz, z, x):
+def code(encoder: SetConv, xz, z, x):
     # Prepend density channel.
     if encoder.density_channel:
         with B.on_device(z):
@@ -40,12 +40,12 @@ def compute_weights(encoder, x1, x2):
 
 
 @_dispatch
-def smooth(encoder: AbstractSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric):
+def smooth(encoder: SetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric):
     return B.matmul(z, compute_weights(encoder, xz, x))
 
 
 @_dispatch
-def smooth(encoder: AbstractSetConv, xz: B.Numeric, z: B.Numeric, x: tuple):
+def smooth(encoder: SetConv, xz: B.Numeric, z: B.Numeric, x: tuple):
     ws = [compute_weights(encoder, xz[:, i : i + 1, :], xi) for i, xi in enumerate(x)]
     letters_i = 3
     base = "abc"
@@ -59,7 +59,7 @@ def smooth(encoder: AbstractSetConv, xz: B.Numeric, z: B.Numeric, x: tuple):
 
 
 @_dispatch
-def smooth(encoder: AbstractSetConv, xz: tuple, z: B.Numeric, x: B.Numeric):
+def smooth(encoder: SetConv, xz: tuple, z: B.Numeric, x: B.Numeric):
     ws = [compute_weights(encoder, xzi, x[:, i : i + 1, :]) for i, xzi in enumerate(xz)]
     letters_i = 3
     base_base = "ab"

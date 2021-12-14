@@ -2,7 +2,8 @@ import lab as B
 import matrix  # noqa
 
 from . import _dispatch
-from .parallel import AbstractParallel
+from .parallel import Parallel
+from .util import register_module
 
 __all__ = ["code", "Materialise"]
 
@@ -18,7 +19,7 @@ def _merge(z: B.Numeric):
 
 
 @_dispatch
-def _merge(zs: AbstractParallel):
+def _merge(zs: Parallel):
     return _merge(*zs)
 
 
@@ -42,7 +43,7 @@ def _repeat_concat(z: B.Numeric):
 
 
 @_dispatch
-def _repeat_concat(zs: AbstractParallel):
+def _repeat_concat(zs: Parallel):
     return _repeat_concat(*zs)
 
 
@@ -59,6 +60,7 @@ def _repeat_concat(z0: B.Numeric, *zs: B.Numeric):
     return B.concat(*zs, axis=1)
 
 
+@register_module
 class Materialise:
     def __init__(self, agg_x=_merge, agg_y=_repeat_concat, broadcast_y=True):
         self.agg_x = agg_x
