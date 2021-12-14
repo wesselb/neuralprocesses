@@ -24,12 +24,15 @@ pip install neuralprocesses
 ## Example
 
 ### TensorFlow
+
+#### CNP
+
 ```python
 import lab as B
 import tensorflow as tf
-import neuralprocesses.tensorflow as nps_tf
+import neuralprocesses.tensorflow as nps
 
-cnp = nps_tf.construct_cnp(dim_x=2, dim_y=3)
+cnp = nps.construct_cnp(dim_x=2, dim_y=3)
 dist = cnp(
     B.randn(tf.float32, 16, 2, 10),
     B.randn(tf.float32, 16, 3, 10),
@@ -39,14 +42,35 @@ print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
 print(dist.kl(dist))
 ```
 
+#### ConvGNP
+
+```python
+import lab as B
+import tensorflow as tf
+
+import neuralprocesses.tensorflow as nps
+
+cnp = nps.construct_convcnp1d(dim_y=2, likelihood="lowrank")
+
+dist = cnp(
+    B.randn(tf.float32, 16, 1, 10),
+    B.randn(tf.float32, 16, 2, 10),
+    B.randn(tf.float32, 16, 1, 15),
+)
+print(dist.logpdf(B.randn(tf.float32, 16, 2, 15)))
+print(dist.kl(dist))
+```
+
 ### PyTorch
+
+#### CNP
 
 ```python
 import lab as B
 import torch
-import neuralprocesses.torch as nps_torch
+import neuralprocesses.torch as nps
 
-cnp = nps_torch.construct_cnp(dim_x=2, dim_y=3)
+cnp = nps.construct_cnp(dim_x=2, dim_y=3)
 dist = cnp(
     B.randn(torch.float32, 16, 2, 10),
     B.randn(torch.float32, 16, 3, 10),

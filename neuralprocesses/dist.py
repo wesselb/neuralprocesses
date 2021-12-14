@@ -37,12 +37,9 @@ class MultiOutputNormal:
             mean (tensor): Mean of shape `(b, c, n)`.
             var (tensor): Variance of shape `(b, c, n, c, n)`.
         """
-        c, n = B.shape_matrix(mean)
+        b, c, n = B.shape_matrix(mean)
         return cls(
-            Normal(
-                B.reshape(mean, *B.shape_batch(mean), c * n, -1),
-                B.reshape(var, *B.shape(var)[:-4], c * n, c * n),
-            ),
+            Normal(B.reshape(mean, b, c * n, -1), B.reshape(var, b, c * n, c * n)),
             c,
         )
 
@@ -54,11 +51,11 @@ class MultiOutputNormal:
             mean (tensor): Mean of shape `(b, c, n)`.
             var (tensor): Marginal variances of shape `(b, c, n)`.
         """
-        c, n = B.shape_matrix(mean)
+        b, c, n = B.shape(mean)
         return cls(
             Normal(
-                B.reshape(mean, *B.shape_batch(mean), c * n, -1),
-                Diagonal(B.reshape(var, *B.shape_batch(var), c * n)),
+                B.reshape(mean, b, c * n, -1),
+                Diagonal(B.reshape(var, b, c * n)),
             ),
             c,
         )
@@ -72,15 +69,17 @@ class MultiOutputNormal:
             var_diag (tensor): Diagonal part of the low-rank variance of shape
                 `(b, c, n)`.
             var_factor (tensor): Factors of the low-rank variance of shape
-                `(b, c, num_factors, n)`.
+                `(b, c * num_factors, n)`.
         """
-        c, n = B.shape_matrix(mean)
-        f = B.shape(var_factor, -2)
+        b, c, n = B.shape(mean)
+        # Separate out factor channels.
+        var_factor = B.reshape(var_factor, b, c, -1, n)
+        var_factor = B.transpose(var_factor)
         return cls(
             Normal(
-                B.reshape(mean, *B.shape_batch(mean), c * n, -1),
-                Diagonal(B.reshape(var_diag, *B.shape_batch(var_diag), c * n))
-                + LowRank(B.reshape(var_factor, *B.shape(var_factor)[:-3], c * n, f)),
+                B.reshape(mean, b, c * n, -1),
+                Diagonal(B.reshape(var_diag, b, c * n))
+                + LowRank(B.reshape(var_factor, b, c * n, -1)),
             ),
             c,
         )

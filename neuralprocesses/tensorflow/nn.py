@@ -87,6 +87,10 @@ class Interface:
     ConvTransposed2d = partial(ConvNd, dim=2, transposed=True)
     ConvTransposed3d = partial(ConvNd, dim=3, transposed=True)
 
+    @staticmethod
+    def Parameter(x):
+        return tf.Variable(x, dtype=tf.float32)
+
 
 interface = Interface()
 

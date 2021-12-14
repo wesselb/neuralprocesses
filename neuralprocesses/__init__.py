@@ -1,5 +1,3 @@
-# noinspection PyUnresolvedReferences
-import lab.torch  # Load PyTorch extension.
 import plum
 
 _dispatch = plum.Dispatcher()
@@ -12,6 +10,8 @@ from .parallel import *
 from .chain import *
 from .likelihood import *
 from .model import *
+from .setconv import *
+from .discretisation import *
 
 from .architectures import *
 

@@ -4,7 +4,7 @@ import matrix  # noqa
 from . import _dispatch
 from .util import abstract
 
-__all__ = ["InputsCoder", "AbstractDeepSet"]
+__all__ = ["InputsCoder", "AbstractFunctionalCoder", "AbstractDeepSet"]
 
 
 class InputsCoder:
@@ -12,8 +12,28 @@ class InputsCoder:
 
 
 @_dispatch
-def code(coder: InputsCoder, xz, z, x):
+def code(coder: InputsCoder, xz, z, x, **kw_args):
     return x, x
+
+
+@abstract
+class AbstractFunctionalCoder:
+    """A coder that codes to a discretisation for a functional representation.
+
+    Args:
+        disc (:class:`.discretisation.AbstractDiscretisation`): Discretisation.
+        coder (coder): Coder.
+    """
+
+    def __init__(self, disc, coder):
+        self.disc = disc
+        self.coder = coder
+
+
+@_dispatch
+def code(coder: AbstractFunctionalCoder, xz, z, x, **kw_args):
+    x = coder.disc(xz, x, **kw_args)
+    return code(coder.coder, xz, z, x, **kw_args)
 
 
 @abstract

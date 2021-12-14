@@ -1,11 +1,15 @@
 import math
 
-import lab.torch as B
+import lab as B
 
-__all__ = ["Discretisation1d"]
+__all__ = ["AbstractDiscretisation", "Discretisation1d"]
 
 
-class Discretisation1d:
+class AbstractDiscretisation:
+    pass
+
+
+class Discretisation1d(AbstractDiscretisation):
     def __init__(self, points_per_unit, multiple, margin):
         self.points_per_unit = points_per_unit
         self.resolution = 1 / self.points_per_unit
@@ -32,9 +36,19 @@ class Discretisation1d:
         grid_start = round(grid_start / self.resolution) * self.resolution
 
         # Produce the grid.
-        return B.linspace(
-            B.dtype(args[0]),
-            grid_start,
-            grid_start + (n - 1) * self.resolution,
-            n,
+        batch = B.shape(args[0], 0)
+        return B.tile(
+            B.expand_dims(
+                B.linspace(
+                    B.dtype(args[0]),
+                    grid_start,
+                    grid_start + (n - 1) * self.resolution,
+                    n,
+                ),
+                axis=0,
+                times=2,
+            ),
+            batch,
+            1,
+            1,
         )

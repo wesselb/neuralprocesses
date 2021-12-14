@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Optional
 
+import lab
 import torch
 
 __all__ = ["Module"]
@@ -60,6 +61,12 @@ class Interface:
     ConvTransposed1d = partial(ConvNd, dim=1, transposed=True)
     ConvTransposed2d = partial(ConvNd, dim=2, transposed=True)
     ConvTransposed3d = partial(ConvNd, dim=3, transposed=True)
+
+    @staticmethod
+    def Parameter(x):
+        if not isinstance(x, lab.TorchNumeric):
+            x = torch.tensor(x)
+        return torch.nn.Parameter(x, requires_grad=True)
 
 
 interface = Interface()
