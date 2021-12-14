@@ -144,3 +144,11 @@ class MultiOutputNormal:
             tensor: KL-divergences `kl(self, other)` of shape `(b,)`.
         """
         return self.normal.kl(other.normal)
+
+    def entropy(self):
+        """Compute entropy.
+
+        Returns:
+            tensor: Entropies of shape `(b,)`.
+        """
+        return self.normal.entropy()

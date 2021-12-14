@@ -40,6 +40,7 @@ dist = cnp(
 )
 print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
 print(dist.kl(dist))
+print(dist.entropy())
 ```
 
 #### ConvGNP
@@ -59,6 +60,7 @@ dist = cnp(
 )
 print(dist.logpdf(B.randn(tf.float32, 16, 2, 15)))
 print(dist.kl(dist))
+print(dist.entropy())
 ```
 
 ### PyTorch
@@ -78,4 +80,23 @@ dist = cnp(
 )
 print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
 print(dist.kl(dist))
+print(dist.entropy())
+```
+
+#### ConvGNP
+
+```python
+import lab as B
+import torch
+import neuralprocesses.torch as nps
+
+cnp = nps.construct_convcnp1d(dim_y=2, likelihood="lowrank")
+dist = cnp(
+    B.randn(torch.float32, 16, 1, 10),
+    B.randn(torch.float32, 16, 2, 10),
+    B.randn(torch.float32, 16, 1, 15),
+)
+print(dist.logpdf(B.randn(torch.float32, 16, 2, 15)))
+print(dist.kl(dist))
+print(dist.entropy())
 ```
