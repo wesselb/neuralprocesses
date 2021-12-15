@@ -17,6 +17,7 @@ def create_construct_convgnp(ns):
     ):
         unet_out_channels, likelihood = construct_likelihood(
             ns,
+            ns,
             spec=likelihood,
             dim_y=dim_y,
             num_basis_functions=num_basis_functions,
