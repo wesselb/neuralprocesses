@@ -96,6 +96,19 @@ class MultiOutputNormal:
             + indented_kv("normal", str(self.normal), suffix=">")
         )
 
+    def _unreshape(self, x):
+        return B.reshape(x, *B.shape(x)[:-1], self.num_outputs, -1)
+
+    @property
+    def mean(self):
+        """tensor: Marginal means."""
+        return self._unreshape(self.normal.mean[..., 0])
+
+    @property
+    def var(self):
+        """tensor: Marginal variances."""
+        return self._unreshape(B.diag(self.normal.var))
+
     def logpdf(self, x):
         """Compute the log-pdf at inputs `x`.
 
@@ -126,8 +139,8 @@ class MultiOutputNormal:
         else:
             state = None
         # Reshape sample to have the right size.
-        res = B.transpose(res)
-        res = B.reshape(res, *B.shape(res)[:-1], self.num_outputs, -1)
+        res = B.transpose(res)  # Put the sample dimension second to last.
+        res = self._unreshape(res)
         # Also return random state in case it was separated off.
         if state is not None:
             return state, res

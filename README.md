@@ -42,6 +42,8 @@ dist = cnp(
 print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
 print(dist.kl(dist))
 print(dist.entropy())
+print(dist.mean)
+print(dist.var)
 ```
 
 #### ConvGNP
@@ -59,6 +61,8 @@ dist = cnp(
     B.randn(tf.float32, 16, 3, 10),
     B.randn(tf.float32, 16, 2, 15),
 )
+mean, var = dist.mean, dist.var
+
 print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
 print(dist.kl(dist))
 print(dist.entropy())
@@ -80,6 +84,8 @@ dist = cnp(
     B.randn(torch.float32, 16, 3, 10),
     B.randn(torch.float32, 16, 2, 15),
 )
+mean, var = dist.mean, dist.var
+
 print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
 print(dist.kl(dist))
 print(dist.entropy())
@@ -99,6 +105,8 @@ dist = cnp(
     B.randn(torch.float32, 16, 3, 10),
     B.randn(torch.float32, 16, 2, 15),
 )
+mean, var = dist.mean, dist.var
+
 print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
 print(dist.kl(dist))
 print(dist.entropy())
