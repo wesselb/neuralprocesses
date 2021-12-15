@@ -82,7 +82,7 @@ class GPGenerator:
         self.num_context_points = num_context_points
         self.num_target_points = num_target_points
 
-        self.pred_logpdf = False
+        self.pred_logpdf = pred_logpdf
 
     def generate_batch(self):
         """Generate a batch.
