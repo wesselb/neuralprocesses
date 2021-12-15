@@ -14,11 +14,11 @@ def create_init(module):
 
 
 def create_call(module):
-    def call(self, x, training=False):
+    def call(self, *args, training=False, **kw_args):
         try:
-            return module.__call__(self, x, training=training)
+            return module.__call__(self, *args, training=training, **kw_args)
         except TypeError:
-            return module.__call__(self, x)
+            return module.__call__(self, *args, **kw_args)
 
     return call
 
