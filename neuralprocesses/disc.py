@@ -1,7 +1,6 @@
-import math
-
 import lab as B
 from lab.shape import Dimension
+
 from .util import register_module
 
 __all__ = ["AbstractDiscretisation", "Discretisation"]

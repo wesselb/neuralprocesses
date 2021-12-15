@@ -32,7 +32,7 @@ def _merge(z0: B.Numeric, *zs: B.Numeric):
         raise ValueError("No inputs specified.")
     elif len(zs) > 1:
         diffs = sum([B.mean(B.abs(zs[0] - z)) for z in zs[1:]])
-        if B.to_numpy(diffs) > B.epsilon:
+        if B.jit_to_numpy(diffs) > B.epsilon:
             raise ValueError("Cannot merge inputs.")
     return zs[0]
 
