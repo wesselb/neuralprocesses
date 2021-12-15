@@ -1,2 +1,2 @@
-from .cnp import *
+from .gnp import *
 from .convgnp import *

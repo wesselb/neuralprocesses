@@ -25,7 +25,7 @@ pip install neuralprocesses
 
 ### TensorFlow
 
-#### CNP
+#### GNP
 
 ```python
 import lab as B
@@ -33,7 +33,7 @@ import tensorflow as tf
 
 import neuralprocesses.tensorflow as nps
 
-cnp = nps.construct_cnp(dim_x=2, dim_y=3)
+cnp = nps.construct_gnp(dim_x=2, dim_y=3, likelihood="lowrank")
 dist = cnp(
     B.randn(tf.float32, 16, 2, 10),
     B.randn(tf.float32, 16, 3, 10),
@@ -70,7 +70,7 @@ print(dist.entropy())
 
 ### PyTorch
 
-#### CNP
+#### GNP
 
 ```python
 import lab as B
@@ -78,7 +78,7 @@ import torch
 
 import neuralprocesses.torch as nps
 
-cnp = nps.construct_cnp(dim_x=2, dim_y=3)
+cnp = nps.construct_gnp(dim_x=2, dim_y=3, likelihood="lowrank")
 dist = cnp(
     B.randn(torch.float32, 16, 2, 10),
     B.randn(torch.float32, 16, 3, 10),

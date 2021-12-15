@@ -19,7 +19,7 @@ from .util import nps, generate_data  # noqa
 )
 def test_architectures(nps, float64, construct_name, kw_args):
     if float64:
-        nps.dtype = nps.dtype64
+        nps.dtype = nps.float64
     model = getattr(nps, construct_name)(**kw_args, dtype=nps.dtype)
     xc, yc, xt, yt = generate_data(nps, dim_x=kw_args["dim_x"], dim_y=kw_args["dim_y"])
     pred = model(xc, yc, xt)

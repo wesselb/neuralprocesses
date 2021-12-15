@@ -1,3 +1,4 @@
+from .lik import construct_likelihood
 from ..util import register_model
 
 __all__ = ["create_construct_convgnp"]
@@ -14,14 +15,13 @@ def create_construct_convgnp(ns):
         num_basis_functions=64,
         dtype=None,
     ):
-        if likelihood == "het":
-            unet_out_channels = 2 * dim_y
-            likelihood = ns.HeterogeneousGaussianLikelihood()
-        elif likelihood == "lowrank":
-            unet_out_channels = (2 + num_basis_functions) * dim_y
-            likelihood = ns.LowRankGaussianLikelihood(num_basis_functions)
-        else:
-            raise ValueError(f'Incorrect likelihood "{likelihood}".')
+        unet_out_channels, likelihood = construct_likelihood(
+            ns,
+            ns,
+            spec=likelihood,
+            dim_y=dim_y,
+            num_basis_functions=num_basis_functions,
+        )
         unet = ns.UNet(
             dim=dim_x,
             in_channels=dim_y + 1,
@@ -39,11 +39,7 @@ def create_construct_convgnp(ns):
                 disc,
                 ns.SetConv(disc.points_per_unit, density_channel=True, dtype=dtype),
             ),
-            ns.Chain(
-                unet,
-                ns.SetConv(disc.points_per_unit, dtype=dtype),
-                likelihood,
-            ),
+            ns.Chain(unet, ns.SetConv(disc.points_per_unit, dtype=dtype), likelihood),
         )
 
     return construct_convgnp
