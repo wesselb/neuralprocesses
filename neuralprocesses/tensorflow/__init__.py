@@ -1,4 +1,5 @@
 import lab.tensorflow  # noqa
+from plum import convert
 
 from .nn import *
 from .. import *  # noqa
@@ -13,12 +14,13 @@ def create_init(module):
     return __init__
 
 
-def create_call(module):
-    def call(self, *args, training=False, **kw_args):
+def create_tf_call(module):
+    def call(self, x, training=False):
+        args = convert(x, tuple)  # Deal with multiple arguments passed as a tuple.
         try:
-            return module.__call__(self, *args, training=training, **kw_args)
+            return module.__call__(self, *args, training=training)
         except TypeError:
-            return module.__call__(self, *args, **kw_args)
+            return module.__call__(self, *args)
 
     return call
 
@@ -30,7 +32,7 @@ for module in modules:
         (module, Module),
         {
             "__init__": create_init(module),
-            "call": create_call(module),
+            "call": create_tf_call(module),
         },
     )
 
