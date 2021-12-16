@@ -4,7 +4,7 @@ requirements = [
     "numpy>=1.16",
     "backends>=1.4.17",
     "plum-dispatch>=1",
-    "stheno>=1.3.1",
+    "stheno>=1.3.2",
     "wbml",
 ]
 
