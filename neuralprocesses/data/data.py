@@ -1,4 +1,5 @@
 import lab as B
+import matrix
 import numpy as np
 import stheno
 
@@ -26,8 +27,10 @@ class GPGenerator:
         num_target_points (int or tuple[int, int], optional): A fixed number of target
             points or a lower and upper bound. Defaults to the fixed number `50`.
         pred_logpdf (bool, optional): Also compute the logpdf of the target set given
-            the context set. Defaults to `True`.
-        device (str, optional): Device on which to generate data. Defaults to `"cpu"`.
+            the context set under the true GP. Defaults to `True`.
+        pred_logpdf_diag (bool, optional): Also compute the logpdf of the target set
+            given the context set under the true diagonalised GP. Defaults to `True`.
+        device (str, optional): Device on which to generate data. Defaults to `cpu`.
     """
 
     def __init__(
@@ -42,6 +45,7 @@ class GPGenerator:
         num_context_points=(1, 50),
         num_target_points=50,
         pred_logpdf=True,
+        pred_logpdf_diag=True,
         device="cpu",
     ):
         self.dtype = dtype
@@ -83,13 +87,14 @@ class GPGenerator:
         self.num_target_points = num_target_points
 
         self.pred_logpdf = pred_logpdf
+        self.pred_logpdf_diag = pred_logpdf_diag
 
     def generate_batch(self):
         """Generate a batch.
 
         Returns:
-            dict: A task, which is a dictionary with keys `x_context`, `y_context`,
-                `x_target`, and `y_target`.
+            dict: A task, which is a dictionary with keys `xc`, `yc`, `xt`, and `yt`.
+                Also possibly contains the keys `pred_logpdf` and `pred_logpdf_diag`.
         """
         with B.on_device(self.device):
             batch = {}
@@ -127,9 +132,15 @@ class GPGenerator:
             xt = x[:, num_context_points:, :]
             yt = x[:, num_context_points:, :]
 
-            if self.pred_logpdf:
+            # Compute predictive logpdfs.
+            if self.pred_logpdf or self.pred_logpdf_diag:
                 f_post = f | (f(xc, noise), yc)
-                batch["pred_logpdf"] = f_post(xt, noise).logpdf(yt)
+                fdd = f_post(xt, noise)
+            if self.pred_logpdf:
+                batch["pred_logpdf"] = fdd.logpdf(yt)
+            if self.pred_logpdf_diag:
+                fdd_diag = stheno.Normal(fdd.mean, matrix.Diagonal(B.diag(fdd.var)))
+                batch["pred_logpdf_diag"] = fdd_diag.logpdf(yt)
 
             # Put the data dimension last and convert to the right data type.
             batch["xc"] = B.cast(self.dtype, B.transpose(xc))
