@@ -22,8 +22,8 @@ class GPGenerator:
             range corresponds to a dimension of the input, which means that the number
             of ranges determine the dimensionality of the input. Defaults to
             `((-2, 2),)`.
-        y_dim (int, optional): Dimensionality of the outputs. Defaults to `1`.
-        y_latent_dim (int, optional): If `y_dim > 1`, this specifies the number of
+        dim_y (int, optional): Dimensionality of the outputs. Defaults to `1`.
+        dim_y_latent (int, optional): If `y_dim > 1`, this specifies the number of
             latent processes. Defaults to `y_dim`.
         num_context_points (int or tuple[int, int], optional): A fixed number of context
             points or a lower and upper bound. Defaults to the range `(1, 50)`.
@@ -45,8 +45,8 @@ class GPGenerator:
         batch_size=16,
         num_tasks=2 ** 14,
         x_ranges=((-2, 2),),
-        y_dim=1,
-        y_latent_dim=None,
+        dim_y=1,
+        dim_y_latent=None,
         num_context_points=(1, 50),
         num_target_points=50,
         pred_logpdf=True,
@@ -75,14 +75,14 @@ class GPGenerator:
                 f"the batch size {batch_size}."
             )
 
-        self.x_dim = len(x_ranges)
+        self.dim_x = len(x_ranges)
         # Contruct tensors for the bounds on the input range. These must be `flaot64`s.
         with B.on_device(self.device):
             lower = B.stack(*(B.cast(self.float64, l) for l, _ in x_ranges))[None, :]
             upper = B.stack(*(B.cast(self.float64, u) for _, u in x_ranges))[None, :]
             self.x_ranges = B.to_active_device(lower), B.to_active_device(upper)
-        self.y_dim = y_dim
-        self.y_latent_dim = y_latent_dim or y_dim
+        self.dim_y = dim_y
+        self.dim_y_latent = dim_y_latent or dim_y
 
         # Ensure that `num_context_points` and `num_target_points` are tuples of lower
         # bounds and upper bounds.
@@ -121,7 +121,7 @@ class GPGenerator:
                 self.float64,
                 self.batch_size,
                 int(num_context_points + num_target_points),
-                self.x_dim,
+                self.dim_x,
             )
             lower, upper = self.x_ranges
             x = lower + rand * (upper - lower)
@@ -130,19 +130,20 @@ class GPGenerator:
             # because Python scalars will not be interpreted as tensors and hence will
             # not be moved to the GPU.
             noise = B.to_active_device(B.cast(self.float64, self.noise))
-            # If `self.y_dim > 1`, then we create a multi-output GP.
-            if self.y_dim == 1:
+            # If `self.y_dim > 1`, then we create a multi-output GP. Otherwise, we
+            # use a simple regular GP.
+            if self.dim_y == 1:
                 f = stheno.GP(self.kernel)
             else:
                 with stheno.Measure():
                     # Construct latent processes and initialise output processes.
-                    xs = [stheno.GP(self.kernel) for _ in range(self.y_latent_dim)]
-                    fs = [0 for _ in range(self.y_dim)]
+                    xs = [stheno.GP(self.kernel) for _ in range(self.dim_y_latent)]
+                    fs = [0 for _ in range(self.dim_y)]
                     # Draw a random mixing matrix.
-                    H = B.randn(self.float64, self.y_dim, self.y_latent_dim)
+                    H = B.randn(self.float64, self.dim_y, self.dim_y_latent)
                     # Perform matrix multiplication.
-                    for i in range(self.y_dim):
-                        for j in range(self.y_latent_dim):
+                    for i in range(self.dim_y):
+                        for j in range(self.dim_y_latent):
                             fs[i] = fs[i] + H[i, j] * xs[j]
                     # Finally, construct the multi-output GP.
                     f = stheno.cross(*fs)
@@ -155,7 +156,7 @@ class GPGenerator:
             # multiple outputs from the sample. Reshape to `(self.y_dim, -1)` or to
             # `(-1, self.y_dim)`?
             x = B.transpose(x)
-            y = B.reshape(y, self.batch_size, self.y_dim, -1)
+            y = B.reshape(y, self.batch_size, self.dim_y, -1)
             xc = x[:, :, :num_context_points]
             yc = y[:, :, :num_context_points]
             xt = x[:, :, num_context_points:]
