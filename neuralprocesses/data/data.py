@@ -18,10 +18,13 @@ class GPGenerator:
         batch_size (int, optional): Batch size. Defaults to 16.
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
-        x_range (tuple[tuple[float, float]...], optional): Ranges of the inputs. Every
+        x_ranges (tuple[tuple[float, float]...], optional): Ranges of the inputs. Every
             range corresponds to a dimension of the input, which means that the number
             of ranges determine the dimensionality of the input. Defaults to
             `((-2, 2),)`.
+        y_dim (int, optional): Dimensionality of the outputs. Defaults to `1`.
+        y_latent_dim (int, optional): If `y_dim > 1`, this specifies the number of
+            latent processes. Defaults to `y_dim`.
         num_context_points (int or tuple[int, int], optional): A fixed number of context
             points or a lower and upper bound. Defaults to the range `(1, 50)`.
         num_target_points (int or tuple[int, int], optional): A fixed number of target
@@ -41,7 +44,9 @@ class GPGenerator:
         seed=0,
         batch_size=16,
         num_tasks=2 ** 14,
-        x_range=((-2, 2),),
+        x_ranges=((-2, 2),),
+        y_dim=1,
+        y_latent_dim=None,
         num_context_points=(1, 50),
         num_target_points=50,
         pred_logpdf=True,
@@ -70,12 +75,14 @@ class GPGenerator:
                 f"the batch size {batch_size}."
             )
 
-        self.x_dim = len(x_range)
+        self.x_dim = len(x_ranges)
         # Contruct tensors for the bounds on the input range. These must be `flaot64`s.
         with B.on_device(self.device):
-            lower = B.stack(*(B.cast(self.float64, l) for l, _ in x_range))[None, :]
-            upper = B.stack(*(B.cast(self.float64, u) for _, u in x_range))[None, :]
-            self.x_range = B.to_active_device(lower), B.to_active_device(upper)
+            lower = B.stack(*(B.cast(self.float64, l) for l, _ in x_ranges))[None, :]
+            upper = B.stack(*(B.cast(self.float64, u) for _, u in x_ranges))[None, :]
+            self.x_ranges = B.to_active_device(lower), B.to_active_device(upper)
+        self.y_dim = y_dim
+        self.y_latent_dim = y_latent_dim or y_dim
 
         # Ensure that `num_context_points` and `num_target_points` are tuples of lower
         # bounds and upper bounds.
@@ -116,37 +123,63 @@ class GPGenerator:
                 int(num_context_points + num_target_points),
                 self.x_dim,
             )
-            lower, upper = self.x_range
+            lower, upper = self.x_ranges
             x = lower + rand * (upper - lower)
 
             # Construct prior. Cast `noise` before moving it to the active device,
-            # because Python scalars will not be interpreted as tensors and hence will\
+            # because Python scalars will not be interpreted as tensors and hence will
             # not be moved to the GPU.
-            noise = B.to_active_device(B.cast(self.dtype, self.noise))
-            f = stheno.GP(self.kernel)
+            noise = B.to_active_device(B.cast(self.float64, self.noise))
+            # If `self.y_dim > 1`, then we create a multi-output GP.
+            if self.y_dim == 1:
+                f = stheno.GP(self.kernel)
+            else:
+                with stheno.Measure():
+                    # Construct latent processes and initialise output processes.
+                    xs = [stheno.GP(self.kernel) for _ in range(self.y_latent_dim)]
+                    fs = [0 for _ in range(self.y_dim)]
+                    # Draw a random mixing matrix.
+                    H = B.randn(self.float64, self.y_dim, self.y_latent_dim)
+                    # Perform matrix multiplication.
+                    for i in range(self.y_dim):
+                        for j in range(self.y_latent_dim):
+                            fs[i] = fs[i] + H[i, j] * xs[j]
+                    # Finally, construct the multi-output GP.
+                    f = stheno.cross(*fs)
 
             # Sample context and target set.
             self.state, y = f(x, noise).sample(self.state)
-            xc = x[:, :num_context_points, :]
-            yc = x[:, :num_context_points, :]
-            xt = x[:, num_context_points:, :]
-            yt = x[:, num_context_points:, :]
+            # Shuffle the dimensions to line up with the convention in the package.
+            # Afterwards, when computing logpdfs, we'll have to be careful to reshape
+            # things back when. Moreover, we need to be super careful when extracting
+            # multiple outputs from the sample. Reshape to `(self.y_dim, -1)` or to
+            # `(-1, self.y_dim)`?
+            x = B.transpose(x)
+            y = B.reshape(y, self.batch_size, self.y_dim, -1)
+            xc = x[:, :, :num_context_points]
+            yc = y[:, :, :num_context_points]
+            xt = x[:, :, num_context_points:]
+            yt = y[:, :, num_context_points:]
 
             # Compute predictive logpdfs.
             if self.pred_logpdf or self.pred_logpdf_diag:
-                f_post = f | (f(xc, noise), yc)
-                fdd = f_post(xt, noise)
+                # Compute posterior and preditive distribution.
+                obs = (f(B.transpose(xc), noise), B.reshape(yc, self.batch_size, -1, 1))
+                f_post = f | obs
+                fdd = f_post(B.transpose(xt), noise)
+                # Prepare `yt` for logpdf computation.
+                yt_reshaped = B.reshape(yt, self.batch_size, -1, 1)
             if self.pred_logpdf:
-                batch["pred_logpdf"] = fdd.logpdf(yt)
+                batch["pred_logpdf"] = fdd.logpdf(yt_reshaped)
             if self.pred_logpdf_diag:
                 fdd_diag = stheno.Normal(fdd.mean, matrix.Diagonal(B.diag(fdd.var)))
-                batch["pred_logpdf_diag"] = fdd_diag.logpdf(yt)
+                batch["pred_logpdf_diag"] = fdd_diag.logpdf(yt_reshaped)
 
-            # Put the data dimension last and convert to the right data type.
-            batch["xc"] = B.cast(self.dtype, B.transpose(xc))
-            batch["yc"] = B.cast(self.dtype, B.transpose(yc))
-            batch["xt"] = B.cast(self.dtype, B.transpose(xt))
-            batch["yt"] = B.cast(self.dtype, B.transpose(yt))
+            # Convert to the data type and save.
+            batch["xc"] = B.cast(self.dtype, xc)
+            batch["yc"] = B.cast(self.dtype, yc)
+            batch["xt"] = B.cast(self.dtype, xt)
+            batch["yt"] = B.cast(self.dtype, yt)
 
             return batch
 
