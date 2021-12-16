@@ -1,7 +1,7 @@
 __all__ = ["construct_likelihood"]
 
 
-def construct_likelihood(ns, spec, dim_y, num_basis_functions):
+def construct_likelihood(ns, *, spec, dim_y, num_basis_functions):
     if spec == "het":
         num_channels = 2 * dim_y
         lik = ns.HeterogeneousGaussianLikelihood()
