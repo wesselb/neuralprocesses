@@ -15,6 +15,7 @@ class Chain:
     """
 
     def __init__(self, *links):
+        links = tuple(filter(None, links))  # Filter `None`s
         try:
             self.links = self.nn.ModuleList(links)
         except AttributeError:

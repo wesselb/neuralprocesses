@@ -31,7 +31,7 @@ def construct_convgnp(nps):
             )
             unet_in_channels += 2 * num_harmonics
         else:
-            harmonics = lambda x: x
+            harmonics = None
         unet = nps.UNet(
             dim=dim_x,
             in_channels=unet_in_channels,
