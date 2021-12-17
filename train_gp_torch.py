@@ -8,7 +8,7 @@ from neuralprocesses.data import GPGenerator
 B.set_global_device("cuda")
 
 dim_x = 2
-dim_y = 2
+dim_y = 1
 
 cnp = nps.construct_convgnp(
     points_per_unit=64,
@@ -19,7 +19,7 @@ cnp = nps.construct_convgnp(
 
 gen = GPGenerator(
     torch.float32,
-    batch_size=32,
+    batch_size=64,
     num_context_points=(1, 50),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,

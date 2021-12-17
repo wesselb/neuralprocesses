@@ -37,7 +37,7 @@ def objective(xc, yc, xt, yt):
     return -B.mean(pred.logpdf(B.cast(tf.float64, yt)))
 
 
-opt = tf.keras.optimizers.Adam(1e-3)
+opt = tf.keras.optimizers.Adam(5e-3)
 
 for i in range(10_000):
     with Progress(name=f"Epoch {i + 1}", total=gen.num_batches) as progress:
