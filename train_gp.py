@@ -42,7 +42,7 @@ if args.backend == "torch":
         return val
 
 
-elif args.backed == "tensorflow":
+elif args.backend == "tensorflow":
 
     import tensorflow as backend
     import neuralprocesses.tensorflow as nps
