@@ -1,6 +1,7 @@
 import lab as B
 import torch
 from wbml.out import Progress
+from mlkernels import EQ
 
 import neuralprocesses.torch as nps
 from neuralprocesses.data import GPGenerator
@@ -19,6 +20,7 @@ cnp = nps.construct_convgnp(
 
 gen = GPGenerator(
     torch.float32,
+    kernel=EQ().stretch(0.25 * B.sqrt(2) ** (dim_x - 1)),
     batch_size=32,
     num_context_points=(1, 50),
     num_target_points=50,
