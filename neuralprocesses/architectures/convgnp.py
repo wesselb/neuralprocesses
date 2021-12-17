@@ -38,7 +38,11 @@ def create_construct_convgnp(ns):
                 disc,
                 ns.SetConv(disc.points_per_unit, density_channel=True, dtype=dtype),
             ),
-            ns.Chain(unet, ns.SetConv(disc.points_per_unit, dtype=dtype), likelihood),
+            ns.Chain(
+                unet,
+                ns.SetConv(disc.points_per_unit, dtype=dtype),
+                likelihood,
+            ),
         )
 
     return construct_convgnp

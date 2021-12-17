@@ -21,7 +21,10 @@ class HeterogeneousGaussianLikelihood:
 
     def __call__(self, z):
         dim_y = B.shape(z, 1) // 2
-        return MultiOutputNormal.diagonal(z[:, :dim_y, :], B.softplus(z[:, dim_y:, :]))
+        return MultiOutputNormal.diagonal(
+            z[:, :dim_y, :],
+            B.softplus(z[:, dim_y:, :]),
+        )
 
 
 @register_module
