@@ -10,7 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
 parser.add_argument("--backend", choices=["tensorflow", "torch"], required=True)
-parser.add_argument("--batch_size", type=int, default=32)
+parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--harmonics", type=int, default=0)
 args = parser.parse_args()
 
@@ -103,7 +103,7 @@ gen_eval = GPGenerator(
     backend.float32,
     kernel=EQ().stretch(0.25 * B.sqrt(2) ** (dim_x - 1)),
     num_tasks=4096,
-    batch_size=16,
+    batch_size=batch_size,
     num_context_points=(3, 10),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,
@@ -151,20 +151,23 @@ with Progress(name="Epochs", total=10_000) as progress_epochs:
                     }
                 )
 
-        vals = []
-        for batch in gen.epoch():
-            vals.append(
-                objective(
-                    batch["xc"],
-                    batch["yc"],
-                    batch["xt"],
-                    batch["yt"],
-                )
+        full_vals = []
+        diag_vals = []
+        for batch in gen_eval.epoch():
+            batch_vals = objective(
+                batch["xc"],
+                batch["yc"],
+                batch["xt"],
+                batch["yt"],
             )
-        vals = B.stack(*vals)
+            nt = B.shape(batch["xt"], 2)
+            full_vals.append(B.to_numpy(batch_vals + batch["pred_logpdf"]) / nt)
+            diag_vals.append(B.to_numpy(batch_vals + batch["pred_logpdf_diag"]) / nt)
+        full_vals = B.concat(*full_vals)
+        diag_vals = B.concat(*diag_vals)
         progress_epochs(
             {
-                "KL (full)": with_err((vals + batch["pred_logpdf"]) / nt),
-                "KL (diag)": with_err((vals + batch["pred_logpdf_diag"]) / nt),
+                "KL (full)": with_err(full_vals),
+                "KL (diag)": with_err(diag_vals),
             }
         )
