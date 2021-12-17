@@ -34,7 +34,7 @@ def objective(xc, yc, xt, yt):
     pred = cnp(xc, yc, xt)
     # Use `float64`s for the logpdf computation.
     pred = B.cast(torch.float64, pred)
-    return -B.mean(pred.logpdf(yt))
+    return -B.mean(pred.logpdf(B.cast(torch.float64, yt)))
 
 
 opt = torch.optim.Adam(cnp.parameters(), 1e-3)
