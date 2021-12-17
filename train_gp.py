@@ -88,7 +88,7 @@ gen = GPGenerator(
     backend.float32,
     kernel=EQ().stretch(0.25 * B.sqrt(2) ** (dim_x - 1)),
     batch_size=batch_size,
-    num_context_points=(1, 50),
+    num_context_points=(3, 10),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,
     dim_y=dim_y,

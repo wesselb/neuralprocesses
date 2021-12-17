@@ -21,9 +21,8 @@ def create_forward(Module):
 
 
 for module in modules:
-    name = module.__name__
-    globals()[name] = type(
-        name,
+    globals()[module.__name__] = type(
+        module.__name__,
         (module, Module),
         {"__init__": create_init(module), "forward": create_forward(module)},
     )
@@ -37,5 +36,4 @@ ns = Namespace()
 ns.__dict__.update(globals())
 
 for model in models:
-    name = "_".join(model.__name__.split("_")[1:])
-    globals()[name] = model(ns)
+    globals()[model.__name__] = model(ns)

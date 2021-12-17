@@ -1,11 +1,11 @@
 from .lik import construct_likelihood
 from ..util import register_model
 
-__all__ = ["create_construct_gnp"]
+__all__ = ["construct_gnp"]
 
 
 @register_model
-def create_construct_gnp(ns):
+def construct_gnp(nps):
     def construct_gnp(
         dim_x=1,
         dim_y=1,
@@ -17,23 +17,23 @@ def create_construct_gnp(ns):
         dtype=None,
     ):
         mlp_out_channels, likelihood = construct_likelihood(
-            ns,
+            nps,
             spec=likelihood,
             dim_y=dim_y,
             num_basis_functions=num_basis_functions,
         )
-        encoder = ns.Chain(
-            ns.Parallel(
-                ns.InputsCoder(),
-                ns.DeepSet(
-                    ns.MLP(
+        encoder = nps.Chain(
+            nps.Parallel(
+                nps.InputsCoder(),
+                nps.DeepSet(
+                    nps.MLP(
                         dim_in=dim_x + dim_y,
                         dim_hidden=dim_embedding,
                         dim_out=dim_embedding,
                         num_layers=num_enc_layers,
                         dtype=dtype,
                     ),
-                    ns.MLP(
+                    nps.MLP(
                         dim_in=dim_embedding,
                         dim_hidden=dim_embedding,
                         dim_out=dim_embedding,
@@ -43,9 +43,9 @@ def create_construct_gnp(ns):
                 ),
             ),
         )
-        decoder = ns.Chain(
-            ns.Materialise(),
-            ns.MLP(
+        decoder = nps.Chain(
+            nps.Materialise(),
+            nps.MLP(
                 dim_in=dim_x + dim_embedding,
                 dim_hidden=dim_embedding,
                 dim_out=mlp_out_channels,
@@ -54,6 +54,6 @@ def create_construct_gnp(ns):
             ),
             likelihood,
         )
-        return ns.Model(encoder, decoder)
+        return nps.Model(encoder, decoder)
 
     return construct_gnp

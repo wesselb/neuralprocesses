@@ -5,7 +5,12 @@ import lab as B
 from . import _dispatch
 from .util import register_module
 
-__all__ = ["SetConv", "PrependDensityChannel", "DivideByDensityChannel"]
+__all__ = [
+    "SetConv",
+    "PrependDensityChannel",
+    "DivideByFirstChannel",
+    "AppendHarmonics",
+]
 
 
 @register_module
@@ -62,7 +67,7 @@ class PrependDensityChannel:
 
 
 @register_module
-class DivideByDensityChannel:
+class DivideByFirstChannel:
     def __call__(self, z):
         return B.concat(z[:, :1, ...], z[:, 1:, ...] / (z[:, :1, ...] + 1e-8), axis=1)
 
