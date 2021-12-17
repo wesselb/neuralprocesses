@@ -77,7 +77,7 @@ model = to_device(
         dim_x=dim_x,
         dim_y=dim_y,
         likelihood="lowrank",
-        harmonics_range=(-2, 2) if args.harmonics else None
+        harmonics_range=(-2, 2) if args.harmonics else None,
     )
 )
 
