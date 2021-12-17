@@ -52,6 +52,9 @@ elif args.backend == "tensorflow":
     else:
         device = "cpu"
 
+    def to_device(x):
+        return x
+
     def create_optimiser(model):
         return backend.keras.optimizers.Adam(rate)
 
