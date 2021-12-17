@@ -29,10 +29,7 @@ for module in modules:
     globals()[module.__name__] = type(
         module.__name__,
         (module, Module),
-        {
-            "__init__": create_init(module),
-            "call": create_tf_call(module),
-        },
+        {"__init__": create_init(module), "call": create_tf_call(module)},
     )
 
 
