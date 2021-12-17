@@ -76,7 +76,7 @@ class GPGenerator:
             )
 
         self.dim_x = len(x_ranges)
-        # Contruct tensors for the bounds on the input range. These must be `flaot64`s.
+        # Contruct tensors for the bounds on the input range. These must be `float64`s.
         with B.on_device(self.device):
             lower = B.stack(*(B.cast(self.float64, l) for l, _ in x_ranges))[None, :]
             upper = B.stack(*(B.cast(self.float64, u) for _, u in x_ranges))[None, :]
@@ -152,8 +152,8 @@ class GPGenerator:
             self.state, y = f(x, noise).sample(self.state)
             # Shuffle the dimensions to line up with the convention in the package.
             # Afterwards, when computing logpdfs, we'll have to be careful to reshape
-            # things back when. Moreover, we need to be super careful when extracting
-            # multiple outputs from the sample. Reshape to `(self.y_dim, -1)` or to
+            # things back. Moreover, we need to be super careful when extracting
+            # multiple outputs from the sample: reshape to `(self.y_dim, -1)` or to
             # `(-1, self.y_dim)`?
             x = B.transpose(x)
             y = B.reshape(y, self.batch_size, self.dim_y, -1)
