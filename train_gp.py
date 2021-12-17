@@ -81,6 +81,7 @@ model = to_device(
         likelihood="lowrank",
         harmonics_range=harmonics_range,
         num_harmonics=num_harmonics,
+        num_basis_functions=32
     )
 )
 
