@@ -165,3 +165,13 @@ class MultiOutputNormal:
             tensor: Entropies of shape `(b,)`.
         """
         return self.normal.entropy()
+
+
+@B.dispatch
+def dtype(dist: MultiOutputNormal):
+    return B.dtype(dist.normal)
+
+
+@B.dispatch
+def cast(dtype: B.DType, dist: MultiOutputNormal):
+    return MultiOutputNormal(B.cast(dtype, dist.normal), dist.num_outputs)
