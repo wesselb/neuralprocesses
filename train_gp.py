@@ -41,7 +41,6 @@ if args.backend == "torch":
         opt.step()
         return val
 
-
 elif args.backend == "tensorflow":
 
     import tensorflow as backend
@@ -64,7 +63,6 @@ elif args.backend == "tensorflow":
         grads = tape.gradient(val, model.trainable_weights)
         opt.apply_gradients(zip(grads, model.trainable_weights))
         return val
-
 
 else:
     raise ValueError(f'Unknown backend "{args.backend}".')
