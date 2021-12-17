@@ -84,6 +84,15 @@ class GPGenerator:
         self.dim_y = dim_y
         self.dim_y_latent = dim_y_latent or dim_y
 
+        if self.dim_y > 1:
+            # Draw a random mixing matrix.
+            self.state, self.h = B.randn(
+                self.state,
+                self.float64,
+                self.dim_y,
+                self.dim_y_latent,
+            )
+
         # Ensure that `num_context_points` and `num_target_points` are tuples of lower
         # bounds and upper bounds.
         if not isinstance(num_context_points, tuple):
@@ -139,12 +148,10 @@ class GPGenerator:
                     # Construct latent processes and initialise output processes.
                     xs = [stheno.GP(self.kernel) for _ in range(self.dim_y_latent)]
                     fs = [0 for _ in range(self.dim_y)]
-                    # Draw a random mixing matrix.
-                    H = B.randn(self.float64, self.dim_y, self.dim_y_latent)
                     # Perform matrix multiplication.
                     for i in range(self.dim_y):
                         for j in range(self.dim_y_latent):
-                            fs[i] = fs[i] + H[i, j] * xs[j]
+                            fs[i] = fs[i] + self.h[i, j] * xs[j]
                     # Finally, construct the multi-output GP.
                     f = stheno.cross(*fs)
 
