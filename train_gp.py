@@ -47,7 +47,7 @@ elif args.backend == "tensorflow":
     import tensorflow as backend
     import neuralprocesses.tensorflow as nps
 
-    if len(backend.config.list_physical_devices("gpu")) > 0:
+    if len(backend.config.list_physical_devices("GPU")) > 0:
         device = "gpu"
     else:
         device = "cpu"
