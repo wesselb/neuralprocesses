@@ -11,6 +11,7 @@ parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
 parser.add_argument("--backend", choices=["tensorflow", "torch"], required=True)
 parser.add_argument("--batch_size", type=int, default=32)
+parser.add_argument("--harmonics", action="store_true")
 args = parser.parse_args()
 
 batch_size = args.batch_size
@@ -76,6 +77,7 @@ model = to_device(
         dim_x=dim_x,
         dim_y=dim_y,
         likelihood="lowrank",
+        harmonics_range=(-2, 2) if args.harmonics else None
     )
 )
 
