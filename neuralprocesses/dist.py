@@ -53,10 +53,7 @@ class MultiOutputNormal:
         """
         b, c, n = B.shape(mean)
         return cls(
-            Normal(
-                B.reshape(mean, b, c * n, -1),
-                Diagonal(B.reshape(var, b, c * n)),
-            ),
+            Normal(B.reshape(mean, b, c * n, -1), Diagonal(B.reshape(var, b, c * n))),
             c,
         )
 
@@ -75,19 +72,17 @@ class MultiOutputNormal:
         # Separate out factor channels.
         var_factor = B.reshape(var_factor, b, c, -1, n)
         var_factor = B.transpose(var_factor)
-        return cls(
-            Normal(
-                B.reshape(mean, b, c * n, -1),
-                Diagonal(B.reshape(var_diag, b, c * n))
-                + LowRank(B.reshape(var_factor, b, c * n, -1)),
-            ),
-            c,
-        )
+        # Construct variance.
+        var = Diagonal(B.reshape(var_diag, b, c * n))
+        var = var + LowRank(B.reshape(var_factor, b, c * n, -1))
+        # Do not retain structure if it doesn't give you computational savings.
+        if var.lr.rank >= B.shape_matrix(var, 0):
+            var = B.dense(var)
+        return cls(Normal(B.reshape(mean, b, c * n, -1), var), c)
 
     def __repr__(self):
-        return (  # fmt: off
-            f"<MultiOutputNormal: num_outputs={self.num_outputs}\n"
-            + indented_kv("normal", repr(self.normal), suffix=">")
+        return f"<MultiOutputNormal: num_outputs={self.num_outputs}\n" + indented_kv(
+            "normal", repr(self.normal), suffix=">"
         )
 
     def __str__(self):
