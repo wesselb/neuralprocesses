@@ -124,6 +124,7 @@ def objective(xc, yc, xt, yt):
 
 
 def with_err(vals):
+    vals = B.to_numpy(vals)
     mean = B.mean(vals)
     err = 1.96 * B.std(vals) / B.sqrt(B.length(vals))
     return f"{mean:7.3f} +- {err:7.3f}"
@@ -135,9 +136,9 @@ with Progress(name="Epochs", total=10_000) as progress_epochs:
     for i in range(10_000):
         if i < 3:
             # Regularise heavily for the first three epochs.
-            B.epsilon = 1e-4
+            B.epsilon = 1e-2
         else:
-            B.epsilon = 1e-8
+            B.epsilon = 1e-6
         with Progress(name=f"Epoch {i + 1}", total=gen.num_batches) as progress_epoch:
             for batch in gen.epoch():
                 vals = step_optimiser(
