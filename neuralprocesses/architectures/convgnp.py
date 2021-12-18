@@ -12,9 +12,10 @@ def construct_convgnp(nps):
         points_per_unit=64,
         margin=0.1,
         likelihood="het",
-        num_basis_functions=256,
+        unet_channels=(64,) * 6,
+        num_basis_functions=16,
         harmonics_range=None,
-        num_harmonics=64,
+        num_harmonics=0,
         dtype=None,
     ):
         unet_in_channels = dim_y + 1
@@ -24,18 +25,19 @@ def construct_convgnp(nps):
             dim_y=dim_y,
             num_basis_functions=num_basis_functions,
         )
-        if harmonics_range is not None:
-            harmonics = nps.AppendHarmonics(
+        if num_harmonics > 0:
+            append_harmonics = nps.AppendHarmonics(
                 x_range=harmonics_range,
                 num_harmonics=num_harmonics,
             )
             unet_in_channels += 2 * num_harmonics
         else:
-            harmonics = None
+            append_harmonics = None
         unet = nps.UNet(
             dim=dim_x,
             in_channels=unet_in_channels,
             out_channels=unet_out_channels,
+            channels=unet_channels,
             dtype=dtype,
         )
         disc = nps.Discretisation(
@@ -51,7 +53,7 @@ def construct_convgnp(nps):
                     nps.PrependDensityChannel(),
                     nps.SetConv(disc.points_per_unit, dtype=dtype),
                     nps.DivideByFirstChannel(),
-                    harmonics,
+                    append_harmonics,
                 ),
             ),
             nps.Chain(
