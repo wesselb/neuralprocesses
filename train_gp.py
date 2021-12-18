@@ -10,12 +10,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
 parser.add_argument("--backend", choices=["tensorflow", "torch"], required=True)
-parser.add_argument("--batch_size", type=int, default=16)
+parser.add_argument("--batch_size", type=int, default=128)
 parser.add_argument("--harmonics", type=int, default=0)
 args = parser.parse_args()
 
 batch_size = args.batch_size
-rate = 1e-3 * B.sqrt(args.batch_size / 16)
+rate = 1e-3
 dim_x = args.dim_x
 dim_y = args.dim_y
 harmonics_range = (-2, 2) if args.harmonics > 0 else None
@@ -83,15 +83,18 @@ model = to_device(
         likelihood="lowrank",
         harmonics_range=harmonics_range,
         num_harmonics=num_harmonics,
-        num_basis_functions=128,
+        num_basis_functions=512,
     )
 )
 
+kernel = EQ().stretch(0.25 * B.sqrt(2) ** (dim_x - 1))
+#  kernel = EQ().stretch(0.5) * EQ().periodic(period=0.25)
+
 gen = GPGenerator(
     backend.float32,
-    kernel=EQ().stretch(0.25 * B.sqrt(2) ** (dim_x - 1)),
+    kernel=kernel,
     batch_size=batch_size,
-    num_context_points=(3, 10),
+    num_context_points=(3, 50),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,
     dim_y=dim_y,
@@ -101,10 +104,10 @@ gen = GPGenerator(
 )
 gen_eval = GPGenerator(
     backend.float32,
-    kernel=EQ().stretch(0.25 * B.sqrt(2) ** (dim_x - 1)),
+    kernel=kernel,
     num_tasks=4096,
     batch_size=batch_size,
-    num_context_points=(3, 10),
+    num_context_points=(3, 50),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,
     dim_y=dim_y,
