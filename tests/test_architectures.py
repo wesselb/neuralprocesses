@@ -9,8 +9,11 @@ from .util import nps, generate_data  # noqa
 @pytest.mark.parametrize(
     "construct_name, kw_args",
     [
-        (model, {"dim_x": dim_x, "dim_y": dim_y, "likelihood": lik})
-        for model in ["construct_gnp", "construct_convgnp"]
+        (model, dict(base_kw_args, dim_x=dim_x, dim_y=dim_y, likelihood=lik))
+        for model, base_kw_args in [
+            ("construct_gnp", {}),
+            ("construct_convgnp", {"points_per_unit": 16, "unet_channels": (8,) * 3}),
+        ]
         for dim_x in [1, 2]
         for dim_y in [1, 2]
         for lik in ["het", "lowrank", "lowrank-correlated"]
