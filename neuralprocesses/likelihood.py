@@ -66,5 +66,5 @@ class LowRankGaussianLikelihood:
         # Make it square.
         middle = B.reshape(middle, *B.shape(middle)[:-2], num_factors, num_factors)
         # Make it positive definite.
-        middle = B.matmul(middle, middle, tr_b=True)
+        middle = B.matmul(middle, middle, tr_b=True) / num_factors
         return self(z, middle=middle)
