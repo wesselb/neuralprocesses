@@ -6,6 +6,8 @@ from wbml.out import Progress
 
 from neuralprocesses.data import GPGenerator
 
+B.epsilon = 1e-7
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
@@ -15,7 +17,7 @@ parser.add_argument("--harmonics", type=int, default=0)
 args = parser.parse_args()
 
 batch_size = args.batch_size
-rate = 5e-4
+rate = 1e-3
 dim_x = args.dim_x
 dim_y = args.dim_y
 num_harmonics = args.harmonics
@@ -86,7 +88,7 @@ model = to_device(
     )
 )
 
-kernel = EQ().stretch(1)
+kernel = EQ().stretch(0.25)
 #  kernel = EQ().stretch(0.5) * EQ().periodic(period=0.25)
 
 gen = GPGenerator(
@@ -134,11 +136,6 @@ opt = create_optimiser(model)
 
 with Progress(name="Epochs", total=10_000) as progress_epochs:
     for i in range(10_000):
-        if i < 3:
-            # Regularise heavily for the first three epochs.
-            B.epsilon = 1e-2
-        else:
-            B.epsilon = 1e-6
         with Progress(name=f"Epoch {i + 1}", total=gen.num_batches) as progress_epoch:
             for batch in gen.epoch():
                 vals = step_optimiser(
