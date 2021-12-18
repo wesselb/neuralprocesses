@@ -18,7 +18,6 @@ batch_size = args.batch_size
 rate = 1e-3
 dim_x = args.dim_x
 dim_y = args.dim_y
-harmonics_range = (-2, 2) if args.harmonics > 0 else None
 num_harmonics = args.harmonics
 
 if args.backend == "torch":
@@ -81,9 +80,9 @@ model = to_device(
         dim_x=dim_x,
         dim_y=dim_y,
         likelihood="lowrank",
-        harmonics_range=harmonics_range,
+        harmonics_range=(-2, 2),
         num_harmonics=num_harmonics,
-        num_basis_functions=512,
+        num_basis_functions=16,
     )
 )
 
