@@ -15,7 +15,7 @@ parser.add_argument("--harmonics", type=int, default=0)
 args = parser.parse_args()
 
 batch_size = args.batch_size
-rate = 1e-3
+rate = 5e-4
 dim_x = args.dim_x
 dim_y = args.dim_y
 num_harmonics = args.harmonics
@@ -79,14 +79,14 @@ model = to_device(
         points_per_unit=64,
         dim_x=dim_x,
         dim_y=dim_y,
-        likelihood="lowrank",
+        likelihood="lowrank-correlated",
         harmonics_range=(-2, 2),
         num_harmonics=num_harmonics,
-        num_basis_functions=512,
+        num_basis_functions=256,
     )
 )
 
-kernel = EQ().stretch(0.25 * B.sqrt(2) ** (dim_x - 1))
+kernel = EQ().stretch(1)
 #  kernel = EQ().stretch(0.5) * EQ().periodic(period=0.25)
 
 gen = GPGenerator(
@@ -104,8 +104,8 @@ gen = GPGenerator(
 gen_eval = GPGenerator(
     backend.float32,
     kernel=kernel,
-    num_tasks=4096,
-    batch_size=batch_size,
+    num_tasks=2 ** 10,
+    batch_size=16,
     num_context_points=(3, 50),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,
@@ -133,6 +133,11 @@ opt = create_optimiser(model)
 
 with Progress(name="Epochs", total=10_000) as progress_epochs:
     for i in range(10_000):
+        if i < 3:
+            # Regularise heavily for the first three epochs.
+            B.epsilon = 1e-4
+        else:
+            B.epsilon = 1e-8
         with Progress(name=f"Epoch {i + 1}", total=gen.num_batches) as progress_epoch:
             for batch in gen.epoch():
                 vals = step_optimiser(
