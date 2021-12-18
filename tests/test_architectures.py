@@ -11,8 +11,15 @@ from .util import nps, generate_data  # noqa
     [
         (model, dict(base_kw_args, dim_x=dim_x, dim_y=dim_y, likelihood=lik))
         for model, base_kw_args in [
-            ("construct_gnp", {}),
-            ("construct_convgnp", {"points_per_unit": 16, "unet_channels": (8,) * 3}),
+            ("construct_gnp", {"num_basis_functions": 4}),
+            (
+                "construct_convgnp",
+                {
+                    "num_basis_functions": 4,
+                    "points_per_unit": 16,
+                    "unet_channels": (8,) * 3,
+                },
+            ),
         ]
         for dim_x in [1, 2]
         for dim_y in [1, 2]
