@@ -11,9 +11,9 @@ def construct_convgnp(nps):
         dim_y=1,
         points_per_unit=64,
         margin=0.1,
-        likelihood="het",
+        likelihood="lowrank",
         unet_channels=(64,) * 6,
-        num_basis_functions=16,
+        num_basis_functions=512,
         harmonics_range=None,
         num_harmonics=0,
         dtype=None,
@@ -24,6 +24,7 @@ def construct_convgnp(nps):
             spec=likelihood,
             dim_y=dim_y,
             num_basis_functions=num_basis_functions,
+            dtype=dtype
         )
         if num_harmonics > 0:
             append_harmonics = nps.AppendHarmonics(

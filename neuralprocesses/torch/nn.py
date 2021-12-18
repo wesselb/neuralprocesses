@@ -58,12 +58,29 @@ def ConvNd(
     )
 
 
+def _is_lambda(f):
+    lam = lambda: None
+    return isinstance(f, type(lam)) and f.__name__ == lam.__name__
+
+
+class _LambdaModule(torch.nn.Module):
+    def __init__(self, f):
+        super().__init__()
+        self.f = f
+
+    def forward(self, x):
+        return self.f(x)
+
+
 class Interface:
     ReLU = torch.nn.ReLU
 
     Sequential = torch.nn.Sequential
 
-    ModuleList = torch.nn.ModuleList
+    @staticmethod
+    def ModuleList(modules):
+        modules = [_LambdaModule(m) if _is_lambda(m) else m for m in modules]
+        return torch.nn.ModuleList(modules)
 
     Linear = torch.nn.Linear
 

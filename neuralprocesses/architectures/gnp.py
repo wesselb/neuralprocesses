@@ -12,7 +12,7 @@ def construct_gnp(nps):
         dim_embedding=64,
         num_enc_layers=6,
         num_dec_layers=6,
-        likelihood="het",
+        likelihood="lowrank",
         num_basis_functions=64,
         dtype=None,
     ):
@@ -21,6 +21,7 @@ def construct_gnp(nps):
             spec=likelihood,
             dim_y=dim_y,
             num_basis_functions=num_basis_functions,
+            dtype=dtype,
         )
         encoder = nps.Chain(
             nps.Parallel(

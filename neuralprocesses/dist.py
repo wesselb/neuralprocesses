@@ -1,6 +1,6 @@
 import lab as B
 from matrix import Diagonal, LowRank
-from plum import Dispatcher
+from plum import Dispatcher, Union
 from stheno import Normal
 from wbml.util import indented_kv
 
@@ -58,7 +58,13 @@ class MultiOutputNormal:
         )
 
     @classmethod
-    def lowrank(cls, mean: B.Numeric, var_diag: B.Numeric, var_factor: B.Numeric):
+    def lowrank(
+        cls,
+        mean: B.Numeric,
+        var_diag: B.Numeric,
+        var_factor: B.Numeric,
+        var_middle: Union[B.Numeric, None] = None,
+    ):
         """Construct a low-rank multi-output normal distribution.
 
         Args:
@@ -67,6 +73,8 @@ class MultiOutputNormal:
                 `(b, c, n)`.
             var_factor (tensor): Factors of the low-rank variance of shape
                 `(b, c * num_factors, n)`.
+            var_middle (tensor, optional): Covariance of the factors of shape
+                `(b, num_factors, num_factors)`.
         """
         b, c, n = B.shape(mean)
         # Separate out factor channels.
@@ -74,8 +82,8 @@ class MultiOutputNormal:
         var_factor = B.transpose(var_factor)
         # Construct variance.
         var = Diagonal(B.reshape(var_diag, b, c * n))
-        var = var + LowRank(B.reshape(var_factor, b, c * n, -1))
-        # Do not retain structure if it doesn't give you computational savings.
+        var = var + LowRank(left=B.reshape(var_factor, b, c * n, -1), middle=var_middle)
+        # Do not retain structure if it doesn't give computational savings.
         if var.lr.rank >= B.shape_matrix(var, 0):
             var = B.dense(var)
         return cls(Normal(B.reshape(mean, b, c * n, -1), var), c)

@@ -1,10 +1,15 @@
 from typing import Tuple
 
 import lab as B
+from plum import Dispatcher
 
+from .parallel import Parallel
 from .util import register_module
 
-__all__ = ["MLP", "UNet"]
+__all__ = ["MLP", "UNet", "Splitter"]
+
+
+_dispatch = Dispatcher()
 
 
 @register_module
@@ -128,3 +133,18 @@ class UNet:
             h = self.activation(layer(B.concat(h_prev, h, axis=1)))
 
         return self.final_linear(h)
+
+
+@register_module
+class Splitter:
+    def __init__(self, *sizes):
+        self.sizes = sizes
+
+    @_dispatch
+    def __call__(self, z: B.Numeric):
+        i = 0
+        splits = []
+        for size in self.sizes:
+            splits.append(z[:, i : i + size, :])
+            i += size
+        return Parallel(*splits)

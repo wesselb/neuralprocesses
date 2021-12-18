@@ -9,14 +9,11 @@ from .util import nps, generate_data  # noqa
 @pytest.mark.parametrize(
     "construct_name, kw_args",
     [
-        ("construct_gnp", {"dim_x": 1, "dim_y": 2, "likelihood": "het"}),
-        ("construct_gnp", {"dim_x": 2, "dim_y": 2, "likelihood": "het"}),
-        ("construct_gnp", {"dim_x": 1, "dim_y": 2, "likelihood": "lowrank"}),
-        ("construct_gnp", {"dim_x": 2, "dim_y": 2, "likelihood": "lowrank"}),
-        ("construct_convgnp", {"dim_x": 1, "dim_y": 2, "likelihood": "het"}),
-        ("construct_convgnp", {"dim_x": 2, "dim_y": 2, "likelihood": "het"}),
-        ("construct_convgnp", {"dim_x": 1, "dim_y": 2, "likelihood": "lowrank"}),
-        ("construct_convgnp", {"dim_x": 2, "dim_y": 2, "likelihood": "lowrank"}),
+        (model, {"dim_x": dim_x, "dim_y": dim_y, "likelihood": lik})
+        for model in ["construct_gnp", "construct_convgnp"]
+        for dim_x in [1, 2]
+        for dim_y in [1, 2]
+        for lik in ["het", "lowrank", "lowrank-correlated"]
     ],
 )
 def test_architectures(nps, float64, construct_name, kw_args):

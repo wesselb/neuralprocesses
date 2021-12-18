@@ -82,7 +82,7 @@ model = to_device(
         likelihood="lowrank",
         harmonics_range=(-2, 2),
         num_harmonics=num_harmonics,
-        num_basis_functions=16,
+        num_basis_functions=512,
     )
 )
 

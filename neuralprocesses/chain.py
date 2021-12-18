@@ -6,6 +6,7 @@ from .util import register_module
 __all__ = ["Chain"]
 
 
+
 @register_module
 class Chain:
     """A chain of links.
@@ -15,7 +16,8 @@ class Chain:
     """
 
     def __init__(self, *links):
-        links = tuple(filter(None, links))  # Filter `None`s
+        # Filter `None`s.
+        links = tuple(filter(None, links))
         try:
             self.links = self.nn.ModuleList(links)
         except AttributeError:
