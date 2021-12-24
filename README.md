@@ -12,6 +12,12 @@ See also [NeuralProcesses.jl](https://github.com/wesselb/NeuralProcesses.jl).
 There will be more here soon. In the meantime, see
 [NeuralProcesses.jl](https://github.com/wesselb/NeuralProcesses.jl).*
 
+Contents:
+
+- [Installation](#installation)
+- [Examples of Predefined Models](#examples-of-predefined-models)
+- [Build Your Own Model](#build-your-own-model)
+
 ## Installation
 
 See [the instructions here](https://gist.github.com/wesselb/4b44bf87f3789425f96e26c4308d0adc).
