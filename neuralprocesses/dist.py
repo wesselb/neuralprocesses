@@ -89,12 +89,13 @@ class MultiOutputNormal:
         return cls(Normal(B.reshape(mean, b, c * n, -1), var), c)
 
     def __repr__(self):
-        return f"<MultiOutputNormal: num_outputs={self.num_outputs}\n" + indented_kv(
-            "normal", repr(self.normal), suffix=">"
+        return (  # Comment to preserve formatting.
+            f"<MultiOutputNormal: num_outputs={self.num_outputs}\n"
+            + indented_kv("normal", repr(self.normal), suffix=">")
         )
 
     def __str__(self):
-        return (  # fmt: off
+        return (  # Comment to preserve formatting.
             f"<MultiOutputNormal: num_outputs={self.num_outputs}\n"
             + indented_kv("normal", str(self.normal), suffix=">")
         )

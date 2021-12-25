@@ -24,7 +24,7 @@ def construct_convgnp(nps):
             spec=likelihood,
             dim_y=dim_y,
             num_basis_functions=num_basis_functions,
-            dtype=dtype
+            dtype=dtype,
         )
         if num_harmonics > 0:
             append_harmonics = nps.AppendHarmonics(

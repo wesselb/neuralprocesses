@@ -13,7 +13,7 @@ def construct_gnp(nps):
         num_enc_layers=6,
         num_dec_layers=6,
         likelihood="lowrank",
-        num_basis_functions=64,
+        num_basis_functions=512,
         dtype=None,
     ):
         mlp_out_channels, likelihood = construct_likelihood(

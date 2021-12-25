@@ -55,7 +55,7 @@ class LowRankGaussianLikelihood:
             z[:, :dim_y, :],
             B.softplus(z[:, dim_y : 2 * dim_y, :]),
             z[:, 2 * dim_y :, :] / B.sqrt(self.rank),
-            middle
+            middle,
         )
 
     @_dispatch

@@ -24,7 +24,7 @@ def construct_likelihood(nps, *, spec, dim_y, num_basis_functions, dtype):
                     dim_hidden=(2 + num_basis_functions) * dim_y,
                     dim_out=(2 + num_basis_functions) * dim_y,
                     num_layers=3,
-                    dtype=dtype
+                    dtype=dtype,
                 ),
                 nps.Chain(
                     # Compute global channels.
@@ -34,7 +34,7 @@ def construct_likelihood(nps, *, spec, dim_y, num_basis_functions, dtype):
                         dim_hidden=factor * num_basis_functions,
                         dim_out=num_basis_functions * num_basis_functions,
                         num_layers=3,
-                        dtype=dtype
+                        dtype=dtype,
                     ),
                 ),
             ),

@@ -6,7 +6,6 @@ from .util import register_module
 __all__ = ["Chain"]
 
 
-
 @register_module
 class Chain:
     """A chain of links.

@@ -12,6 +12,12 @@ See also [NeuralProcesses.jl](https://github.com/wesselb/NeuralProcesses.jl).
 There will be more here soon. In the meantime, see
 [NeuralProcesses.jl](https://github.com/wesselb/NeuralProcesses.jl).*
 
+Contents:
+
+- [Installation](#installation)
+- [Examples of Predefined Models](#examples-of-predefined-models)
+- [Build Your Own Model](#build-your-own-model)
+
 ## Installation
 
 See [the instructions here](https://gist.github.com/wesselb/4b44bf87f3789425f96e26c4308d0adc).
@@ -21,7 +27,7 @@ Then simply
 pip install neuralprocesses
 ```
 
-## Example
+## Examples of Predefined Models
 
 ### TensorFlow
 
@@ -42,6 +48,7 @@ dist = cnp(
 mean, var = dist.mean, dist.var
 
 print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
+print(dist.sample())
 print(dist.kl(dist))
 print(dist.entropy())
 ```
@@ -64,6 +71,7 @@ dist = cnp(
 mean, var = dist.mean, dist.var
 
 print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
+print(dist.sample())
 print(dist.kl(dist))
 print(dist.entropy())
 ```
@@ -87,6 +95,7 @@ dist = cnp(
 mean, var = dist.mean, dist.var
 
 print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
+print(dist.sample())
 print(dist.kl(dist))
 print(dist.entropy())
 ```
@@ -108,6 +117,61 @@ dist = cnp(
 mean, var = dist.mean, dist.var
 
 print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
+print(dist.sample())
 print(dist.kl(dist))
 print(dist.entropy())
+```
+
+## Build Your Own Model
+
+### ConvGNP
+
+#### TensorFlow
+```python
+import lab as B
+import tensorflow as tf
+
+import neuralprocesses.tensorflow as nps
+
+dim_x = 1
+dim_y = 1
+
+# CNN architecture:
+unet = nps.UNet(
+    dim=dim_x,
+    in_channels=2 * dim_y,
+    out_channels=(2 + 512) * dim_y,
+    channels=(8, 16, 16, 32, 32, 64),
+)
+
+# Discretisation of the functional embedding:
+disc = nps.Discretisation(
+    points_per_unit=64,
+    multiple=2 ** unet.num_halving_layers,
+    margin=0.1,
+    dim=dim_x,
+)
+
+# Create the encoder and decoder and construct the model.
+encoder = nps.FunctionalCoder(
+    disc,
+    nps.Chain(
+        nps.PrependDensityChannel(),
+        nps.SetConv(disc.points_per_unit),
+        nps.DivideByFirstChannel(),
+    ),
+)
+decoder =  nps.Chain(
+    unet,
+    nps.SetConv(disc.points_per_unit),
+    nps.LowRankGaussianLikelihood(512)
+)
+convgnp = nps.Model(encoder, decoder)
+
+# Run the model on some random data.
+dist = convgnp(
+    B.randn(tf.float32, 16, 1, 10),
+    B.randn(tf.float32, 16, 1, 10),
+    B.randn(tf.float32, 16, 1, 15),
+)
 ```
