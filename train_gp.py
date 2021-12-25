@@ -6,7 +6,6 @@ from wbml.out import Progress
 
 from neuralprocesses.data import GPGenerator
 
-B.epsilon = 1e-7
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--dim_x", type=int, default=1)
@@ -17,10 +16,25 @@ parser.add_argument("--harmonics", type=int, default=0)
 args = parser.parse_args()
 
 batch_size = args.batch_size
-rate = 1e-3
 dim_x = args.dim_x
 dim_y = args.dim_y
 num_harmonics = args.harmonics
+
+
+if dim_x == 1:
+    kernel = EQ().stretch(1) * EQ().periodic(0.25)
+    unet_channels = (256,) * 6
+    B.epsilon = 1e-7
+    rate = 1e-4
+    points_per_unit = 64
+elif dim_x == 2:
+    kernel = EQ().stretch(1) * EQ().periodic(1)
+    unet_channels = (128,) * 6
+    B.epsilon = 1e-7
+    rate = 5e-5
+    points_per_unit = 20
+else:
+    raise RuntimeError("Could not determine kernel for input dimensionality.")
 
 if args.backend == "torch":
 
@@ -78,18 +92,17 @@ B.set_global_device(device)
 
 model = to_device(
     nps.construct_convgnp(
-        points_per_unit=64,
+        points_per_unit=points_per_unit,
         dim_x=dim_x,
         dim_y=dim_y,
-        likelihood="lowrank-correlated",
+        likelihood="lowrank",
         harmonics_range=(-2, 2),
         num_harmonics=num_harmonics,
-        num_basis_functions=256,
+        unet_channels=unet_channels,
+        num_basis_functions=1024,
     )
 )
 
-kernel = EQ().stretch(0.25)
-#  kernel = EQ().stretch(0.5) * EQ().periodic(period=0.25)
 
 gen = GPGenerator(
     backend.float32,
@@ -134,7 +147,7 @@ def with_err(vals):
 
 opt = create_optimiser(model)
 
-with Progress(name="Epochs", total=10_000) as progress_epochs:
+with Progress(name="Epochs", total=10_000, filter_global=None) as progress_epochs:
     for i in range(10_000):
         with Progress(name=f"Epoch {i + 1}", total=gen.num_batches) as progress_epoch:
             for batch in gen.epoch():
@@ -153,26 +166,29 @@ with Progress(name="Epochs", total=10_000) as progress_epochs:
                     {
                         "KL (full)": with_err((vals + batch["pred_logpdf"]) / nt),
                         "KL (diag)": with_err((vals + batch["pred_logpdf_diag"]) / nt),
+                        "Score": B.mean(vals + batch["pred_logpdf"]) / B.mean(-batch["pred_logpdf_diag"] + batch["pred_logpdf"]),
                     }
                 )
 
-        full_vals = []
-        diag_vals = []
-        for batch in gen_eval.epoch():
-            batch_vals = objective(
-                batch["xc"],
-                batch["yc"],
-                batch["xt"],
-                batch["yt"],
+        with backend.no_grad():
+            full_vals = []
+            diag_vals = []
+            for batch in gen_eval.epoch():
+                batch_vals = objective(
+                    batch["xc"],
+                    batch["yc"],
+                    batch["xt"],
+                    batch["yt"],
+                )
+                nt = B.shape(batch["xt"], 2)
+                full_vals.append(B.to_numpy(batch_vals + batch["pred_logpdf"]) / nt)
+                diag_vals.append(B.to_numpy(batch_vals + batch["pred_logpdf_diag"]) / nt)
+            full_vals = B.concat(*full_vals)
+            diag_vals = B.concat(*diag_vals)
+            progress_epochs(
+                {
+                    "KL (full)": with_err(full_vals),
+                    "KL (diag)": with_err(diag_vals),
+                    "Score": B.mean(full_vals) / B.mean(full_vals - diag_vals),
+                }
             )
-            nt = B.shape(batch["xt"], 2)
-            full_vals.append(B.to_numpy(batch_vals + batch["pred_logpdf"]) / nt)
-            diag_vals.append(B.to_numpy(batch_vals + batch["pred_logpdf_diag"]) / nt)
-        full_vals = B.concat(*full_vals)
-        diag_vals = B.concat(*diag_vals)
-        progress_epochs(
-            {
-                "KL (full)": with_err(full_vals),
-                "KL (diag)": with_err(diag_vals),
-            }
-        )
