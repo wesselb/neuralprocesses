@@ -1,4 +1,5 @@
 from typing import Tuple
+import math
 
 import lab as B
 from plum import Dispatcher
@@ -6,7 +7,7 @@ from plum import Dispatcher
 from .parallel import Parallel
 from .util import register_module
 
-__all__ = ["MLP", "UNet", "Splitter"]
+__all__ = ["MLP", "UNet", "ConvNet", "Splitter"]
 
 
 _dispatch = Dispatcher()
@@ -66,7 +67,7 @@ class UNet:
         self.initial_linear = Conv(
             in_channels=in_channels,
             out_channels=channels[0],
-            kernel_size=1,
+            kernel=1,
             dtype=dtype,
         )
 
@@ -74,18 +75,18 @@ class UNet:
         self.final_linear = Conv(
             in_channels=channels[0],
             out_channels=out_channels,
-            kernel_size=1,
+            kernel=1,
             dtype=dtype,
         )
 
         # Before turn layers:
-        kernel_size = 5
+        kernel = 5
         self.before_turn_layers = self.nn.ModuleList(
             [
                 Conv(
                     in_channels=channels[max(i - 1, 0)],
                     out_channels=channels[i],
-                    kernel_size=kernel_size,
+                    kernel=kernel,
                     stride=2,
                     dtype=dtype,
                 )
@@ -108,7 +109,7 @@ class UNet:
                 ConvTranspose(
                     in_channels=get_num_in_channels(i),
                     out_channels=channels[max(i - 1, 0)],
-                    kernel_size=kernel_size,
+                    kernel=kernel,
                     stride=2,
                     output_padding=1,
                     dtype=dtype,
@@ -133,6 +134,67 @@ class UNet:
             h = self.activation(layer(B.concat(h_prev, h, axis=1)))
 
         return self.final_linear(h)
+
+
+@register_module
+class ConvNet:
+    def __init__(
+        self,
+        dim: int,
+        in_channels: int,
+        out_channels: int,
+        channels: int,
+        num_layers: int,
+        points_per_unit: float,
+        receptive_field: float,
+        dtype=None,
+    ):
+        activation = self.nn.ReLU()
+        # To make it a drop-in substitute for :class:`UNet`.
+        self.num_halving_layers = 0
+
+        # Compute kernel size.
+        receptive_points = receptive_field * points_per_unit
+        kernel = math.ceil(1 + (receptive_points - 1) / num_layers)
+        kernel = kernel + 1 if kernel % 2 == 0 else kernel  # Make kernel size odd.
+
+        Conv = getattr(self.nn, f"Conv{dim}d")
+        layers = [
+            Conv(
+                in_channels=in_channels,
+                out_channels=channels,
+                kernel=1,
+            ),
+            activation,
+        ]
+        for _ in range(num_layers):
+            layers.extend(
+                [
+                    Conv(
+                        in_channels=channels,
+                        out_channels=channels,
+                        kernel=kernel,
+                        groups=channels,
+                    ),
+                    Conv(
+                        in_channels=channels,
+                        out_channels=channels,
+                        kernel=1,
+                    ),
+                    activation,
+                ]
+            )
+        layers.append(
+            Conv(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel=1,
+            )
+        )
+        self.conv_net = self.nn.Sequential(*layers)
+
+    def __call__(self, z):
+        return self.conv_net(z)
 
 
 @register_module

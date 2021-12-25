@@ -90,18 +90,52 @@ else:
 
 B.set_global_device(device)
 
-model = to_device(
-    nps.construct_convgnp(
-        points_per_unit=points_per_unit,
-        dim_x=dim_x,
-        dim_y=dim_y,
-        likelihood="lowrank",
-        harmonics_range=(-2, 2),
-        num_harmonics=num_harmonics,
-        unet_channels=unet_channels,
-        num_basis_functions=1024,
-    )
+# model = to_device(
+#     nps.construct_convgnp(
+#         points_per_unit=points_per_unit,
+#         dim_x=dim_x,
+#         dim_y=dim_y,
+#         likelihood="lowrank",
+#         harmonics_range=(-2, 2),
+#         num_harmonics=num_harmonics,
+#         unet_channels=unet_channels,
+#         num_basis_functions=1024,
+#     )
+# )
+
+# Discretisation of the functional embedding:
+disc = nps.Discretisation(
+    points_per_unit=64,
+    multiple=1,
+    margin=0.1,
+    dim=dim_x,
 )
+# DWS CNN:
+cnn = nps.ConvNet(
+    dim=dim_x,
+    in_channels=2 * dim_y,
+    out_channels=(2 + 1024) * dim_y,
+    num_layers=6,
+    channels=64,
+    receptive_field=4,
+    points_per_unit=disc.points_per_unit,
+)
+
+# Create the encoder and decoder and construct the model.
+encoder = nps.FunctionalCoder(
+    disc,
+    nps.Chain(
+        nps.PrependDensityChannel(),
+        nps.SetConv(disc.points_per_unit),
+        nps.DivideByFirstChannel(),
+    ),
+)
+decoder = nps.Chain(
+    cnn,
+    nps.SetConv(disc.points_per_unit),
+    nps.LowRankGaussianLikelihood(1024),
+)
+model = to_device(nps.Model(encoder, decoder))
 
 
 gen = GPGenerator(
@@ -166,7 +200,8 @@ with Progress(name="Epochs", total=10_000, filter_global=None) as progress_epoch
                     {
                         "KL (full)": with_err((vals + batch["pred_logpdf"]) / nt),
                         "KL (diag)": with_err((vals + batch["pred_logpdf_diag"]) / nt),
-                        "Score": B.mean(vals + batch["pred_logpdf"]) / B.mean(-batch["pred_logpdf_diag"] + batch["pred_logpdf"]),
+                        "Score": B.mean(vals + batch["pred_logpdf"])
+                        / B.mean(-batch["pred_logpdf_diag"] + batch["pred_logpdf"]),
                     }
                 )
 
@@ -182,7 +217,9 @@ with Progress(name="Epochs", total=10_000, filter_global=None) as progress_epoch
                 )
                 nt = B.shape(batch["xt"], 2)
                 full_vals.append(B.to_numpy(batch_vals + batch["pred_logpdf"]) / nt)
-                diag_vals.append(B.to_numpy(batch_vals + batch["pred_logpdf_diag"]) / nt)
+                diag_vals.append(
+                    B.to_numpy(batch_vals + batch["pred_logpdf_diag"]) / nt
+                )
             full_vals = B.concat(*full_vals)
             diag_vals = B.concat(*diag_vals)
             progress_epochs(

@@ -20,7 +20,7 @@ def ConvNd(
     dim: int,
     in_channels: int,
     out_channels: int,
-    kernel_size: int,
+    kernel: int,
     stride: int = 1,
     dilation: int = 1,
     groups: int = 1,
@@ -35,7 +35,7 @@ def ConvNd(
         additional_args["output_padding"] = output_padding
 
     # Use same-padding.
-    if kernel_size % 2 != 1:
+    if kernel % 2 != 1:
         raise ValueError("Kernel size must be odd to achieve same-padding.")
 
     # Get the right layer kind.
@@ -47,9 +47,9 @@ def ConvNd(
     return getattr(torch.nn, f"Conv{suffix}{dim}d")(
         in_channels=in_channels,
         out_channels=out_channels,
-        kernel_size=kernel_size,
+        kernel_size=kernel,
         stride=stride,
-        padding=kernel_size // 2,
+        padding=kernel // 2,
         dilation=dilation,
         groups=groups,
         bias=bias,

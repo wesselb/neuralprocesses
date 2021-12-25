@@ -34,7 +34,7 @@ def ConvNd(
     dim: int,
     in_channels: int,
     out_channels: int,
-    kernel_size: int,
+    kernel: int,
     stride: int = 1,
     dilation: int = 1,
     groups: int = 1,
@@ -63,7 +63,7 @@ def ConvNd(
     conv_layer = getattr(tf.keras.layers, f"Conv{dim}D{suffix}")(
         input_shape=(in_channels,) + (None,) * dim,
         filters=out_channels,
-        kernel_size=kernel_size,
+        kernel_size=kernel,
         strides=stride,
         padding="same",
         dilation_rate=dilation,
