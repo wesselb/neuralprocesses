@@ -14,6 +14,7 @@ parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
 parser.add_argument("--backend", choices=["tensorflow", "torch"], required=True)
 parser.add_argument("--batch_size", type=int, default=128)
+parser.add_argument("--rate", type=float, default=1e-4)
 parser.add_argument(
     "--model",
     choices=["cnp", "convcnp", "convgnp-linear"],
@@ -22,6 +23,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 batch_size = args.batch_size
+rate = args.rate
 dim_x = args.dim_x
 dim_y = args.dim_y
 
@@ -30,12 +32,10 @@ wd = WorkingDirectory("_experiments", f"{args.model}")
 if dim_x == 1:
     kernel = EQ().stretch(0.25)
     unet_channels = (128,) * 6
-    rate = 1e-4
     points_per_unit = 64
 elif dim_x == 2:
     kernel = EQ().stretch(0.25)
     unet_channels = (64,) * 6
-    rate = 5e-5
     points_per_unit = 20
 else:
     raise RuntimeError("Could not determine kernel for input dimensionality.")
@@ -210,4 +210,5 @@ for i in range(epochs):
         if B.mean(full_vals) < best_eval_loss:
             # Found new best model. Save it!
             out.out("New best model!")
+            best_eval_loss = B.mean(full_vals)
             save_model_as_best()
