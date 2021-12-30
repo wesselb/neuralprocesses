@@ -67,7 +67,6 @@ if args.backend == "torch":
     def save_model_as_best():
         backend.save(model.state_dict(), wd.file("model.torch"))
 
-
 elif args.backend == "tensorflow":
 
     import tensorflow as backend
@@ -94,7 +93,6 @@ elif args.backend == "tensorflow":
 
     def save_model_as_best():
         model.save_weights(wd.file("model.tensorflow"))
-
 
 else:
     raise ValueError(f'Unknown backend "{args.backend}".')
@@ -135,7 +133,7 @@ gen = GPGenerator(
     backend.float32,
     kernel=kernel,
     batch_size=batch_size,
-    num_context_points=(3, 10),
+    num_context_points=(3, 20),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,
     dim_y=dim_y,
@@ -148,7 +146,7 @@ gen_eval = GPGenerator(
     kernel=kernel,
     num_tasks=2 ** 12,
     batch_size=16,
-    num_context_points=(3, 10),
+    num_context_points=(3, 20),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,
     dim_y=dim_y,
