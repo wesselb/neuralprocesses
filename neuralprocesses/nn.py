@@ -186,7 +186,7 @@ class ConvNet:
             )
         layers.append(
             Conv(
-                in_channels=in_channels,
+                in_channels=channels,
                 out_channels=out_channels,
                 kernel=1,
             )
