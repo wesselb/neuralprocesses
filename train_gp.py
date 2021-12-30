@@ -12,8 +12,8 @@ out.report_time = True
 parser = argparse.ArgumentParser()
 parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
-parser.add_argument("--backend", choices=["tensorflow", "torch"], required=True)
-parser.add_argument("--batch_size", type=int, default=128)
+parser.add_argument("--backend", choices=["tensorflow", "torch"], default="torch")
+parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--rate", type=float, default=1e-4)
 parser.add_argument(
     "--model",
@@ -67,6 +67,7 @@ if args.backend == "torch":
     def save_model_as_best():
         backend.save(model.state_dict(), wd.file("model.torch"))
 
+
 elif args.backend == "tensorflow":
 
     import tensorflow as backend
@@ -93,6 +94,7 @@ elif args.backend == "tensorflow":
 
     def save_model_as_best():
         model.save_weights(wd.file("model.tensorflow"))
+
 
 else:
     raise ValueError(f'Unknown backend "{args.backend}".')
@@ -127,6 +129,7 @@ else:
     raise ValueError(f'Invalid model "{args.model}".')
 
 model = to_device(model)
+out.kv("Num. params", nps.num_params(model))
 
 gen = GPGenerator(
     backend.float32,
@@ -190,25 +193,29 @@ for i in range(epochs):
 
         # The epoch is done. Now evaluate.
         with backend.no_grad():
+            vals = []
             full_vals = []
             diag_vals = []
             for batch in gen_eval.epoch():
-                vals = objective(
+                vs = objective(
                     batch["xc"],
                     batch["yc"],
                     batch["xt"],
                     batch["yt"],
                 )
                 nt = B.shape(batch["xt"], 2)
-                full_vals.append(B.to_numpy(vals + batch["pred_logpdf"]) / nt)
-                diag_vals.append(B.to_numpy(vals + batch["pred_logpdf_diag"]) / nt)
+                vals.append(B.to_numpy(vs) / nt)
+                full_vals.append(B.to_numpy(vs + batch["pred_logpdf"]) / nt)
+                diag_vals.append(B.to_numpy(vs + batch["pred_logpdf_diag"]) / nt)
+            vals = B.concat(*vals)
             full_vals = B.concat(*full_vals)
             diag_vals = B.concat(*diag_vals)
+            out.kv("Loglik", with_err(-vals))
             out.kv("KL (diag)", with_err(diag_vals))
             out.kv("KL (full)", with_err(full_vals))
 
-        if B.mean(full_vals) < best_eval_loss:
+        if B.mean(vals) < best_eval_loss:
             # Found new best model. Save it!
             out.out("New best model!")
-            best_eval_loss = B.mean(full_vals)
+            best_eval_loss = B.mean(vals)
             save_model_as_best()
