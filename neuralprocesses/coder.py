@@ -51,7 +51,7 @@ class DeepSet:
         self,
         phi,
         rho,
-        agg=lambda x: B.mean(x, axis=2, squeeze=False),
+        agg=lambda x: B.sum(x, axis=2, squeeze=False),
     ):
         self.phi = phi
         self.rho = rho

@@ -9,7 +9,7 @@ def construct_gnp(nps):
     def construct_gnp(
         dim_x=1,
         dim_y=1,
-        dim_embedding=64,
+        dim_embedding=128,
         num_enc_layers=6,
         num_dec_layers=6,
         likelihood="lowrank",
@@ -29,16 +29,16 @@ def construct_gnp(nps):
                 nps.DeepSet(
                     nps.MLP(
                         dim_in=dim_x + dim_y,
-                        dim_hidden=dim_embedding,
+                        dim_hidden=512,
                         dim_out=dim_embedding,
-                        num_layers=num_enc_layers,
+                        num_layers=num_enc_layers // 2,
                         dtype=dtype,
                     ),
                     nps.MLP(
                         dim_in=dim_embedding,
-                        dim_hidden=dim_embedding,
+                        dim_hidden=512,
                         dim_out=dim_embedding,
-                        num_layers=num_enc_layers,
+                        num_layers=num_enc_layers // 2,
                         dtype=dtype,
                     ),
                 ),
@@ -48,7 +48,7 @@ def construct_gnp(nps):
             nps.Materialise(),
             nps.MLP(
                 dim_in=dim_x + dim_embedding,
-                dim_hidden=dim_embedding,
+                dim_hidden=512,
                 dim_out=mlp_out_channels,
                 num_layers=num_dec_layers,
                 dtype=dtype,
