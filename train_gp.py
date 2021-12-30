@@ -67,7 +67,6 @@ if args.backend == "torch":
     def save_model_as_best():
         backend.save(model.state_dict(), wd.file("model.torch"))
 
-
 elif args.backend == "tensorflow":
 
     import tensorflow as backend
@@ -94,7 +93,6 @@ elif args.backend == "tensorflow":
 
     def save_model_as_best():
         model.save_weights(wd.file("model.tensorflow"))
-
 
 else:
     raise ValueError(f'Unknown backend "{args.backend}".')
