@@ -46,6 +46,16 @@ def code(encoder: SetConv, xz: B.Numeric, z: B.Numeric, x: tuple):
 
 @_dispatch
 def code(encoder: SetConv, xz: tuple, z: B.Numeric, x: B.Numeric):
+    # Implement batching to allow decoding at very high resolution.
+    batch_size = 1024
+    if B.shape(x, 2) > batch_size:
+        i = 0
+        outs = []
+        while i < B.shape(x, 2):
+            outs.append(code(encoder, xz, z, x[:, :, i : i + batch_size])[1])
+            i += batch_size
+        return x, B.concat(*outs, axis=2)
+
     ws = [compute_weights(encoder, xzi, x[:, i : i + 1, :]) for i, xzi in enumerate(xz)]
     letters_i = 3
     base_base = "ab"
