@@ -120,6 +120,7 @@ class GPGenerator:
             self.state, num_context_points = B.randint(
                 self.state, self.int64, lower=lower, upper=upper + 1
             )
+            lower, upper = self.num_target_points
             self.state, num_target_points = B.randint(
                 self.state, self.int64, lower=lower, upper=upper + 1
             )
