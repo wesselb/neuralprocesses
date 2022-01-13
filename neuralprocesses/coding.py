@@ -9,7 +9,7 @@ __all__ = ["code", "Materialise"]
 
 
 @_dispatch
-def code(f, xz, z, x):
+def code(f, xz, z, x, **kw_args):
     return xz, f(z)
 
 
@@ -69,5 +69,5 @@ class Materialise:
 
 
 @_dispatch
-def code(coder: Materialise, xz, z, x):
+def code(coder: Materialise, xz, z, x, **kw_args):
     return coder.agg_x(xz), coder.agg_y(z)

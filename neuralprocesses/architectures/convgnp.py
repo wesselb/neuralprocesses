@@ -14,8 +14,7 @@ def construct_convgnp(nps):
         likelihood="lowrank",
         unet_channels=(64,) * 6,
         num_basis_functions=512,
-        harmonics_range=None,
-        num_harmonics=0,
+        scale=None,
         dtype=None,
     ):
         unet_in_channels = dim_y + 1
@@ -26,14 +25,6 @@ def construct_convgnp(nps):
             num_basis_functions=num_basis_functions,
             dtype=dtype,
         )
-        if num_harmonics > 0:
-            append_harmonics = nps.AppendHarmonics(
-                x_range=harmonics_range,
-                num_harmonics=num_harmonics,
-            )
-            unet_in_channels += 2 * num_harmonics
-        else:
-            append_harmonics = None
         unet = nps.UNet(
             dim=dim_x,
             in_channels=unet_in_channels,
@@ -47,19 +38,20 @@ def construct_convgnp(nps):
             margin=margin,
             dim=dim_x,
         )
+        if scale is None:
+            scale = 2 / disc.points_per_unit
         return nps.Model(
             nps.FunctionalCoder(
                 disc,
                 nps.Chain(
                     nps.PrependDensityChannel(),
-                    nps.SetConv(disc.points_per_unit, dtype=dtype),
+                    nps.SetConv(scale, dtype=dtype),
                     nps.DivideByFirstChannel(),
-                    append_harmonics,
                 ),
             ),
             nps.Chain(
                 unet,
-                nps.SetConv(disc.points_per_unit, dtype=dtype),
+                nps.SetConv(scale, dtype=dtype),
                 likelihood,
             ),
         )

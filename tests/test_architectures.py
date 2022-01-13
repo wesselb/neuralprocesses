@@ -11,7 +11,12 @@ from .util import nps, generate_data  # noqa
     [
         (model, dict(base_kw_args, dim_x=dim_x, dim_y=dim_y, likelihood=lik))
         for model, base_kw_args in [
-            ("construct_gnp", {"num_basis_functions": 4}),
+            (
+                "construct_gnp",
+                {
+                    "num_basis_functions": 4,
+                },
+            ),
             (
                 "construct_convgnp",
                 {
@@ -31,7 +36,7 @@ def test_architectures(nps, float64, construct_name, kw_args):
         nps.dtype = nps.dtype64
     model = getattr(nps, construct_name)(**kw_args, dtype=nps.dtype)
     xc, yc, xt, yt = generate_data(nps, dim_x=kw_args["dim_x"], dim_y=kw_args["dim_y"])
-    pred = model(xc, yc, xt)
+    pred = model(xc, yc, xt, batch_size=2, unused_arg=None)
     objective = B.sum(pred.logpdf(yt))
     # Check that the objective is finite and of the right data type.
     assert np.isfinite(B.to_numpy(objective))

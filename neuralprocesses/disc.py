@@ -19,13 +19,13 @@ class Discretisation(AbstractDiscretisation):
         self.margin = margin
         self.dim = dim
 
-    def discretise(self, *args):
+    def discretise(self, *args, margin):
         grid_min = B.min(B.stack(*[B.min(x) for x in args if x is not None]))
         grid_max = B.max(B.stack(*[B.max(x) for x in args if x is not None]))
 
         # Add margin.
-        grid_min = grid_min - self.margin
-        grid_max = grid_max + self.margin
+        grid_min = grid_min - margin
+        grid_max = grid_max + margin
 
         # Account for snapping to the grid (below).
         grid_min = grid_min - self.resolution
@@ -60,10 +60,13 @@ class Discretisation(AbstractDiscretisation):
             1,
         )
 
-    def __call__(self, *args):
+    def __call__(self, *args, margin=None, **kw_args):
+        if margin is None:
+            margin = self.margin
         # Cast with `int` so we can safely pass it to `range` below!
         dim = self.dim or int(B.shape(args[0], 1))
         discs = tuple(
-            self.discretise(*[arg[:, i, :] for arg in args]) for i in range(dim)
+            self.discretise(*[arg[:, i, :] for arg in args], margin=margin)
+            for i in range(dim)
         )
         return discs[0] if len(discs) == 1 else discs
