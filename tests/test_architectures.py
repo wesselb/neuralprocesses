@@ -5,8 +5,6 @@ import pytest
 from .util import nps, generate_data  # noqa
 
 
-
-
 @pytest.mark.parametrize("float64", [False, True])
 @pytest.mark.parametrize(
     "construct_name, kw_args",
