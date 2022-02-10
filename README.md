@@ -76,6 +76,54 @@ print(dist.kl(dist))
 print(dist.entropy())
 ```
 
+#### ConvGNP with Auxiliary Variables
+
+```python
+import lab as B
+import tensorflow as tf
+
+import neuralprocesses.tensorflow as nps
+
+cnp = nps.construct_convgnp(
+    dim_x=2,
+    dim_yc=(
+        3,  # Observed data has three dimensions.
+        1,  # First auxiliary variable has one dimension.
+        2,  # Second auxiliary variables has two dimensions.
+    ),
+    dim_yt=3,  # Predictions have three dimensions.
+    num_basis_functions=64, 
+    likelihood="lowrank",
+)
+
+observed_data = (
+    B.randn(tf.float32, 16, 2, 10),
+    B.randn(tf.float32, 16, 3, 10),
+)
+
+# Define two auxiliary variables. One is specified like the observed data, and the other
+# is observed on a grid of points.
+aux_var1 = (
+    B.randn(tf.float32, 16, 2, 10),
+    B.randn(tf.float32, 16, 1, 10),  # Has one dimension.
+)
+aux_var2 = (
+    (B.randn(tf.float32, 16, 1, 25), B.randn(tf.float32, 16, 1, 35)),
+    B.randn(tf.float32, 16, 2, 25, 35),  # Has two dimensions.
+)
+
+dist = cnp(
+    [observed_data, aux_var1, aux_var2],
+    B.randn(tf.float32, 16, 2, 15),
+)
+mean, var = dist.mean, dist.var
+
+print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
+print(dist.sample())
+print(dist.kl(dist))
+print(dist.entropy())
+```
+
 ### PyTorch
 
 #### GNP
