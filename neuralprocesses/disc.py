@@ -1,6 +1,9 @@
 import lab as B
 from lab.shape import Dimension
+from plum import List
 
+from . import _dispatch
+from .parallel import Parallel
 from .util import register_module
 
 __all__ = ["AbstractDiscretisation", "Discretisation"]
@@ -63,10 +66,24 @@ class Discretisation(AbstractDiscretisation):
     def __call__(self, *args, margin=None, **kw_args):
         if margin is None:
             margin = self.margin
-        # Cast with `int` so we can safely pass it to `range` below!
-        dim = self.dim or int(B.shape(args[0], 1))
-        discs = tuple(
-            self.discretise(*[arg[:, i, :] for arg in args], margin=margin)
-            for i in range(dim)
-        )
+        coords = _split_coordinates(Parallel(*args), dim=self.dim)
+        discs = tuple(self.discretise(*cs, margin=margin) for cs in coords)
         return discs[0] if len(discs) == 1 else discs
+
+
+@_dispatch
+def _split_coordinates(x: B.Numeric, dim=None) -> List[List[B.Numeric]]:
+    # Cast with `int` so we can safely pass it to `range` below!
+    dim = dim or int(B.shape(x, 1))
+    return [[x[:, i, :]] for i in range(dim)]
+
+
+@_dispatch
+def _split_coordinates(x: Parallel, dim=None) -> List[List[B.Numeric]]:
+    all_coords = zip(*(_split_coordinates(xi, dim=dim) for xi in x))
+    return [sum(coords, []) for coords in all_coords]
+
+
+@_dispatch
+def _split_coordinates(x: tuple, dim=None) -> List[List[B.Numeric]]:
+    return [[xi] for xi in x]

@@ -1,10 +1,29 @@
 import lab as B
 from matrix.util import indent
+from plum import List, Tuple, Union
 
+from . import _dispatch
 from .coding import code
+from .parallel import Parallel
 from .util import register_module
 
 __all__ = ["Model"]
+
+
+@_dispatch
+def _convert_empty_contexts_to_none(xc, yc: B.Numeric):
+    if all([B.shape(yc, i) == 0 for i in range(2, B.rank(yc))]):
+        return None, None
+    else:
+        return xc, yc
+
+
+@_dispatch
+def _convert_empty_contexts_to_none(xc: Parallel, yc: Parallel):
+    xc, yc = zip(
+        *[_convert_empty_contexts_to_none(xci, yci) for xci, yci in zip(xc, yc)]
+    )
+    return Parallel(*xc), Parallel(*yc)
 
 
 @register_module
@@ -13,20 +32,33 @@ class Model:
         self.encoder = encoder
         self.decoder = decoder
 
+    @_dispatch
     def __call__(
         self,
-        xc: B.Numeric,
-        yc: B.Numeric,
+        xc,
+        yc,
         xt: B.Numeric,
         num_samples=1,
         **kw_args,
     ):
-        if B.shape(xc, 2) == 0:
-            xc = None
-            yc = None
+        xc, yc = _convert_empty_contexts_to_none(xc, yc)
         xz, z = code(self.encoder, xc, yc, xt, **kw_args)
         _, d = code(self.decoder, xz, z, xt, **kw_args)
         return d
+
+    @_dispatch
+    def __call__(
+        self,
+        contexts: List[Tuple[Union[tuple, B.Numeric], B.Numeric]],
+        xt: B.Numeric,
+        num_samples=1,
+        **kw_args,
+    ):
+        return self(
+            Parallel(*(c[0] for c in contexts)),
+            Parallel(*(c[1] for c in contexts)),
+            xt,
+        )
 
     def __str__(self):
         return (

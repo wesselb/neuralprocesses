@@ -19,7 +19,7 @@ class Chain:
         links = tuple(filter(None, links))
         try:
             self.links = self.nn.ModuleList(links)
-        except AttributeError:
+        except Exception:
             self.links = links
 
     def __call__(self, x):

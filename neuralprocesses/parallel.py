@@ -18,7 +18,7 @@ class Parallel:
     def __init__(self, *elements):
         try:
             self.elements = self.nn.ModuleList(elements)
-        except AttributeError:
+        except Exception:
             self.elements = elements
 
     def __call__(self, x):

@@ -1,3 +1,5 @@
+from plum import convert
+
 from .lik import construct_likelihood
 from ..util import register_model
 
@@ -9,6 +11,8 @@ def construct_convgnp(nps):
     def construct_convgnp(
         dim_x=1,
         dim_y=1,
+        dim_yc=None,
+        dim_yt=None,
         points_per_unit=64,
         margin=0.1,
         likelihood="lowrank",
@@ -17,11 +21,14 @@ def construct_convgnp(nps):
         scale=None,
         dtype=None,
     ):
-        unet_in_channels = dim_y + 1
+        dim_yc = convert(dim_yc or dim_y, tuple)
+        dim_yt = dim_yt or dim_y
+        # `len(dim_yc)` is equal to the number of density channels.
+        unet_in_channels = sum(dim_yc) + len(dim_yc)
         unet_out_channels, likelihood = construct_likelihood(
             nps,
             spec=likelihood,
-            dim_y=dim_y,
+            dim_y=dim_yt,
             num_basis_functions=num_basis_functions,
             dtype=dtype,
         )
