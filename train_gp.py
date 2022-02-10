@@ -144,7 +144,7 @@ gen = GPGenerator(
 gen_eval = GPGenerator(
     backend.float32,
     kernel=kernel,
-    num_tasks=2 ** 12,
+    num_tasks=2**12,
     batch_size=16,
     num_context_points=(3, 20),
     num_target_points=50,

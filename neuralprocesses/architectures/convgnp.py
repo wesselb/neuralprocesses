@@ -41,7 +41,7 @@ def construct_convgnp(nps):
         )
         disc = nps.Discretisation(
             points_per_unit=points_per_unit,
-            multiple=2 ** unet.num_halving_layers,
+            multiple=2**unet.num_halving_layers,
             margin=margin,
             dim=dim_x,
         )
