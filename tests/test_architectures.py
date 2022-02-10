@@ -5,6 +5,8 @@ import pytest
 from .util import nps, generate_data  # noqa
 
 
+
+
 @pytest.mark.parametrize("float64", [False, True])
 @pytest.mark.parametrize(
     "construct_name, kw_args",
@@ -20,9 +22,9 @@ from .util import nps, generate_data  # noqa
             (
                 "construct_convgnp",
                 {
-                    "num_basis_functions": 4,
+                    "num_basis_functions": 16,
                     "points_per_unit": 16,
-                    "unet_channels": (8,) * 3,
+                    "unet_channels": (8,) * 2,
                 },
             ),
         ]

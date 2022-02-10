@@ -3,6 +3,7 @@ from matrix.util import indent
 from plum import List, Tuple, Union
 
 from . import _dispatch
+from .augment import AugmentedInput
 from .coding import code
 from .parallel import Parallel
 from .util import register_module
@@ -33,14 +34,7 @@ class Model:
         self.decoder = decoder
 
     @_dispatch
-    def __call__(
-        self,
-        xc,
-        yc,
-        xt: B.Numeric,
-        num_samples=1,
-        **kw_args,
-    ):
+    def __call__(self, xc, yc, xt, num_samples=1, **kw_args):
         xc, yc = _convert_empty_contexts_to_none(xc, yc)
         xz, z = code(self.encoder, xc, yc, xt, **kw_args)
         _, d = code(self.decoder, xz, z, xt, **kw_args)
@@ -49,15 +43,25 @@ class Model:
     @_dispatch
     def __call__(
         self,
+        xc,
+        yc,
+        xt: Tuple[B.Numeric, object],
+        **kw_args,
+    ):
+        return self(xc, yc, AugmentedInput(*xt), **kw_args)
+
+    @_dispatch
+    def __call__(
+        self,
         contexts: List[Tuple[Union[tuple, B.Numeric], B.Numeric]],
-        xt: B.Numeric,
-        num_samples=1,
+        xt,
         **kw_args,
     ):
         return self(
             Parallel(*(c[0] for c in contexts)),
             Parallel(*(c[1] for c in contexts)),
             xt,
+            **kw_args,
         )
 
     def __str__(self):

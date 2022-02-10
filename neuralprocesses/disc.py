@@ -1,8 +1,11 @@
+from typing import Optional
+
 import lab as B
 from lab.shape import Dimension
 from plum import List
 
 from . import _dispatch
+from .augment import AugmentedInput
 from .parallel import Parallel
 from .util import register_module
 
@@ -72,18 +75,27 @@ class Discretisation(AbstractDiscretisation):
 
 
 @_dispatch
-def _split_coordinates(x: B.Numeric, dim=None) -> List[List[B.Numeric]]:
+def _split_coordinates(
+    x: B.Numeric, dim: Optional[int] = None
+) -> List[List[B.Numeric]]:
     # Cast with `int` so we can safely pass it to `range` below!
     dim = dim or int(B.shape(x, 1))
     return [[x[:, i, :]] for i in range(dim)]
 
 
 @_dispatch
-def _split_coordinates(x: Parallel, dim=None) -> List[List[B.Numeric]]:
+def _split_coordinates(x: Parallel, dim: Optional[int] = None) -> List[List[B.Numeric]]:
     all_coords = zip(*(_split_coordinates(xi, dim=dim) for xi in x))
     return [sum(coords, []) for coords in all_coords]
 
 
 @_dispatch
-def _split_coordinates(x: tuple, dim=None) -> List[List[B.Numeric]]:
+def _split_coordinates(x: tuple, dim: Optional[int] = None) -> List[List[B.Numeric]]:
     return [[xi] for xi in x]
+
+
+@_dispatch
+def _split_coordinates(
+    x: AugmentedInput, dim: Optional[int] = None
+) -> List[List[B.Numeric]]:
+    return _split_coordinates(x.x, dim=dim)

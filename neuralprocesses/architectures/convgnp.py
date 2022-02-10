@@ -10,6 +10,7 @@ __all__ = ["construct_convgnp"]
 def construct_convgnp(nps):
     def construct_convgnp(
         dim_x=1,
+        dim_xt_aug=None,
         dim_y=1,
         dim_yc=None,
         dim_yt=None,
@@ -25,17 +26,31 @@ def construct_convgnp(nps):
         dim_yt = dim_yt or dim_y
         # `len(dim_yc)` is equal to the number of density channels.
         unet_in_channels = sum(dim_yc) + len(dim_yc)
-        unet_out_channels, likelihood = construct_likelihood(
+        likelihood_in_channels, likelihood = construct_likelihood(
             nps,
             spec=likelihood,
             dim_y=dim_yt,
             num_basis_functions=num_basis_functions,
             dtype=dtype,
         )
+        if dim_xt_aug:
+            likelihood = nps.Augment(
+                nps.Chain(
+                    nps.MLP(
+                        dim_in=unet_channels[-1] + dim_xt_aug,
+                        dim_hidden=128,
+                        dim_out=likelihood_in_channels,
+                        num_layers=3,
+                        dtype=dtype,
+                    ),
+                    likelihood,
+                )
+            )
+            likelihood_in_channels = unet_channels[-1]
         unet = nps.UNet(
             dim=dim_x,
             in_channels=unet_in_channels,
-            out_channels=unet_out_channels,
+            out_channels=likelihood_in_channels,
             channels=unet_channels,
             dtype=dtype,
         )

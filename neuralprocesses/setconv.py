@@ -4,6 +4,7 @@ from string import ascii_lowercase as letters
 import lab as B
 
 from . import _dispatch
+from .augment import AugmentedInput
 from .parallel import Parallel
 from .util import register_module
 
@@ -110,6 +111,12 @@ def code(coder: SetConv, xz: Parallel, z: Parallel, x, **kw_args):
     # The elements of `xzs` should all be equal, so we can just take the first one.
     # Concatenate all encodings along the channel dimension.
     return xzs[0], B.concat(*zs, axis=1)
+
+
+@_dispatch
+def code(coder: SetConv, xz, z, x: AugmentedInput, **kw_args):
+    xz, z = code(coder, xz, z, x.x)
+    return AugmentedInput(xz, x.augmentation), z
 
 
 @register_module

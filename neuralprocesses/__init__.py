@@ -12,6 +12,7 @@ from .likelihood import *
 from .model import *
 from .setconv import *
 from .disc import *
+from .augment import *
 
 from .architectures import *
 

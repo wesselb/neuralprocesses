@@ -195,7 +195,7 @@ unet = nps.UNet(
 # Discretisation of the functional embedding:
 disc = nps.Discretisation(
     points_per_unit=64,
-    multiple=2 ** unet.num_halving_layers,
+    multiple=2**unet.num_halving_layers,
     margin=0.1,
     dim=dim_x,
 )
@@ -205,14 +205,14 @@ encoder = nps.FunctionalCoder(
     disc,
     nps.Chain(
         nps.PrependDensityChannel(),
-        nps.SetConv(disc.points_per_unit),
+        nps.SetConv(scale=2 / disc.points_per_unit),
         nps.DivideByFirstChannel(),
     ),
 )
-decoder =  nps.Chain(
+decoder = nps.Chain(
     unet,
-    nps.SetConv(disc.points_per_unit),
-    nps.LowRankGaussianLikelihood(512)
+    nps.SetConv(scale=2 / disc.points_per_unit),
+    nps.LowRankGaussianLikelihood(512),
 )
 convgnp = nps.Model(encoder, decoder)
 
