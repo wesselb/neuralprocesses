@@ -106,7 +106,7 @@ observed_data = (
 # at arbitrary inputs.
 aux_var1 = (
     B.randn(tf.float32, 16, 2, 12),
-    B.randn(tf.float32, 16, 1, 12),
+    B.randn(tf.float32, 16, 1, 12),  # Has one dimension.
 )
 # The second one is specified on a grid.
 aux_var2 = (
