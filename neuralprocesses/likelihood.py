@@ -51,10 +51,15 @@ class LowRankGaussianLikelihood:
     @_dispatch
     def __call__(self, z: B.Numeric, *, middle=None):
         dim_y = B.shape(z, 1) // (2 + self.rank)
+        dim_inner = B.shape(z, 1) - 2 * dim_y
         return MultiOutputNormal.lowrank(
             z[:, :dim_y, :],
             B.softplus(z[:, dim_y : 2 * dim_y, :]),
-            z[:, 2 * dim_y :, :] / B.sqrt(self.rank),
+            # If everything were independent, we should divide by `B.sqrt(dim_inner)`
+            # to keep the variance constant. However, we really don't want the variance
+            # to be blowing up. Therefore, assume that everything is perfectly
+            # correlated, and divide by `dim_inner` instead.
+            z[:, 2 * dim_y :, :] / dim_inner,
             middle,
         )
 

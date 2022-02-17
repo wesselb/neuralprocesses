@@ -135,8 +135,14 @@ class PrependDensityChannel:
 @register_module
 class DivideByFirstChannel:
     @_dispatch
+    def __init__(self, epsilon: float = 1e-6):
+        self.epsilon = epsilon
+
+    @_dispatch
     def __call__(self, z: B.Numeric):
-        return B.concat(z[:, :1, ...], z[:, 1:, ...] / (z[:, :1, ...] + 1e-8), axis=1)
+        return B.concat(
+            z[:, :1, ...], z[:, 1:, ...] / (z[:, :1, ...] + self.epsilon), axis=1
+        )
 
     @_dispatch
     def __call__(self, z: Parallel):

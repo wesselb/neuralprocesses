@@ -20,6 +20,7 @@ def construct_convgnp(nps):
         unet_channels=(64,) * 6,
         num_basis_functions=512,
         scale=None,
+        epsilon=1e-6,
         dtype=None,
     ):
         dim_yc = convert(dim_yc or dim_y, tuple)
@@ -68,7 +69,7 @@ def construct_convgnp(nps):
                 nps.Chain(
                     nps.PrependDensityChannel(),
                     nps.SetConv(scale, dtype=dtype),
-                    nps.DivideByFirstChannel(),
+                    nps.DivideByFirstChannel(epsilon=epsilon),
                 ),
             ),
             nps.Chain(
