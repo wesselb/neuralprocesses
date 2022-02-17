@@ -20,7 +20,7 @@ def construct_convgnp(nps):
         unet_channels=(64,) * 6,
         num_basis_functions=512,
         scale=None,
-        epsilon=1e-6,
+        epsilon=1e-4,
         dtype=None,
     ):
         dim_yc = convert(dim_yc or dim_y, tuple)
