@@ -20,15 +20,16 @@ from .util import nps, generate_data  # noqa
             (
                 "construct_convgnp",
                 {
-                    "num_basis_functions": 16,
+                    "num_basis_functions": 4,
                     "points_per_unit": 16,
                     "unet_channels": (8,) * 2,
+                    "epsilon": 1e-2,
                 },
             ),
         ]
         for dim_x in [1, 2]
         for dim_y in [1, 2]
-        for lik in ["het", "lowrank"]
+        for lik in ["het", "lowrank", "lowrank-correlated"]
     ],
 )
 def test_architectures(nps, float64, construct_name, kw_args):
