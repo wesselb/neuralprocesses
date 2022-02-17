@@ -1,5 +1,6 @@
 from functools import wraps
 from string import ascii_lowercase as letters
+from typing import Optional
 
 import lab as B
 
@@ -138,12 +139,33 @@ class DivideByFirstChannel:
     def __init__(self, epsilon: float = 1e-6):
         self.epsilon = epsilon
 
-    @_dispatch
-    def __call__(self, z: B.Numeric):
-        return B.concat(
-            z[:, :1, ...], z[:, 1:, ...] / (z[:, :1, ...] + self.epsilon), axis=1
-        )
 
-    @_dispatch
-    def __call__(self, z: Parallel):
-        return Parallel(*(self(zi) for zi in z))
+@_dispatch
+def code(
+    coder: DivideByFirstChannel,
+    xz,
+    z: B.Numeric,
+    x,
+    epsilon: Optional[float] = None,
+    **kw_args,
+):
+    epsilon = epsilon or coder.epsilon
+    return (
+        xz,
+        B.concat(z[:, :1, ...], z[:, 1:, ...] / (z[:, :1, ...] + epsilon), axis=1),
+    )
+
+
+@_dispatch
+def code(
+    coder: DivideByFirstChannel,
+    xz,
+    z: Parallel,
+    x,
+    epsilon: Optional[float] = None,
+    **kw_args,
+):
+    return (
+        xz,
+        Parallel(*(code(coder, xz, zi, x, epsilon=epsilon, **kw_args) for zi in z)),
+    )
