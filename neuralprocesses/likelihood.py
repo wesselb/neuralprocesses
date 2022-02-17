@@ -55,11 +55,7 @@ class LowRankGaussianLikelihood:
         return MultiOutputNormal.lowrank(
             z[:, :dim_y, :],
             B.softplus(z[:, dim_y : 2 * dim_y, :]),
-            # If everything were independent, we should divide by `B.sqrt(dim_inner)`
-            # to keep the variance constant. However, we really don't want the variance
-            # to be blowing up. Therefore, assume that everything is perfectly
-            # correlated, and divide by `dim_inner` instead.
-            z[:, 2 * dim_y :, :] / dim_inner,
+            z[:, 2 * dim_y :, :] / B.sqrt(dim_inner),
             middle,
         )
 
