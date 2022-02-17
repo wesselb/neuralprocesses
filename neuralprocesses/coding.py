@@ -36,6 +36,11 @@ def _merge(z0: B.Numeric, *zs: B.Numeric):
             raise ValueError("Cannot merge inputs.")
     return zs[0]
 
+@_dispatch
+def _merge(z0: tuple, *zs: tuple):
+    zs = (z0,) + zs
+    return tuple(_merge(*zis) for zis in zip(*zs))
+
 
 @_dispatch
 def _repeat_concat(z: B.Numeric):

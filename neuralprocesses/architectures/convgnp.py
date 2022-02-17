@@ -70,6 +70,7 @@ def construct_convgnp(nps):
                     nps.PrependDensityChannel(),
                     nps.SetConv(scale, dtype=dtype),
                     nps.DivideByFirstChannel(epsilon=epsilon),
+                    nps.Materialise(),
                 ),
             ),
             nps.Chain(

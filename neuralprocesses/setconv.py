@@ -109,9 +109,7 @@ def code(coder: SetConv, xz: tuple, z: B.Numeric, x: tuple, **kw_args):
 @_dispatch
 def code(coder: SetConv, xz: Parallel, z: Parallel, x, **kw_args):
     xzs, zs = zip(*(code(coder, xzi, zi, x, **kw_args) for xzi, zi in zip(xz, z)))
-    # The elements of `xzs` should all be equal, so we can just take the first one.
-    # Concatenate all encodings along the channel dimension.
-    return xzs[0], B.concat(*zs, axis=1)
+    return Parallel(*xzs), Parallel(*zs)
 
 
 @_dispatch
@@ -136,7 +134,7 @@ class PrependDensityChannel:
 @register_module
 class DivideByFirstChannel:
     @_dispatch
-    def __init__(self, epsilon: float = 1e-6):
+    def __init__(self, epsilon: float = 1e-8):
         self.epsilon = epsilon
 
 
@@ -159,13 +157,10 @@ def code(
 @_dispatch
 def code(
     coder: DivideByFirstChannel,
-    xz,
+    xz: Parallel,
     z: Parallel,
     x,
-    epsilon: Optional[float] = None,
     **kw_args,
 ):
-    return (
-        xz,
-        Parallel(*(code(coder, xz, zi, x, epsilon=epsilon, **kw_args) for zi in z)),
-    )
+    xzs, zs = zip(*(code(coder, xzi, zi, x, **kw_args) for xzi, zi in zip(xz, z)))
+    return Parallel(*xzs), Parallel(*zs)
