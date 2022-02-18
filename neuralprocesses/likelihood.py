@@ -12,7 +12,16 @@ _dispatch = Dispatcher()
 
 @register_module
 class HeterogeneousGaussianLikelihood:
-    """Gaussian likelihood with heterogeneous noise."""
+    """Gaussian likelihood with heterogeneous noise.
+
+    Args:
+        epsilon (float, optional): Smallest allowable diagonal variance. Defaults to
+            `1e-6`.
+    """
+
+    @_dispatch
+    def __init__(self, epsilon: float = 1e-6):
+        self.epsilon = epsilon
 
     def __str__(self):
         return repr(self)
@@ -24,7 +33,7 @@ class HeterogeneousGaussianLikelihood:
         dim_y = B.shape(z, 1) // 2
         return MultiOutputNormal.diagonal(
             z[:, :dim_y, :],
-            B.softplus(z[:, dim_y:, :]),
+            self.epsilon + B.softplus(z[:, dim_y:, :]),
         )
 
 
@@ -34,13 +43,18 @@ class LowRankGaussianLikelihood:
 
     Args:
         rank (int): Rank of the low-rank part of the noise variance.
+        epsilon (float, optional): Smallest allowable diagonal variance. Defaults to
+            `1e-6`.
 
     Attributes:
         rank (int): Rank of the low-rank part of the noise variance.
+        epsilon (float): Smallest allowable diagonal variance.
     """
 
-    def __init__(self, rank):
+    @_dispatch
+    def __init__(self, rank, epsilon: float = 1e-6):
         self.rank = rank
+        self.epsilon = epsilon
 
     def __str__(self):
         return repr(self)
@@ -54,7 +68,7 @@ class LowRankGaussianLikelihood:
         dim_inner = B.shape(z, 1) - 2 * dim_y
         return MultiOutputNormal.lowrank(
             z[:, :dim_y, :],
-            B.softplus(z[:, dim_y : 2 * dim_y, :]),
+            self.epsilon + B.softplus(z[:, dim_y : 2 * dim_y, :]),
             z[:, 2 * dim_y :, :] / B.sqrt(dim_inner),
             middle,
         )
