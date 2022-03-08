@@ -18,6 +18,8 @@ def construct_convgnp(nps):
         margin=0.1,
         likelihood="lowrank",
         unet_channels=(64,) * 6,
+        unet_activations=None,
+        unet_kernels=5,
         num_basis_functions=512,
         scale=None,
         epsilon=1e-4,
@@ -53,6 +55,8 @@ def construct_convgnp(nps):
             in_channels=unet_in_channels,
             out_channels=likelihood_in_channels,
             channels=unet_channels,
+            kernels=unet_kernels,
+            activations=unet_activations,
             dtype=dtype,
         )
         disc = nps.Discretisation(

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Optional
+from typing import Optional, Union
 
 import lab.tensorflow as B
 import numpy as np
@@ -85,6 +85,38 @@ def ConvNd(
         )
 
 
+def AvgPoolNd(
+    dim: int,
+    kernel: int,
+    stride: Union[None, int] = None,
+    dtype=None,
+):
+    # Only set `data_format` on the GPU: there is no CPU support.
+    if len(tf.config.list_physical_devices("GPU")) > 0:
+        data_format = "channels_first"
+    else:
+        data_format = "channels_last"
+
+    pool_layer = getattr(tf.keras.layers, f"AveragePooling{dim}D")(
+        pool_size=kernel,
+        strides=stride,
+        padding="valid",
+        data_format=data_format,
+        dtype=dtype,
+    )
+
+    if data_format == "channels_first":
+        return pool_layer
+    else:
+        return tf.keras.Sequential(
+            [
+                ChannelsToLast(dtype=dtype),
+                pool_layer,
+                ChannelsToFirst(dtype=dtype),
+            ]
+        )
+
+
 class Interface:
     ReLU = tf.keras.layers.ReLU
 
@@ -108,6 +140,10 @@ class Interface:
     ConvTransposed1d = partial(ConvNd, dim=1, transposed=True)
     ConvTransposed2d = partial(ConvNd, dim=2, transposed=True)
     ConvTransposed3d = partial(ConvNd, dim=3, transposed=True)
+
+    AvgPool1d = partial(AvgPoolNd, dim=1)
+    AvgPool2d = partial(AvgPoolNd, dim=2)
+    AvgPool3d = partial(AvgPoolNd, dim=3)
 
     @staticmethod
     def Parameter(x, dtype=None):

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Optional
+from typing import Optional, Union
 
 import lab.torch as B
 import numpy as np
@@ -58,6 +58,19 @@ def ConvNd(
     )
 
 
+def AvgPoolNd(
+    dim: int,
+    kernel: int,
+    stride: Union[None, int] = None,
+    dtype=None,
+):
+    return getattr(torch.nn, f"AvgPool{dim}d")(
+        kernel_size=kernel,
+        stride=stride,
+        padding=0,
+    )
+
+
 def _is_lambda(f):
     lam = lambda: None
     return isinstance(f, type(lam)) and f.__name__ == lam.__name__
@@ -91,6 +104,10 @@ class Interface:
     ConvTransposed1d = partial(ConvNd, dim=1, transposed=True)
     ConvTransposed2d = partial(ConvNd, dim=2, transposed=True)
     ConvTransposed3d = partial(ConvNd, dim=3, transposed=True)
+
+    AvgPool1d = partial(AvgPoolNd, dim=1)
+    AvgPool2d = partial(AvgPoolNd, dim=2)
+    AvgPool3d = partial(AvgPoolNd, dim=3)
 
     @staticmethod
     def Parameter(x, dtype=None):

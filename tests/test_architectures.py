@@ -23,6 +23,8 @@ from .util import nps, generate_data  # noqa
                     "num_basis_functions": 4,
                     "points_per_unit": 16,
                     "unet_channels": (8,) * 2,
+                    "unet_kernels": (5,) * 2,
+                    "unet_activations": (B.relu,) * 2,
                     "epsilon": 1e-2,
                 },
             ),

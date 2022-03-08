@@ -15,8 +15,7 @@ class HeterogeneousGaussianLikelihood:
     """Gaussian likelihood with heterogeneous noise.
 
     Args:
-        epsilon (float, optional): Smallest allowable diagonal variance. Defaults to
-            `1e-6`.
+        epsilon (float, optional): Smallest allowable variance. Defaults to `1e-6`.
     """
 
     @_dispatch
@@ -43,8 +42,7 @@ class LowRankGaussianLikelihood:
 
     Args:
         rank (int): Rank of the low-rank part of the noise variance.
-        epsilon (float, optional): Smallest allowable diagonal variance. Defaults to
-            `1e-6`.
+        epsilon (float, optional): Smallest allowable variance. Defaults to `1e-6`.
 
     Attributes:
         rank (int): Rank of the low-rank part of the noise variance.
