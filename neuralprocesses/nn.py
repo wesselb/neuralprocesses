@@ -126,11 +126,7 @@ class UNet:
                             stride=1,
                             dtype=dtype,
                         ),
-                        AvgPool(
-                            kernel=2,
-                            stride=2,
-                            dtype=dtype
-                        ),
+                        AvgPool(kernel=2, stride=2, dtype=dtype),
                     )
                     if self.receptive_fields[i] % 2 == 1
                     # Perform subsampling if the previous receptive field is even.
