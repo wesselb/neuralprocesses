@@ -88,7 +88,7 @@ class UNet:
         self.receptive_fields = [1]
         # Forward pass:
         for kernel in self.kernels:
-            after_conv = self.receptive_fields[-1] + 2 * (kernel - 1) // 2
+            after_conv = self.receptive_fields[-1] + (kernel - 1)
             if after_conv % 2 == 0:
                 # If even, then subsample.
                 self.receptive_fields.append(after_conv // 2)
@@ -98,7 +98,7 @@ class UNet:
         # Backward pass:
         for kernel in reversed(self.kernels):
             after_interp = self.receptive_fields[-1] * 2 - 1
-            self.receptive_fields.append(after_interp + 2 * (kernel - 1) // 2)
+            self.receptive_fields.append(after_interp + (kernel - 1))
         self.receptive_field = self.receptive_fields[-1]
 
         Conv = getattr(self.nn, f"Conv{dim}d")

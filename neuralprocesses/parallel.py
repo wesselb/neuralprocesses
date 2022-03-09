@@ -42,18 +42,18 @@ class Parallel:
 
 
 @_dispatch
-def code(p: Parallel, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
+def code(p: Parallel, xz, z, x, **kw_args):
     xz, z = zip(*[code(pi, xz, z, x, **kw_args) for pi in p])
     return Parallel(*xz), Parallel(*z)
 
 
 @_dispatch
-def code(p: Parallel, xz: B.Numeric, z: Parallel, x: B.Numeric, **kw_args):
+def code(p: Parallel, xz, z: Parallel, x, **kw_args):
     xz, z = zip(*[code(pi, xz, zi, x, **kw_args) for (pi, zi) in zip(p, z)])
     return Parallel(*xz), Parallel(*z)
 
 
 @_dispatch
-def code(p: Parallel, xz: Parallel, z: Parallel, x: B.Numeric, **kw_args):
+def code(p: Parallel, xz: Parallel, z: Parallel, x, **kw_args):
     xz, z = zip(*[code(pi, xzi, zi, x, **kw_args) for (pi, xzi, zi) in zip(p, xz, z)])
     return Parallel(*xz), Parallel(*z)
