@@ -5,6 +5,8 @@ import numpy as np
 from mlkernels import EQ
 from neuralprocesses.data import GPGenerator
 from wbml.experiment import WorkingDirectory
+import matplotlib.pyplot as plt
+from wbml.out import tweak
 import wbml.out as out
 
 out.report_time = True
@@ -27,16 +29,18 @@ rate = args.rate
 dim_x = args.dim_x
 dim_y = args.dim_y
 
-wd = WorkingDirectory("_experiments", f"{args.model}")
+wd = WorkingDirectory("_experiments", f"{args.model}", f"x{dim_x}_y{dim_y}")
 
 if dim_x == 1:
     kernel = EQ().stretch(0.25)
     unet_channels = (128,) * 6
     points_per_unit = 64
+    margin = 7
 elif dim_x == 2:
     kernel = EQ().stretch(0.25)
-    unet_channels = (64,) * 6
-    points_per_unit = 20
+    unet_channels = (128,) * 6
+    points_per_unit = 64 / 2
+    margin = 0.1  # Cannot permit a big margin.
 else:
     raise RuntimeError("Could not determine kernel for input dimensionality.")
 
@@ -64,8 +68,8 @@ if args.backend == "torch":
         opt.step()
         return vals
 
-    def save_model_as_best():
-        backend.save(model.state_dict(), wd.file("model.torch"))
+    def save_model(name):
+        backend.save(model.state_dict(), wd.file(f"model-{name}.torch"))
 
 elif args.backend == "tensorflow":
 
@@ -91,8 +95,8 @@ elif args.backend == "tensorflow":
         opt.apply_gradients(zip(grads, model.trainable_weights))
         return vals
 
-    def save_model_as_best():
-        model.save_weights(wd.file("model.tensorflow"))
+    def save_model(name):
+        model.save_weights(wd.file(f"model-{name}.tensorflow"))
 
 else:
     raise ValueError(f'Unknown backend "{args.backend}".')
@@ -107,6 +111,7 @@ if args.model == "convcnp":
         dim_y=dim_y,
         likelihood="het",
         unet_channels=unet_channels,
+        margin=margin,
     )
 elif args.model == "cnp":
     model = nps.construct_gnp(
@@ -122,6 +127,7 @@ elif args.model == "convgnp-linear":
         likelihood="lowrank",
         unet_channels=unet_channels,
         num_basis_functions=1024,
+        margin=margin,
     )
 else:
     raise ValueError(f'Invalid model "{args.model}".')
@@ -170,7 +176,11 @@ def with_err(vals):
     return f"{mean:7.3f} +- {err:7.3f}"
 
 
-epochs = 10_000
+def first_np(x):
+    return B.to_numpy(x[0, 0, :])
+
+
+epochs = 500
 opt = create_optimiser(model)
 best_eval_loss = np.inf
 
@@ -188,6 +198,9 @@ for i in range(epochs):
                     batch["yt"],
                 ),
             )
+
+        # Save current model.
+        save_model("last")
 
         # The epoch is done. Now evaluate.
         with backend.no_grad():
@@ -212,8 +225,70 @@ for i in range(epochs):
             out.kv("KL (diag)", with_err(diag_vals))
             out.kv("KL (full)", with_err(full_vals))
 
+        # Check if the model is the new best.
         if B.mean(vals) < best_eval_loss:
             # Found new best model. Save it!
             out.out("New best model!")
             best_eval_loss = B.mean(vals)
-            save_model_as_best()
+            save_model("best")
+
+        # Visualise the model.
+        if dim_x == 1 and dim_y == 1:
+            with backend.no_grad():
+                batch = gen_eval.generate_batch()
+                with B.on_device(batch["xt"]):
+                    x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
+                    x = B.tile(x, B.shape(batch["xt"], 0))
+                pred = model(batch["xc"], batch["yc"], x)
+
+                plt.figure()
+                # Plot context and target.
+                plt.scatter(
+                    first_np(batch["xc"]),
+                    first_np(batch["yc"]),
+                    label="Context",
+                    style="train",
+                )
+                plt.scatter(
+                    first_np(batch["xt"]),
+                    first_np(batch["yt"]),
+                    label="Context",
+                    style="test",
+                )
+                # Plot prediction.
+                err = 1.96 * B.sqrt(pred.var)
+                plt.plot(
+                    first_np(x),
+                    first_np(pred.mean),
+                    label="Prediction",
+                    style="pred1",
+                )
+                plt.fill_between(
+                    first_np(x),
+                    first_np(pred.mean - err),
+                    first_np(pred.mean + err),
+                    style="pred1",
+                )
+                # Plot prediction by ground truth.
+                f = GP(kernel)
+                f = f | (f(batch["xc"], 0.05**2), batch["yc"])
+                mean, lower, upper = f(x).marginal_credible_bounds()
+                plt.plot(
+                    first_np(x),
+                    first_np(mean),
+                    label="Truth",
+                    style="pred2",
+                )
+                plt.plot(
+                    first_np(x),
+                    first_np(lower),
+                    style="pred2",
+                )
+                plt.plot(
+                    first_np(x),
+                    first_np(upper),
+                    style="pred2",
+                )
+                tweak()
+                plt.savefig(wd.file(f"epoch-{i:03d}.pdf"))
+                plt.close()
