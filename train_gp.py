@@ -138,11 +138,11 @@ elif args.model == "convgnp-linear":
         with B.on_device(device):
             x_lc = B.linspace(backend.float32, -2, 2, 256 + 1)[None, None, :]
             x_lc = B.tile(x_lc, batch_size, 1, 1)
-            y_lc = B.randn(backend.float32, batch_size, 1, 256 + 1)
+            y_lc = B.randn(backend.float32, batch_size, 10, 256 + 1)
         model.y_lc = model.nn.Parameter(y_lc)
 
         def run_model(xc, yc, xt):
-            return model([(xc, yc), (x_lc, model.l_yc)], xt)
+            return model([(xc, yc), (x_lc, model.y_lc)], xt)
 
     else:
 
