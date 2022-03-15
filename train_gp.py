@@ -1,14 +1,14 @@
 import argparse
 
 import lab as B
+import matplotlib.pyplot as plt
 import numpy as np
-from stheno import GP
+import wbml.out as out
 from mlkernels import EQ
 from neuralprocesses.data import GPGenerator
+from stheno import GP
 from wbml.experiment import WorkingDirectory
-import matplotlib.pyplot as plt
 from wbml.plot import tweak
-import wbml.out as out
 
 out.report_time = True
 
@@ -114,22 +114,48 @@ if args.model == "convcnp":
         unet_channels=unet_channels,
         margin=margin,
     )
+    run_model = model
 elif args.model == "cnp":
     model = nps.construct_gnp(
         dim_x=dim_x,
         dim_y=dim_y,
         likelihood="het",
     )
+    run_model = model
 elif args.model == "convgnp-linear":
-    model = nps.construct_convgnp(
-        points_per_unit=points_per_unit,
-        dim_x=dim_x,
-        dim_y=dim_y,
-        likelihood="lowrank",
-        unet_channels=unet_channels,
-        num_basis_functions=1024,
-        margin=margin,
-    )
+    if dim_x == 1 and dim_y == 1:
+        model = nps.construct_convgnp(
+            points_per_unit=points_per_unit,
+            dim_x=dim_x,
+            dim_y=dim_y,
+            dim_yc=(dim_y, 10),
+            likelihood="lowrank",
+            unet_channels=unet_channels,
+            num_basis_functions=1024,
+            margin=margin,
+        )
+
+        with B.on_device(device):
+            x_lc = B.linspace(backend.float32, -2, 2, 256 + 1)[None, None, :]
+            x_lc = B.tile(x_lc, batch_size, 1, 1)
+            y_lc = B.randn(backend.float32, batch_size, 1, 256 + 1)
+        model.y_lc = model.nn.Parameter(y_lc)
+
+        def run_model(xc, yc, xt):
+            return model([(xc, yc), (x_lc, model.l_yc)], xt)
+
+    else:
+
+        model = nps.construct_convgnp(
+            points_per_unit=points_per_unit,
+            dim_x=dim_x,
+            dim_y=dim_y,
+            likelihood="lowrank",
+            unet_channels=unet_channels,
+            num_basis_functions=1024,
+            margin=margin,
+        )
+
 else:
     raise ValueError(f'Invalid model "{args.model}".')
 
@@ -164,7 +190,7 @@ gen_eval = GPGenerator(
 
 
 def objective(xc, yc, xt, yt):
-    pred = model(xc, yc, xt)
+    pred = run_model(xc, yc, xt)
     # Use `float64`s for the logpdf computation.
     pred = B.cast(backend.float64, pred)
     return -pred.logpdf(B.cast(backend.float64, yt))
@@ -245,7 +271,7 @@ for i in range(epochs):
                 with B.on_device(batch["xt"]):
                     x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
                     x = B.tile(x, B.shape(batch["xt"], 0), 1, 1)
-                pred = model(batch["xc"], batch["yc"], x)
+                pred = run_model(batch["xc"], batch["yc"], x)
 
                 plt.figure(figsize=(6, 4))
                 # Plot context and target.
