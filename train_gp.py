@@ -2,11 +2,12 @@ import argparse
 
 import lab as B
 import numpy as np
+from stheno import GP
 from mlkernels import EQ
 from neuralprocesses.data import GPGenerator
 from wbml.experiment import WorkingDirectory
 import matplotlib.pyplot as plt
-from wbml.out import tweak
+from wbml.plot import tweak
 import wbml.out as out
 
 out.report_time = True
@@ -177,7 +178,12 @@ def with_err(vals):
 
 
 def first_np(x):
-    return B.to_numpy(x[0, 0, :])
+    if B.rank(x) == 3:
+        return B.to_numpy(x[0, 0, :])
+    elif B.rank(x) == 2:
+        return B.to_numpy(x[0, :])
+    else:
+        raise ValueError(f"Rank must be two or three.")
 
 
 epochs = 500
@@ -232,28 +238,30 @@ for i in range(epochs):
             best_eval_loss = B.mean(vals)
             save_model("best")
 
-        # Visualise the model.
+        # Visualise a prediction by the model.
         if dim_x == 1 and dim_y == 1:
             with backend.no_grad():
                 batch = gen_eval.generate_batch()
                 with B.on_device(batch["xt"]):
                     x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
-                    x = B.tile(x, B.shape(batch["xt"], 0))
+                    x = B.tile(x, B.shape(batch["xt"], 0), 1, 1)
                 pred = model(batch["xc"], batch["yc"], x)
 
-                plt.figure()
+                plt.figure(figsize=(6, 4))
                 # Plot context and target.
                 plt.scatter(
                     first_np(batch["xc"]),
                     first_np(batch["yc"]),
                     label="Context",
                     style="train",
+                    s=20,
                 )
                 plt.scatter(
                     first_np(batch["xt"]),
                     first_np(batch["yt"]),
                     label="Context",
                     style="test",
+                    s=20,
                 )
                 # Plot prediction.
                 err = 1.96 * B.sqrt(pred.var)
@@ -261,34 +269,48 @@ for i in range(epochs):
                     first_np(x),
                     first_np(pred.mean),
                     label="Prediction",
-                    style="pred1",
+                    style="pred",
                 )
                 plt.fill_between(
                     first_np(x),
                     first_np(pred.mean - err),
                     first_np(pred.mean + err),
-                    style="pred1",
+                    style="pred",
+                )
+                plt.plot(
+                    first_np(x),
+                    first_np(pred.sample(5)[:, 0]),
+                    style="pred",
+                    ls="-",
+                    lw=0.5,
                 )
                 # Plot prediction by ground truth.
                 f = GP(kernel)
-                f = f | (f(batch["xc"], 0.05**2), batch["yc"])
-                mean, lower, upper = f(x).marginal_credible_bounds()
+                # Make sure that everything is of `float64`s and on the GPU.
+                noise = B.to_active_device(B.cast(backend.float64, gen_eval.noise))
+                xc = B.transpose(B.cast(backend.float64, batch["xc"]))
+                yc = B.transpose(B.cast(backend.float64, batch["yc"]))
+                x = B.transpose(B.cast(backend.float64, x))
+                # Compute posterior GP.
+                f_post = f | (f(xc, noise), yc)
+                mean, lower, upper = f_post(x).marginal_credible_bounds()
                 plt.plot(
-                    first_np(x),
+                    first_np(B.transpose(x)),
                     first_np(mean),
                     label="Truth",
                     style="pred2",
                 )
                 plt.plot(
-                    first_np(x),
+                    first_np(B.transpose(x)),
                     first_np(lower),
                     style="pred2",
                 )
                 plt.plot(
-                    first_np(x),
+                    first_np(B.transpose(x)),
                     first_np(upper),
                     style="pred2",
                 )
+                plt.xlim(B.min(x), B.max(x))
                 tweak()
                 plt.savefig(wd.file(f"epoch-{i:03d}.pdf"))
                 plt.close()
