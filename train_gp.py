@@ -15,13 +15,21 @@ out.report_time = True
 parser = argparse.ArgumentParser()
 parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
-parser.add_argument("--backend", choices=["tensorflow", "torch"], default="torch")
+parser.add_argument(
+    "--backend",
+    choices=["tensorflow", "torch"],
+    default="torch",
+)
 parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--rate", type=float, default=1e-4)
 parser.add_argument("--margin", type=float, default=2)
-parser.add_argument("--conv_arch", choices=["unet", "dws"], nargs=1, default="unet")
+parser.add_argument(
+    "--conv_arch",
+    choices=["unet", "dws"],
+    default="unet",
+)
 parser.add_argument("--learnable_channel", action="store_true")
-parser.add_argument("--subdir", type="str")
+parser.add_argument("--subdir", type=str, nargs="*")
 parser.add_argument(
     "--model",
     choices=["cnp", "convcnp", "convgnp-linear"],
@@ -36,7 +44,7 @@ dim_y = args.dim_y
 margin = args.margin
 conv_arch = args.conv_arch
 learnable_channel = args.learnable_channel
-subdir = "" if args.subdir else (args.subdir,)
+subdir = args.subdir or ()
 
 if learnable_channel:
     suffix = "_lc"
@@ -47,19 +55,20 @@ wd = WorkingDirectory(
     "_experiments",
     *subdir,
     f"{args.model}",
+    conv_arch,
     f"x{dim_x}_y{dim_y}{suffix}",
 )
 
 if dim_x == 1:
     kernel = EQ().stretch(0.25)
+    unet_channels = (128,) * 6
     dws_channels = 128
     dws_receptive_field = 2
-    unet_channels = (dws_channels,) * 6
     points_per_unit = 64
 elif dim_x == 2:
     kernel = EQ().stretch(0.25)
+    unet_channels = (128,) * 6
     dws_channels = 128
-    unet_channels = (dws_channels,) * 6
     dws_receptive_field = 2
     points_per_unit = 64 / 2
     margin = 0.1  # Cannot permit a big margin.
@@ -135,6 +144,7 @@ if args.model == "convcnp":
         conv_arch=conv_arch,
         unet_channels=unet_channels,
         dws_channels=dws_channels,
+        dws_receptive_field=dws_receptive_field,
         margin=margin,
     )
     run_model = model
