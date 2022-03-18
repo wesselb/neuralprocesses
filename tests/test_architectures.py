@@ -28,6 +28,18 @@ from .util import nps, generate_data  # noqa
                     "epsilon": 1e-2,
                 },
             ),
+            (
+                "construct_convgnp",
+                {
+                    "num_basis_functions": 4,
+                    "points_per_unit": 16,
+                    "conv_arch": "dws",
+                    "dws_channels": 8,
+                    "dws_layers": 4,
+                    "dws_receptive_field": 1,
+                    "epsilon": 1e-2,
+                },
+            ),
         ]
         for dim_x in [1, 2]
         for dim_y in [1, 2]

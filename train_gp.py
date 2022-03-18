@@ -18,6 +18,10 @@ parser.add_argument("--dim_y", type=int, default=1)
 parser.add_argument("--backend", choices=["tensorflow", "torch"], default="torch")
 parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--rate", type=float, default=1e-4)
+parser.add_argument("--margin", type=float, default=2)
+parser.add_argument("--conv_arch", choices=["unet", "dws"], nargs=1, default="unet")
+parser.add_argument("--learnable_channel", action="store_true")
+parser.add_argument("--subdir", type="str")
 parser.add_argument(
     "--model",
     choices=["cnp", "convcnp", "convgnp-linear"],
@@ -29,17 +33,34 @@ batch_size = args.batch_size
 rate = args.rate
 dim_x = args.dim_x
 dim_y = args.dim_y
+margin = args.margin
+conv_arch = args.conv_arch
+learnable_channel = args.learnable_channel
+subdir = "" if args.subdir else (args.subdir,)
 
-wd = WorkingDirectory("_experiments", f"{args.model}", f"x{dim_x}_y{dim_y}")
+if learnable_channel:
+    suffix = "_lc"
+else:
+    suffix = ""
+
+wd = WorkingDirectory(
+    "_experiments",
+    *subdir,
+    f"{args.model}",
+    f"x{dim_x}_y{dim_y}{suffix}",
+)
 
 if dim_x == 1:
     kernel = EQ().stretch(0.25)
-    unet_channels = (128,) * 6
+    dws_channels = 128
+    dws_receptive_field = 2
+    unet_channels = (dws_channels,) * 6
     points_per_unit = 64
-    margin = 7
 elif dim_x == 2:
     kernel = EQ().stretch(0.25)
-    unet_channels = (128,) * 6
+    dws_channels = 128
+    unet_channels = (dws_channels,) * 6
+    dws_receptive_field = 2
     points_per_unit = 64 / 2
     margin = 0.1  # Cannot permit a big margin.
 else:
@@ -111,7 +132,9 @@ if args.model == "convcnp":
         dim_x=dim_x,
         dim_y=dim_y,
         likelihood="het",
+        conv_arch=conv_arch,
         unet_channels=unet_channels,
+        dws_channels=dws_channels,
         margin=margin,
     )
     run_model = model
@@ -123,22 +146,25 @@ elif args.model == "cnp":
     )
     run_model = model
 elif args.model == "convgnp-linear":
-    if dim_x == 1 and dim_y == 1:
+    if learnable_channel:
         model = nps.construct_convgnp(
             points_per_unit=points_per_unit,
             dim_x=dim_x,
             dim_y=dim_y,
-            dim_yc=(dim_y, 10),
+            dim_yc=(dim_y, 128),
             likelihood="lowrank",
+            conv_arch=conv_arch,
             unet_channels=unet_channels,
-            num_basis_functions=1024,
+            dws_channels=dws_channels,
+            dws_receptive_field=dws_receptive_field,
+            num_basis_functions=512,
             margin=margin,
         )
 
         with B.on_device(device):
             x_lc = B.linspace(backend.float32, -2, 2, 256 + 1)[None, None, :]
             x_lc = B.tile(x_lc, batch_size, 1, 1)
-            y_lc = B.randn(backend.float32, batch_size, 10, 256 + 1)
+            y_lc = B.randn(backend.float32, batch_size, 128, 256 + 1)
         model.y_lc = model.nn.Parameter(y_lc)
 
         def run_model(xc, yc, xt):
@@ -151,10 +177,14 @@ elif args.model == "convgnp-linear":
             dim_x=dim_x,
             dim_y=dim_y,
             likelihood="lowrank",
+            conv_arch=conv_arch,
             unet_channels=unet_channels,
-            num_basis_functions=1024,
+            dws_channels=dws_channels,
+            dws_receptive_field=dws_receptive_field,
+            num_basis_functions=512,
             margin=margin,
         )
+        run_model = model
 
 else:
     raise ValueError(f'Invalid model "{args.model}".')
@@ -178,7 +208,7 @@ gen_eval = GPGenerator(
     backend.float32,
     kernel=kernel,
     num_tasks=2**12,
-    batch_size=16,
+    batch_size=batch_size,
     num_context_points=(3, 20),
     num_target_points=50,
     x_ranges=((-2, 2),) * dim_x,
@@ -204,15 +234,17 @@ def with_err(vals):
 
 
 def first_np(x):
-    if B.rank(x) == 3:
-        return B.to_numpy(x[0, 0, :])
-    elif B.rank(x) == 2:
+    if B.rank(x) == 2:
         return B.to_numpy(x[0, :])
+    elif B.rank(x) == 3:
+        return B.to_numpy(x[0, 0, :])
+    elif B.rank(x) == 4:
+        return B.transpose(B.to_numpy(x[0, :, 0, :]))
     else:
-        raise ValueError(f"Rank must be two or three.")
+        raise ValueError(f"Rank must be two, three, or four.")
 
 
-epochs = 500
+epochs = 1000
 opt = create_optimiser(model)
 best_eval_loss = np.inf
 
@@ -285,7 +317,7 @@ for i in range(epochs):
                 plt.scatter(
                     first_np(batch["xt"]),
                     first_np(batch["yt"]),
-                    label="Context",
+                    label="Target",
                     style="test",
                     s=20,
                 )
@@ -305,7 +337,7 @@ for i in range(epochs):
                 )
                 plt.plot(
                     first_np(x),
-                    first_np(pred.sample(5)[:, 0]),
+                    first_np(pred.sample(5)),
                     style="pred",
                     ls="-",
                     lw=0.5,

@@ -201,7 +201,8 @@ class ConvNet:
         dtype=None,
     ):
         activation = self.nn.ReLU()
-        # To make it a drop-in substitute for :class:`UNet`.
+
+        # Make it a drop-in substitute for :class:`UNet`.
         self.num_halving_layers = 0
 
         # Compute kernel size.
@@ -215,6 +216,7 @@ class ConvNet:
                 in_channels=in_channels,
                 out_channels=channels,
                 kernel=1,
+                dtype=dtype,
             ),
             activation,
         ]
@@ -226,11 +228,13 @@ class ConvNet:
                         out_channels=channels,
                         kernel=kernel,
                         groups=channels,
+                        dtype=dtype,
                     ),
                     Conv(
                         in_channels=channels,
                         out_channels=channels,
                         kernel=1,
+                        dtype=dtype,
                     ),
                     activation,
                 ]
@@ -240,6 +244,7 @@ class ConvNet:
                 in_channels=channels,
                 out_channels=out_channels,
                 kernel=1,
+                dtype=dtype,
             )
         )
         self.conv_net = self.nn.Sequential(*layers)
