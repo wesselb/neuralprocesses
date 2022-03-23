@@ -71,7 +71,7 @@ def construct_convgnp(nps):
                     likelihood,
                 )
             )
-            likelihood_in_channels = unet_channels[-1]
+            likelihood_in_channels = unet_channels[0]
 
         # Construct the core CNN architecture of the model.
         if conv_arch == "unet":
