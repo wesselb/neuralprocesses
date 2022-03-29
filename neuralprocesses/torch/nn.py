@@ -114,6 +114,10 @@ class Interface:
     Conv2d = partial(ConvNd, dim=2)
     Conv3d = partial(ConvNd, dim=3)
 
+    UpSampling1d = partial(UpSamplingNd, dim=1)
+    UpSampling2d = partial(UpSamplingNd, dim=2)
+    UpSampling3d = partial(UpSamplingNd, dim=3)
+
     ConvTransposed1d = partial(ConvNd, dim=1, transposed=True)
     ConvTransposed2d = partial(ConvNd, dim=2, transposed=True)
     ConvTransposed3d = partial(ConvNd, dim=3, transposed=True)
