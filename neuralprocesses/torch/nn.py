@@ -60,7 +60,7 @@ def ConvNd(
 
 def UpSamplingNd(
     size: int = 2,
-    interp_method: str = 'bilinear',
+    interp_method: str = "bilinear",
     dtype=None,
 ):
     return getattr(torch.nn, f"Upsample")(
