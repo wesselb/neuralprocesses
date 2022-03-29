@@ -155,6 +155,7 @@ class UNet:
                 return 2 * channels[i]
 
         if use_resize_convs:
+
             def after_turn_layer(i):
                 return self.nn.Sequential(
                     UpSampling(),
@@ -164,9 +165,11 @@ class UNet:
                         kernel=self.kernels[i],
                         stride=1,
                         dtype=dtype,
-                    )
+                    ),
                 )
+
         elif not use_resize_convs:
+
             def after_turn_layer(i):
                 return ConvTranspose(
                     in_channels=get_num_in_channels(i),
