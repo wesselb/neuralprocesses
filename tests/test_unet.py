@@ -25,11 +25,9 @@ def test_unet_1d_receptive_field(nps):
         channels=(3, 5, 7, 5, 3),
         activations=(B.identity,) * 5,
     )
-    # Create perturbation and run the model once.
+    # Run the model once.
     mult = 2**unet.num_halving_layers
-    x = B.zeros(1, 1, int(10 * unet.receptive_field / mult) * mult)
-    x[0, 0, 5 * unet.receptive_field] = 1
-    x = B.cast(nps.dtype, x)
+    x = B.zeros(nps.dtype, 1, 1, mult)
     unet(x)
     # Set all weights to one.
     if isinstance(nps.dtype, B.TFDType):
@@ -39,9 +37,14 @@ def test_unet_1d_receptive_field(nps):
             p.data = p.data * 0 + 1
     else:
         raise RuntimeError("I don't know how to set the weights of the model.")
-    # Check that the computed receptive field is indeed right.
-    n = B.sum(B.cast(B.dtype(x), B.abs(B.flatten(unet(x * 0) - unet(x))) > 0))
-    assert n == unet.receptive_field
+    for offset in range(unet.receptive_field):
+        # Create perturbation.
+        x = B.zeros(1, 1, int(10 * unet.receptive_field / mult) * mult)
+        x[0, 0, 5 * unet.receptive_field + offset] = 1
+        x = B.cast(nps.dtype, x)
+        # Check that the computed receptive field is indeed right.
+        n = B.sum(B.cast(B.dtype(x), B.abs(B.flatten(unet(x * 0) - unet(x))) > 0))
+        assert n == unet.receptive_field
 
 
 def test_unet_2d(nps):
