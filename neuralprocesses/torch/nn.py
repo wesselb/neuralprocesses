@@ -64,7 +64,8 @@ def UpSamplingNd(
     dtype=None,
 ):
     return getattr(torch.nn, f"Upsample")(
-        # scalar multiplier applied over each dim automatically
+        # `scale_factor` is applied to each dimension automatically: it doesn't need to
+        # be repeated.
         scale_factor=size,
         method=interp_method,
         dtype=dtype,
