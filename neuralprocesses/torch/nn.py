@@ -58,6 +58,19 @@ def ConvNd(
     )
 
 
+def UpSamplingNd(
+    size: int = 2,
+    interp_method: str = 'bilinear',
+    dtype=None,
+):
+    return getattr(torch.nn, f"Upsample")(
+        # scalar multiplier applied over each dim automatically
+        scale_factor=size,
+        method=interp_method,
+        dtype=dtype,
+    )
+
+
 def AvgPoolNd(
     dim: int,
     kernel: int,

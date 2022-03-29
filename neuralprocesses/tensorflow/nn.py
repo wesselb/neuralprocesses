@@ -85,6 +85,37 @@ def ConvNd(
         )
 
 
+def UpSamplingNd(
+    dim: int,
+    size: int = 2,
+    interp_method: str = 'bilinear',
+    dtype=None,
+):
+    # Only set `data_format` on the GPU: there is no CPU support.
+    if len(tf.config.list_physical_devices("GPU")) > 0:
+        data_format = "channels_first"
+    else:
+        data_format = "channels_last"
+
+    upsample_layer = getattr(tf.keras.layers, f"UpSampling{dim}D")(
+        size=size if dim == 1 else (size,) * dim,
+        interpolation=interp_method,
+        data_format=data_format,
+        dtype=dtype,
+    )
+
+    if data_format == "channels_first":
+        return upsample_layer
+    else:
+        return tf.keras.Sequential(
+            [
+                ChannelsToLast(dtype=dtype),
+                upsample_layer,
+                ChannelsToFirst(dtype=dtype),
+            ]
+        )
+
+
 def AvgPoolNd(
     dim: int,
     kernel: int,
