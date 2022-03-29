@@ -88,7 +88,7 @@ def ConvNd(
 def UpSamplingNd(
     dim: int,
     size: int = 2,
-    interp_method: str = 'bilinear',
+    interp_method: str = "bilinear",
     dtype=None,
 ):
     # Only set `data_format` on the GPU: there is no CPU support.
