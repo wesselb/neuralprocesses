@@ -1,0 +1,23 @@
+TODOs:
+    UNet:
+        ☐ Multiple conv blocks: `unet_skip_connections=(True, True, False, False)`, `unet_striding=(True, True, False, False)` @high
+        ☐ Even kernel size
+
+    Port:
+        ☐ GNP @high
+            https://github.com/wesselb/neuralprocesses/tree/f4de0a3f9c0d4971d29813a6ff9acf763f73f05c/neuralprocesses/gnp
+        ☐ Port Julia repo @high
+
+    ☐ kvv covariance
+
+Short term:
+    ☐ Change to channels last format
+
+
+Features:
+    ☐ Learnable channel
+        ☐ Gibbs kernel (MLKernels)
+            ☐ `pairwise_from_dist2`
+            ☐ `elwise_from_dist2`
+        ☐ Given initialisation, like PCA
+
