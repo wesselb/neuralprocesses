@@ -67,7 +67,7 @@ def UpSamplingNd(
         # `scale_factor` is applied to each dimension automatically: it doesn't need to
         # be repeated.
         scale_factor=size,
-        method=interp_method,
+        mode=interp_method,
         dtype=dtype,
     )
 
