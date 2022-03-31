@@ -4,6 +4,7 @@ sphinx
 sphinx-rtd-theme
 pytest
 pytest-cov
+pytest-rerunfailures
 coveralls
 black
 torch

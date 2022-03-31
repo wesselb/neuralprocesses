@@ -58,8 +58,8 @@ from .util import nps, generate_data  # noqa
                     "num_basis_functions": 4,
                     "points_per_unit": 16,
                     "conv_arch": "dws",
-                    "dws_channels": 4,
-                    "dws_layers": 2,
+                    "dws_channels": 8,
+                    "dws_layers": 4,
                     "dws_receptive_field": 0.5,
                     "epsilon": 1e-2,
                 },
@@ -70,6 +70,7 @@ from .util import nps, generate_data  # noqa
         for lik in ["het", "lowrank", "lowrank-correlated"]
     ],
 )
+@pytest.mark.flaky(reruns=3)
 def test_architectures(nps, float64, construct_name, kw_args):
     if float64:
         nps.dtype = nps.dtype64
