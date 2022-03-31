@@ -57,7 +57,7 @@ class UNet:
         channels: Tuple[int, ...] = (8, 16, 16, 32, 32, 64),
         kernels: Union[int, Tuple[int, ...]] = 5,
         activations: Union[None, object, Tuple[object, ...]] = None,
-        use_resize_convs: bool = False,
+        resize_convs: bool = False,
         resize_conv_interp_method: str = "nearest",
         dtype=None,
     ):
@@ -156,7 +156,7 @@ class UNet:
                 # Add the skip connection.
                 return 2 * channels[i]
 
-        if use_resize_convs:
+        if resize_convs:
 
             def after_turn_layer(i):
                 return self.nn.Sequential(
@@ -170,7 +170,7 @@ class UNet:
                     ),
                 )
 
-        elif not use_resize_convs:
+        elif not resize_convs:
 
             def after_turn_layer(i):
                 return ConvTranspose(
