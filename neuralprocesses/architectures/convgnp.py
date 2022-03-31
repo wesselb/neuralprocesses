@@ -84,7 +84,7 @@ def construct_convgnp(nps):
                 channels=unet_channels,
                 kernels=unet_kernels,
                 activations=unet_activations,
-                use_resize_convs=unet_resize_convs,
+                resize_convs=unet_resize_convs,
                 resize_conv_interp_method=unet_resize_conv_interp_method,
                 dtype=dtype,
             )
