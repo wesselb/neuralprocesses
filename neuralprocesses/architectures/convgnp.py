@@ -22,7 +22,7 @@ def construct_convgnp(nps):
         unet_channels=(64,) * 6,
         unet_activations=None,
         unet_kernels=5,
-        unet_use_resize_convs=True,
+        unet_resize_convs=False,
         unet_resize_conv_interp_method="nearest",
         dws_receptive_field=None,
         dws_layers=8,
@@ -84,7 +84,7 @@ def construct_convgnp(nps):
                 channels=unet_channels,
                 kernels=unet_kernels,
                 activations=unet_activations,
-                use_resize_convs=unet_use_resize_convs,
+                use_resize_convs=unet_resize_convs,
                 resize_conv_interp_method=unet_resize_conv_interp_method,
                 dtype=dtype,
             )
