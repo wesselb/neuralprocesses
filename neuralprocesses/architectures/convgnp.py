@@ -22,6 +22,8 @@ def construct_convgnp(nps):
         unet_channels=(64,) * 6,
         unet_activations=None,
         unet_kernels=5,
+        unet_resize_convs=False,
+        unet_resize_conv_interp_method="nearest",
         dws_receptive_field=None,
         dws_layers=8,
         dws_channels=64,
@@ -82,6 +84,8 @@ def construct_convgnp(nps):
                 channels=unet_channels,
                 kernels=unet_kernels,
                 activations=unet_activations,
+                resize_convs=unet_resize_convs,
+                resize_conv_interp_method=unet_resize_conv_interp_method,
                 dtype=dtype,
             )
             receptive_field = conv.receptive_field / points_per_unit

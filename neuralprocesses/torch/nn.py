@@ -58,6 +58,19 @@ def ConvNd(
     )
 
 
+def UpSamplingNd(
+    size: int = 2,
+    interp_method: str = "bilinear",
+    dtype=None,
+):
+    return getattr(torch.nn, "Upsample")(
+        # `scale_factor` is applied to each dimension automatically: it doesn't need to
+        # be repeated.
+        scale_factor=size,
+        mode=interp_method,
+    )
+
+
 def AvgPoolNd(
     dim: int,
     kernel: int,
@@ -100,6 +113,10 @@ class Interface:
     Conv1d = partial(ConvNd, dim=1)
     Conv2d = partial(ConvNd, dim=2)
     Conv3d = partial(ConvNd, dim=3)
+
+    UpSampling1d = partial(UpSamplingNd)
+    UpSampling2d = partial(UpSamplingNd)
+    UpSampling3d = partial(UpSamplingNd)
 
     ConvTransposed1d = partial(ConvNd, dim=1, transposed=True)
     ConvTransposed2d = partial(ConvNd, dim=2, transposed=True)
