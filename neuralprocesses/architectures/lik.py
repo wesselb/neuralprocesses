@@ -23,7 +23,7 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
             nps.Parallel(
                 nps.MLP(
                     in_dim=(2 + num_basis_functions) * dim_y,
-                    dims=((2 + num_basis_functions) * dim_y,) * 3,
+                    layers=((2 + num_basis_functions) * dim_y,) * 3,
                     out_dim=(2 + num_basis_functions) * dim_y,
                     dtype=dtype,
                 ),
@@ -32,7 +32,7 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
                     lambda x: B.mean(x, axis=-1, squeeze=False),
                     nps.MLP(
                         in_dim=factor * num_basis_functions,
-                        dims=(factor * num_basis_functions,) * 3,
+                        layers=(factor * num_basis_functions,) * 3,
                         out_dim=num_basis_functions * num_basis_functions,
                         dtype=dtype,
                     ),

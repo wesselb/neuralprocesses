@@ -18,7 +18,7 @@ class MLP:
     def __init__(
         self,
         in_dim: int,
-        dims: Tuple[int, ...],
+        layers: Tuple[int, ...],
         out_dim: int,
         nonlinearity=None,
         dtype=None,
@@ -29,16 +29,16 @@ class MLP:
             nonlinearity = self.nn.ReLU()
 
         # Build layers.
-        if len(dims) == 0:
+        if len(layers) == 0:
             self.net = self.nn.Linear(in_dim, out_dim, dtype=dtype)
         else:
-            layers = [self.nn.Linear(in_dim, dims[0], dtype=dtype)]
-            for i in range(1, len(dims)):
-                layers.append(nonlinearity)
-                layers.append(self.nn.Linear(dims[i - 1], dims[i], dtype=dtype))
-            layers.append(nonlinearity)
-            layers.append(self.nn.Linear(dims[-1], out_dim, dtype=dtype))
-            self.net = self.nn.Sequential(*layers)
+            net = [self.nn.Linear(in_dim, layers[0], dtype=dtype)]
+            for i in range(1, len(layers)):
+                net.append(nonlinearity)
+                net.append(self.nn.Linear(layers[i - 1], layers[i], dtype=dtype))
+            net.append(nonlinearity)
+            net.append(self.nn.Linear(layers[-1], out_dim, dtype=dtype))
+            self.net = self.nn.Sequential(*net)
 
     def __call__(self, x):
         x = B.transpose(x)

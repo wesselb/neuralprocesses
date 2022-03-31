@@ -12,7 +12,7 @@ __all__ = ["construct_convgnp"]
 def construct_convgnp(
     dim_x=1,
     dim_xt_aug=None,
-    aug_layers=(128,) * 3,
+    dim_xt_aug_layers=(128,) * 3,
     dim_y=1,
     dim_yc=None,
     dim_yt=None,
@@ -67,7 +67,7 @@ def construct_convgnp(
             nps.Chain(
                 nps.MLP(
                     in_dim=conv_out_channels + dim_xt_aug,
-                    dims=aug_layers,
+                    layers=dim_xt_aug_layers,
                     out_dim=likelihood_in_channels,
                     dtype=dtype,
                 ),
