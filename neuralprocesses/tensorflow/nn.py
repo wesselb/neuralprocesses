@@ -103,7 +103,7 @@ def UpSamplingNd(
     layer_kwargs = dict()
     layer_kwargs["size"] = size if dim == 1 else (size,) * dim
     layer_kwargs["dtype"] = dtype
-    if dim == 2 or dim == 3:
+    if dim != 1:
         # UpSampling1D assumes a "channels_last" spec.
         layer_kwargs["data_format"] = data_format
     if dim == 2:
