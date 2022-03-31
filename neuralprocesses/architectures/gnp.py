@@ -29,17 +29,15 @@ def construct_gnp(
             nps.InputsCoder(),
             nps.DeepSet(
                 nps.MLP(
-                    dim_in=dim_x + dim_y,
-                    dim_hidden=512,
-                    dim_out=dim_embedding,
-                    num_layers=num_enc_layers // 2,
+                    in_dim=dim_x + dim_y,
+                    dims=(512,) * (num_enc_layers // 2),
+                    out_dim=dim_embedding,
                     dtype=dtype,
                 ),
                 nps.MLP(
-                    dim_in=dim_embedding,
-                    dim_hidden=512,
-                    dim_out=dim_embedding,
-                    num_layers=num_enc_layers // 2,
+                    in_dim=dim_embedding,
+                    dims=(512,) * (num_enc_layers - num_enc_layers // 2),
+                    out_dim=dim_embedding,
                     dtype=dtype,
                 ),
             ),
@@ -48,10 +46,9 @@ def construct_gnp(
     decoder = nps.Chain(
         nps.Materialise(),
         nps.MLP(
-            dim_in=dim_x + dim_embedding,
-            dim_hidden=512,
-            dim_out=mlp_out_channels,
-            num_layers=num_dec_layers,
+            in_dim=dim_x + dim_embedding,
+            dims=(512,) * num_dec_layers,
+            out_dim=mlp_out_channels,
             dtype=dtype,
         ),
         likelihood,

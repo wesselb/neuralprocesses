@@ -1,5 +1,5 @@
-from typing import Tuple, Union
 import math
+from typing import Tuple, Union
 
 import lab as B
 from plum import Dispatcher
@@ -17,28 +17,28 @@ _dispatch = Dispatcher()
 class MLP:
     def __init__(
         self,
-        dim_in: int,
-        dim_hidden: int,
-        dim_out: int,
-        num_layers: int,
+        in_dim: int,
+        dims: Tuple[int, ...],
+        out_dim: int,
         nonlinearity=None,
         dtype=None,
     ):
+
         # Default to ReLUs.
         if nonlinearity is None:
             nonlinearity = self.nn.ReLU()
 
         # Build layers.
-        if num_layers == 1:
-            layers = self.nn.Linear(dim_in, dim_out, dtype=dtype)
+        if len(dims) == 0:
+            self.net = self.nn.Linear(in_dim, out_dim, dtype=dtype)
         else:
-            layers = [self.nn.Linear(dim_in, dim_hidden, dtype=dtype)]
-            for _ in range(num_layers - 2):
+            layers = [self.nn.Linear(in_dim, dims[0], dtype=dtype)]
+            for i in range(1, len(dims)):
                 layers.append(nonlinearity)
-                layers.append(self.nn.Linear(dim_hidden, dim_hidden, dtype=dtype))
+                layers.append(self.nn.Linear(dims[i - 1], dims[i], dtype=dtype))
             layers.append(nonlinearity)
-            layers.append(self.nn.Linear(dim_hidden, dim_out, dtype=dtype))
-        self.net = self.nn.Sequential(*layers)
+            layers.append(self.nn.Linear(dims[-1], out_dim, dtype=dtype))
+            self.net = self.nn.Sequential(*layers)
 
     def __call__(self, x):
         x = B.transpose(x)

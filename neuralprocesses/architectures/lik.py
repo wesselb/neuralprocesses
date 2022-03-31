@@ -22,20 +22,18 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
             ),
             nps.Parallel(
                 nps.MLP(
-                    dim_in=(2 + num_basis_functions) * dim_y,
-                    dim_hidden=(2 + num_basis_functions) * dim_y,
-                    dim_out=(2 + num_basis_functions) * dim_y,
-                    num_layers=3,
+                    in_dim=(2 + num_basis_functions) * dim_y,
+                    dims=((2 + num_basis_functions) * dim_y,) * 3,
+                    out_dim=(2 + num_basis_functions) * dim_y,
                     dtype=dtype,
                 ),
                 nps.Chain(
                     # Compute global channels.
                     lambda x: B.mean(x, axis=-1, squeeze=False),
                     nps.MLP(
-                        dim_in=factor * num_basis_functions,
-                        dim_hidden=factor * num_basis_functions,
-                        dim_out=num_basis_functions * num_basis_functions,
-                        num_layers=3,
+                        in_dim=factor * num_basis_functions,
+                        dims=(factor * num_basis_functions,) * 3,
+                        out_dim=num_basis_functions * num_basis_functions,
                         dtype=dtype,
                     ),
                 ),
