@@ -1,3 +1,5 @@
+from functools import partial
+
 import lab.torch  # noqa
 
 from .nn import *
@@ -36,4 +38,4 @@ ns = Namespace()
 ns.__dict__.update(globals())
 
 for model in models:
-    globals()[model.__name__] = model(ns)
+    globals()[model.__name__] = partial(model, nps=ns)

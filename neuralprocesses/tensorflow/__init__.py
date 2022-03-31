@@ -1,3 +1,5 @@
+from functools import partial
+
 import lab.tensorflow  # noqa
 from plum import convert
 
@@ -41,4 +43,4 @@ ns = Namespace()
 ns.__dict__.update(globals())
 
 for model in models:
-    globals()[model.__name__] = model(ns)
+    globals()[model.__name__] = partial(model, nps=ns)

@@ -1,9 +1,11 @@
 import lab as B
 
+import neuralprocesses as nps  # This fixes inspection below.
+
 __all__ = ["construct_likelihood"]
 
 
-def construct_likelihood(nps, *, spec, dim_y, num_basis_functions, dtype):
+def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
     if spec == "het":
         num_channels = 2 * dim_y
         lik = nps.HeterogeneousGaussianLikelihood()
