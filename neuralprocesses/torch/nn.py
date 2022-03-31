@@ -63,12 +63,11 @@ def UpSamplingNd(
     interp_method: str = "bilinear",
     dtype=None,
 ):
-    return getattr(torch.nn, f"Upsample")(
+    return getattr(torch.nn, "Upsample")(
         # `scale_factor` is applied to each dimension automatically: it doesn't need to
         # be repeated.
         scale_factor=size,
         mode=interp_method,
-        dtype=dtype,
     )
 
 
