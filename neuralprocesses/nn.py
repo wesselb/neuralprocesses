@@ -57,9 +57,11 @@ class UNet:
         channels: Tuple[int, ...] = (8, 16, 16, 32, 32, 64),
         kernels: Union[int, Tuple[int, ...]] = 5,
         activations: Union[None, object, Tuple[object, ...]] = None,
-        use_resize_convs: bool = True,
+        use_resize_convs: bool = False,
+        resize_conv_interp_method: str = "nearest",
         dtype=None,
     ):
+
         # If `kernel` is an integer, repeat it for every layer.
         if not isinstance(kernels, (tuple, list)):
             kernels = (kernels,) * len(channels)
@@ -158,7 +160,7 @@ class UNet:
 
             def after_turn_layer(i):
                 return self.nn.Sequential(
-                    UpSampling(),
+                    UpSampling(dtype=dtype, interp_method=resize_conv_interp_method),
                     Conv(
                         in_channels=get_num_in_channels(i),
                         out_channels=((channels[0],) + channels)[i],
