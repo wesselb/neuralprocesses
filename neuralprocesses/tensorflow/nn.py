@@ -43,6 +43,12 @@ def ConvNd(
     output_padding: Optional[int] = None,
     dtype=None,
 ):
+    # Only set `data_format` on the GPU: there is no CPU support.
+    if len(tf.config.list_physical_devices("GPU")) > 0:
+        data_format = "channels_first"
+    else:
+        data_format = "channels_last"
+
     # Only set `output_padding` if it is given.
     additional_args = {}
     if output_padding is not None:
@@ -53,12 +59,6 @@ def ConvNd(
         suffix = "Transpose"
     else:
         suffix = ""
-
-    # Only set `data_format` on the GPU: there is no CPU support.
-    if len(tf.config.list_physical_devices("GPU")) > 0:
-        data_format = "channels_first"
-    else:
-        data_format = "channels_last"
 
     conv_layer = getattr(tf.keras.layers, f"Conv{dim}D{suffix}")(
         input_shape=(in_channels,) + (None,) * dim,
@@ -91,48 +91,37 @@ def UpSamplingNd(
     interp_method: str = "nearest",
     dtype=None,
 ):
-    # Only set `data_format` on the GPU: there is no CPU support.
-    if len(tf.config.list_physical_devices("GPU")) > 0:
+    # Only set `data_format` on the GPU: there is no CPU support. Moreover,
+    # `UpSampling1D` does not accept the keyword argument `data_format`.
+    if len(tf.config.list_physical_devices("GPU")) > 0 and dim > 1:
         data_format = "channels_first"
     else:
         data_format = "channels_last"
 
-    # Due to inconsistent input signatures between TensorFlow UpSampling
-    # classes, we must construct conditional layer args dependent
-    # on input dim
-    layer_kwargs = dict()
-    layer_kwargs["size"] = size if dim == 1 else (size,) * dim
-    layer_kwargs["dtype"] = dtype
-    if dim != 1:
-        # UpSampling1D assumes a "channels_last" spec.
-        layer_kwargs["data_format"] = data_format
+    # Due to inconsistent input signatures between TensorFlow's `UpSamplingND`
+    # classes, we must construct keyword arguments dependent on the input dimension.
+    additional_args = {}
+    if dim > 1:
+        # `UpSampling1D` does not accept the keyword `data_format` and requires data as
+        # channels last.
+        additional_args["data_format"] = data_format
     if dim == 2:
-        # Only UpSampling2D accepts an `interpolation` arg;
-        # the 1D and 3D classes only supports nearest-neighbour interpolation.
-        layer_kwargs["interpolation"] = interp_method
-
-    # Check user has specified an `interp_method` that agrees with
-    # the TensorFlow class
-    if (dim == 1 or dim == 3) and interp_method != "nearest":
+        # Only `UpSampling2D` accepts the `interpolation` keyword argument; the 1D and
+        # 3D classes only supports nearest-neighbour interpolation.
+        additional_args["interpolation"] = interp_method
+    elif interp_method != "nearest":
         raise ValueError(
-            f"""With {dim}D inputs, only 'nearest' is supported for
-            `interp_method`."""
-        )
-    elif dim == 2 and interp_method not in ["nearest", "bilinear"]:
-        raise ValueError(
-            """With 2D inputs, `interp_method` must be one of
-            'nearest' or 'bilinear'."""
+            f'With {dim}D inputs, only "nearest" is supported for `interp_method`.'
         )
 
-    upsample_layer = getattr(tf.keras.layers, f"UpSampling{dim}D")(**layer_kwargs)
-
-    if data_format == "channels_first" and dim != 1:
+    upsample_layer = getattr(tf.keras.layers, f"UpSampling{dim}D")(
+        size=size if dim == 1 else (size,) * dim,
+        dtype=dtype,
+        **additional_args,
+    )
+    if data_format == "channels_first":
         return upsample_layer
-    elif data_format == "channels_last" or (
-        data_format == "channels_first" and dim == 1
-    ):
-        # Note: UpSampling1D assumes a "channels_last" spec so we must
-        # temporarily flip from "channel_first" to "channels_last"
+    else:
         return tf.keras.Sequential(
             [
                 ChannelsToLast(dtype=dtype),

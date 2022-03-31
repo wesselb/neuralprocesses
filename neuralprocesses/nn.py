@@ -156,11 +156,13 @@ class UNet:
                 # Add the skip connection.
                 return 2 * channels[i]
 
-        if resize_convs:
-
-            def after_turn_layer(i):
+        def after_turn_layer(i):
+            if resize_convs:
                 return self.nn.Sequential(
-                    UpSampling(dtype=dtype, interp_method=resize_conv_interp_method),
+                    UpSampling(
+                        interp_method=resize_conv_interp_method,
+                        dtype=dtype,
+                    ),
                     Conv(
                         in_channels=get_num_in_channels(i),
                         out_channels=((channels[0],) + channels)[i],
@@ -169,10 +171,7 @@ class UNet:
                         dtype=dtype,
                     ),
                 )
-
-        elif not resize_convs:
-
-            def after_turn_layer(i):
+            else:
                 return ConvTranspose(
                     in_channels=get_num_in_channels(i),
                     out_channels=((channels[0],) + channels)[i],
