@@ -33,6 +33,30 @@ from .util import nps, generate_data  # noqa
                 {
                     "num_basis_functions": 4,
                     "points_per_unit": 16,
+                    "unet_channels": (8, 16),
+                    "unet_kernels": (5,) * 2,
+                    "unet_activations": (B.relu,) * 2,
+                    "unet_resize_convs": False,
+                    "epsilon": 1e-2,
+                },
+            ),
+            (
+                "construct_convgnp",
+                {
+                    "num_basis_functions": 4,
+                    "points_per_unit": 16,
+                    "unet_channels": (8, 16),
+                    "unet_kernels": (5,) * 2,
+                    "unet_activations": (B.relu,) * 2,
+                    "unet_resize_convs": True,
+                    "epsilon": 1e-2,
+                },
+            ),
+            (
+                "construct_convgnp",
+                {
+                    "num_basis_functions": 4,
+                    "points_per_unit": 16,
                     "conv_arch": "dws",
                     "dws_channels": 8,
                     "dws_layers": 4,

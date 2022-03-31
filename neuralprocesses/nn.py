@@ -57,8 +57,11 @@ class UNet:
         channels: Tuple[int, ...] = (8, 16, 16, 32, 32, 64),
         kernels: Union[int, Tuple[int, ...]] = 5,
         activations: Union[None, object, Tuple[object, ...]] = None,
+        resize_convs: bool = False,
+        resize_conv_interp_method: str = "nearest",
         dtype=None,
     ):
+
         # If `kernel` is an integer, repeat it for every layer.
         if not isinstance(kernels, (tuple, list)):
             kernels = (kernels,) * len(channels)
@@ -103,6 +106,7 @@ class UNet:
 
         Conv = getattr(self.nn, f"Conv{dim}d")
         ConvTranspose = getattr(self.nn, f"ConvTransposed{dim}d")
+        UpSampling = getattr(self.nn, f"UpSampling{dim}d")
         AvgPool = getattr(self.nn, f"AvgPool{dim}d")
 
         # Final linear layer:
@@ -152,9 +156,24 @@ class UNet:
                 # Add the skip connection.
                 return 2 * channels[i]
 
-        self.after_turn_layers = self.nn.ModuleList(
-            [
-                ConvTranspose(
+        if resize_convs:
+
+            def after_turn_layer(i):
+                return self.nn.Sequential(
+                    UpSampling(dtype=dtype, interp_method=resize_conv_interp_method),
+                    Conv(
+                        in_channels=get_num_in_channels(i),
+                        out_channels=((channels[0],) + channels)[i],
+                        kernel=self.kernels[i],
+                        stride=1,
+                        dtype=dtype,
+                    ),
+                )
+
+        elif not resize_convs:
+
+            def after_turn_layer(i):
+                return ConvTranspose(
                     in_channels=get_num_in_channels(i),
                     out_channels=((channels[0],) + channels)[i],
                     kernel=self.kernels[i],
@@ -162,8 +181,9 @@ class UNet:
                     output_padding=1,
                     dtype=dtype,
                 )
-                for i in range(len(channels))
-            ]
+
+        self.after_turn_layers = self.nn.ModuleList(
+            [after_turn_layer(i) for i in range(len(channels))]
         )
 
     def __call__(self, x):
