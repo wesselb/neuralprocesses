@@ -91,8 +91,10 @@ cnp = nps.construct_convgnp(
         1,  # First auxiliary variable has one dimension.
         2,  # Second auxiliary variable has two dimensions.
     ),
-    dim_xt_aug=4,  # Third auxiliary variable has four dimensions.
     dim_yt=3,  # Predictions have three dimensions.
+    # Third auxiliary variable has four dimensions and is auxiliary information specific
+    # to the target inputs.
+    aux_t_dim=4,  
     num_basis_functions=64, 
     likelihood="lowrank",
 )
@@ -113,14 +115,15 @@ aux_var2 = (
     (B.randn(tf.float32, 16, 1, 25), B.randn(tf.float32, 16, 1, 35)),
     B.randn(tf.float32, 16, 2, 25, 35),  # Has two dimensions.
 )
-# The third one is specific to the target inputs. We could encoder it like the first
+# The third one is specific to the target inputs. We could encode it like the first
 # auxiliary variable `aux_var1`, but we illustrate how an MLP-style encoding can
 # also be used. The number must match the number of target inputs!
-aux_var3 = B.randn(tf.float32, 16, 4, 15)  # Has four dimensions.
+aux_var_t = B.randn(tf.float32, 16, 4, 15)  # Has four dimensions.
 
 dist = cnp(
     [observed_data, aux_var1, aux_var2],
-    (B.randn(tf.float32, 16, 2, 15), aux_var3),
+    B.randn(tf.float32, 16, 2, 15),
+    aux_t=aux_var_t,
 )
 mean, var = dist.mean, dist.var
 

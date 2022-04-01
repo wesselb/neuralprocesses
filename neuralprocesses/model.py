@@ -34,21 +34,16 @@ class Model:
         self.decoder = decoder
 
     @_dispatch
-    def __call__(self, xc, yc, xt, num_samples=1, **kw_args):
+    def __call__(self, xc, yc, xt, *, num_samples=1, aux_t=None, **kw_args):
+        # Perform augmentation of `xt` with auxiliary target information.
+        if aux_t is not None:
+            xt = AugmentedInput(xt, aux_t)
+
         xc, yc = _convert_empty_contexts_to_none(xc, yc)
         xz, z = code(self.encoder, xc, yc, xt, **kw_args)
         _, d = code(self.decoder, xz, z, xt, **kw_args)
-        return d
 
-    @_dispatch
-    def __call__(
-        self,
-        xc,
-        yc,
-        xt: Tuple[B.Numeric, object],
-        **kw_args,
-    ):
-        return self(xc, yc, AugmentedInput(*xt), **kw_args)
+        return d
 
     @_dispatch
     def __call__(

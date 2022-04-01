@@ -11,7 +11,6 @@ __all__ = ["construct_convgnp"]
 @register_model
 def construct_convgnp(
     dim_x=1,
-    dim_xt_aug=None,
     dim_y=1,
     dim_yc=None,
     dim_yt=None,
@@ -30,7 +29,8 @@ def construct_convgnp(
     num_basis_functions=512,
     encoder_scales=None,
     decoder_scale=None,
-    xt_aug_layers=(128,) * 3,
+    aux_t_dim=None,
+    aux_t_layers=(128,) * 3,
     epsilon=1e-4,
     dtype=None,
     nps=nps,
@@ -60,14 +60,14 @@ def construct_convgnp(
     else:
         raise ValueError(f'Architecture "{conv_arch}" invalid.')
 
-    # If `dim_xt_aug` is given, contruct an MLP which will use the auxiliary
+    # If `aux_t_dim` is given, contruct an MLP which will use the auxiliary
     # information from the augmented inputs.
-    if dim_xt_aug:
+    if aux_t_dim:
         likelihood = nps.Augment(
             nps.Chain(
                 nps.MLP(
-                    in_dim=conv_out_channels + dim_xt_aug,
-                    layers=xt_aug_layers,
+                    in_dim=conv_out_channels + aux_t_dim,
+                    layers=aux_t_layers,
                     out_dim=likelihood_in_channels,
                     dtype=dtype,
                 ),
