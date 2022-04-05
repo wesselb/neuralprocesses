@@ -7,7 +7,7 @@ from plum import List
 from . import _dispatch
 from .augment import AugmentedInput
 from .parallel import Parallel
-from .util import register_module
+from .util import register_module, is_nonempty
 
 __all__ = ["AbstractDiscretisation", "Discretisation"]
 
@@ -26,8 +26,10 @@ class Discretisation(AbstractDiscretisation):
         self.dim = dim
 
     def discretise(self, *args, margin):
-        grid_min = B.min(B.stack(*[B.min(x) for x in args if x is not None]))
-        grid_max = B.max(B.stack(*[B.max(x) for x in args if x is not None]))
+        # Filter global and empty inputs.
+        args = [x for x in args if x is not None and is_nonempty(x)]
+        grid_min = B.min(B.stack(*[B.min(x) for x in args]))
+        grid_max = B.max(B.stack(*[B.max(x) for x in args]))
 
         # Add margin.
         grid_min = grid_min - margin

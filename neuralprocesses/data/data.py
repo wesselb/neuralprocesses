@@ -181,7 +181,7 @@ class GPGenerator:
             if self.pred_logpdf:
                 batch["pred_logpdf"] = fdd.logpdf(yt_reshaped)
             if self.pred_logpdf_diag:
-                fdd_diag = stheno.Normal(fdd.mean, matrix.Diagonal(B.diag(fdd.var)))
+                fdd_diag = stheno.Normal(fdd.mean, matrix.Diagonal(fdd.var_diag))
                 batch["pred_logpdf_diag"] = fdd_diag.logpdf(yt_reshaped)
 
             # Convert to the data type and save.

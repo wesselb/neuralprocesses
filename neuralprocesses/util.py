@@ -1,13 +1,6 @@
 import lab as B
 
-__all__ = [
-    "modules",
-    "register_module",
-    "models",
-    "register_model",
-    "batch_size",
-    "feature_size",
-]
+__all__ = ["modules", "register_module", "models", "register_model", "is_nonempty"]
 
 modules = []
 
@@ -25,9 +18,5 @@ def register_model(model):
     return model
 
 
-def batch_size(x):
-    return B.shape(x)[0]
-
-
-def feature_size(x):
-    return B.shape(x)[1]
+def is_nonempty(x):
+    return all([i > 0 for i in B.shape(x)])

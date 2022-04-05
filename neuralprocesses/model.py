@@ -11,22 +11,6 @@ from .util import register_module
 __all__ = ["Model"]
 
 
-@_dispatch
-def _convert_empty_contexts_to_none(xc, yc: B.Numeric):
-    if all([B.shape(yc, i) == 0 for i in range(2, B.rank(yc))]):
-        return None, None
-    else:
-        return xc, yc
-
-
-@_dispatch
-def _convert_empty_contexts_to_none(xc: Parallel, yc: Parallel):
-    xc, yc = zip(
-        *[_convert_empty_contexts_to_none(xci, yci) for xci, yci in zip(xc, yc)]
-    )
-    return Parallel(*xc), Parallel(*yc)
-
-
 @register_module
 class Model:
     def __init__(self, encoder, decoder):
@@ -39,7 +23,6 @@ class Model:
         if aux_t is not None:
             xt = AugmentedInput(xt, aux_t)
 
-        xc, yc = _convert_empty_contexts_to_none(xc, yc)
         xz, z = code(self.encoder, xc, yc, xt, **kw_args)
         _, d = code(self.decoder, xz, z, xt, **kw_args)
 
