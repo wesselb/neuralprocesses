@@ -6,6 +6,7 @@ import lab as B
 
 from . import _dispatch
 from .augment import AugmentedInput
+from .mask import Masked
 from .parallel import Parallel
 from .util import register_module
 
@@ -33,10 +34,18 @@ class SetConv:
         self.log_scale = self.nn.Parameter(B.log(scale), dtype=dtype)
 
 
+def _concrete_dim(x, i):
+    try:
+        int(B.shape(x, 2))
+        return True
+    except TypeError:
+        return False
+
+
 def _batch_targets(f):
     @wraps(f)
     def f_wrapped(coder, xz, z, x, batch_size=1024, **kw_args):
-        if B.shape(x, 2) > batch_size:
+        if _concrete_dim(x, 2) and B.shape(x, 2) > batch_size:
             i = 0
             outs = []
             while i < B.shape(x, 2):
@@ -142,6 +151,13 @@ class PrependDensityChannel:
     @_dispatch
     def __call__(self, z: Parallel):
         return Parallel(*(self(zi) for zi in z))
+
+    @_dispatch
+    def __call__(self, z: Masked):
+        # Apply mask to density channel _and_ the data channels. Since the mask has
+        # only one channel, we can simply pointwise multiply and broadcasting should
+        # do the rest for us.
+        return z.mask * self(z.y)
 
 
 @register_module

@@ -5,6 +5,7 @@ from plum import List, Tuple, Union
 from . import _dispatch
 from .augment import AugmentedInput
 from .coding import code
+from .mask import Masked
 from .parallel import Parallel
 from .util import register_module
 
@@ -55,7 +56,7 @@ class Model:
     @_dispatch
     def __call__(
         self,
-        contexts: List[Tuple[Union[tuple, B.Numeric], B.Numeric]],
+        contexts: List[Tuple[Union[B.Numeric, tuple], Union[B.Numeric, Masked]]],
         xt,
         **kw_args,
     ):

@@ -200,7 +200,6 @@ else:
     raise ValueError(f'Invalid model "{args.model}".')
 
 model = to_device(model)
-out.kv("Num. params", nps.num_params(model))
 
 gen = GPGenerator(
     backend.float32,
@@ -230,7 +229,13 @@ gen_eval = GPGenerator(
 
 
 def objective(xc, yc, xt, yt):
-    pred = run_model(xc, yc, xt)
+    xc, yc = nps.mask_context(xc, yc)
+    return _objective(xc, yc.y, yc.mask, xt, yt)
+
+
+@B.jit
+def _objective(xc, yc, yc_mask, xt, yt):
+    pred = run_model(xc, nps.Masked(yc, yc_mask), xt)
     # Use `float64`s for the logpdf computation.
     pred = B.cast(backend.float64, pred)
     return -pred.logpdf(B.cast(backend.float64, yt))

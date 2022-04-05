@@ -13,6 +13,7 @@ from .model import *
 from .setconv import *
 from .disc import *
 from .augment import *
+from .mask import *
 
 from .architectures import *
 
