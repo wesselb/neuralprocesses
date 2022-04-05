@@ -24,6 +24,10 @@ class FunctionalCoder:
     Args:
         disc (:class:`.discretisation.AbstractDiscretisation`): Discretisation.
         coder (coder): Coder.
+
+    Attributes:
+        disc (:class:`.discretisation.AbstractDiscretisation`): Discretisation.
+        coder (coder): Coder.
     """
 
     def __init__(self, disc, coder):
@@ -44,7 +48,12 @@ class DeepSet:
     Args:
         phi (function): Pre-aggregation function.
         rho (function): Post-aggregation function.
-        agg (function, optional): Aggregation function. Defaults to taking the mean.
+        agg (function, optional): Aggregation function. Defaults to summing.
+
+    Attributes:
+        phi (function): Pre-aggregation function.
+        rho (function): Post-aggregation function.
+        agg (function): Aggregation function.
     """
 
     def __init__(

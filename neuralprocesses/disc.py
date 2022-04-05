@@ -9,15 +9,30 @@ from .augment import AugmentedInput
 from .parallel import Parallel
 from .util import register_module, is_nonempty
 
-__all__ = ["AbstractDiscretisation", "Discretisation"]
-
-
-class AbstractDiscretisation:
-    pass
+__all__ = ["Discretisation"]
 
 
 @register_module
-class Discretisation(AbstractDiscretisation):
+class Discretisation:
+    """Discretisation.
+
+    Args:
+        points_per_unit (float): Density of the discretisation.
+        multiple (int, optional): Always produce a discretisation which is a multiple
+            of this number. Defaults to `1`.
+        margin (float, optional): Leave this much space around the most extremal points.
+            Defaults to `0.1`.
+        dim (int, optional): Dimensionality of the inputs.
+
+    Attributes:
+        resolution (float): Resolution of the discretisation. Equal to the inverse of
+            `points_per_unit`.
+        multiple (int): Always produce a discretisation which is a multiple of this
+            number.
+        margin (float): Leave this much space around the most extremal points.
+        dim (int): Dimensionality of the inputs.
+    """
+
     def __init__(self, points_per_unit, multiple=1, margin=0.1, dim=None):
         self.points_per_unit = points_per_unit
         self.resolution = 1 / self.points_per_unit
@@ -25,7 +40,16 @@ class Discretisation(AbstractDiscretisation):
         self.margin = margin
         self.dim = dim
 
-    def discretise(self, *args, margin):
+    def discretise_1d(self, *args, margin):
+        """Perform the discretisation for one-dimensional inputs.
+
+        Args:
+            *args (input): One-dimensional inputs.
+            margin (float): Leave this much space around the most extremal points.
+
+        Returns:
+            tensor: Discretisation.
+        """
         # Filter global and empty inputs.
         args = [x for x in args if x is not None and is_nonempty(x)]
         grid_min = B.min(B.stack(*[B.min(x) for x in args]))
@@ -69,10 +93,20 @@ class Discretisation(AbstractDiscretisation):
         )
 
     def __call__(self, *args, margin=None, **kw_args):
+        """Perform the discretisation for multi-dimensional inputs.
+
+        Args:
+            *args (input): Multi-dimensional inputs.
+            margin (float, optional): Leave this much space around the most extremal
+                points. Defaults to `self.margin`.
+
+        Returns:
+            input: Discretisation.
+        """
         if margin is None:
             margin = self.margin
         coords = _split_coordinates(Parallel(*args), dim=self.dim)
-        discs = tuple(self.discretise(*cs, margin=margin) for cs in coords)
+        discs = tuple(self.discretise_1d(*cs, margin=margin) for cs in coords)
         return discs[0] if len(discs) == 1 else discs
 
 

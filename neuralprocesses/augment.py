@@ -7,6 +7,17 @@ __all__ = ["AugmentedInput", "Augment"]
 
 
 class AugmentedInput:
+    """An augmented input.
+
+    Args:
+        x (input): Input.
+        augmentation (object): Augmentation.
+
+    Attributes:
+        x (input): Input.
+        augmentation (object): Augmentation.
+    """
+
     def __init__(self, x, augmentation):
         self.x = x
         self.augmentation = augmentation
@@ -14,6 +25,16 @@ class AugmentedInput:
 
 @register_module
 class Augment:
+    """Concatenate the augmentation of the input to the encoding, and remove any
+    augmentation of target inputs.
+
+    Args:
+        coder (coder): Coder to run after the augmentation.
+
+    Attributes:
+        coder (coder): Coder to run after the augmentation.
+    """
+
     def __init__(self, coder):
         self.coder = coder
 

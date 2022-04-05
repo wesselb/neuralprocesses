@@ -11,7 +11,10 @@ class Chain:
     """A chain of links.
 
     Args:
-        *links (tuple): Links of the chain.
+        *links (object): Links of the chain.
+
+    Attributes:
+        links (tuple): Links of the chain.
     """
 
     def __init__(self, *links):

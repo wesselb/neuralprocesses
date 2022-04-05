@@ -12,8 +12,16 @@ __all__ = ["num_params", "Module"]
 
 
 @_dispatch
-def num_params(x: torch.nn.Module):
-    return sum([int(np.prod(p.shape)) for p in x.parameters()])
+def num_params(model: torch.nn.Module):
+    """Get the number of parameters.
+
+    Args:
+        model (:class:`tf.keras.Model`): PyTorch model.
+
+    Returns:
+        int: Number of parameters.
+    """
+    return sum([int(np.prod(p.shape)) for p in model.parameters()])
 
 
 def ConvNd(
@@ -29,6 +37,24 @@ def ConvNd(
     output_padding: Optional[int] = None,
     dtype=None,
 ):
+    """Convolutional layer.
+
+    Args:
+        dim (int): Dimensionality.
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        kernel (int): Kernel size.
+        stride (int, optional): Stride.
+        dilation (int, optional): Dilation.
+        groups (int, optional): Number of groups.
+        bias (bool, optional): Use a bias. Defaults to `True`.
+        transposed (bool, optional): Transposed convolution. Defaults to `False`.
+        output_padding (int, optional): Output padding.
+        dtype (dtype, optional): Data type.
+
+    Returns:
+        object: Convolutional layer.
+    """
     # Only set `output_padding` if it is given.
     additional_args = {}
     if output_padding is not None:
@@ -63,6 +89,18 @@ def UpSamplingNd(
     interp_method: str = "bilinear",
     dtype=None,
 ):
+    """Up-sampling layer.
+
+    Args:
+        dim (int): Dimensionality.
+        size (int, optional): Up-sampling factor. Defaults to `2`.
+        interp_method (str, optional): Interpolation method. Can be set to "bilinear".
+            Defaults to "nearest'.
+        dtype (dtype): Data type.
+
+    Returns:
+        object: Up-sampling layer.
+    """
     return getattr(torch.nn, "Upsample")(
         # `scale_factor` is applied to each dimension automatically: it doesn't need to
         # be repeated.
@@ -77,6 +115,17 @@ def AvgPoolNd(
     stride: Union[None, int] = None,
     dtype=None,
 ):
+    """Average pooling layer.
+
+    Args:
+        dim (int): Dimensionality.
+        kernel (int): Kernel size.
+        stride (int, optional): Stride.
+        dtype (dtype): Data type.
+
+    Returns:
+        object: Average pooling layer.
+    """
     return getattr(torch.nn, f"AvgPool{dim}d")(
         kernel_size=kernel,
         stride=stride,
@@ -99,12 +148,22 @@ class _LambdaModule(torch.nn.Module):
 
 
 class Interface:
+    """PyTorch interface."""
+
     ReLU = torch.nn.ReLU
 
     Sequential = torch.nn.Sequential
 
     @staticmethod
     def ModuleList(modules):
+        """Make a list of modules whose parameters are tracked.
+
+        Args:
+            modules (list): List of modules.
+
+        Returns:
+            `torch.nn.ModuleList`: List of `modules` whose parameters are tracked.
+        """
         modules = [_LambdaModule(m) if _is_lambda(m) else m for m in modules]
         return torch.nn.ModuleList(modules)
 
@@ -128,6 +187,15 @@ class Interface:
 
     @staticmethod
     def Parameter(x, dtype=None):
+        """A tracked parameter.
+
+        Args:
+            x (tensor): Initial value of the parameter.
+            dtype (dtype, optional): Data type.
+
+        Returns:
+            :class:`torch.nn.Parameter`: Parameter.
+        """
         dtype = dtype or torch.float32
         dtype = convert(dtype, B.TorchDType)
         if not isinstance(x, B.TorchNumeric):
@@ -137,10 +205,12 @@ class Interface:
         return torch.nn.Parameter(x, requires_grad=True)
 
 
-interface = Interface()
+interface = Interface()  #: The PyTorch interface.
 
 
 class Module(torch.nn.Module):
+    """A PyTorch module."""
+
     def __init__(self):
         super().__init__()
         self.nn = interface

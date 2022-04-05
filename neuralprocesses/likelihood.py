@@ -16,6 +16,9 @@ class HeterogeneousGaussianLikelihood:
 
     Args:
         epsilon (float, optional): Smallest allowable variance. Defaults to `1e-6`.
+
+    Args:
+        epsilon (float): Smallest allowable variance.
     """
 
     @_dispatch

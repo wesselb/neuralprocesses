@@ -13,6 +13,9 @@ class Parallel:
 
     Args:
         *elements (tuple): Objects to put in parallel.
+
+    Attributes:
+        elements (tuple): Objects in parallel.
     """
 
     def __init__(self, *elements):

@@ -15,6 +15,19 @@ _dispatch = Dispatcher()
 
 @register_module
 class MLP:
+    """MLP.
+
+    Args:
+        in_dim (int): Input dimensionality.
+        layers (tuple[int, ...]): Width of every hidden layer.
+        out_dim (int): Output dimensionality.
+        nonlinearity (function, optional): Nonlinearity.
+        dtype (dtype, optional): Data type.
+
+    Attributes:
+        net (object): MLP, but which expects a different data format.
+    """
+
     def __init__(
         self,
         in_dim: int,
@@ -49,6 +62,33 @@ class MLP:
 
 @register_module
 class UNet:
+    """UNet.
+
+    Args:
+        dim (int): Dimensionality.
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        channels (tuple[int], optional): Channels of every layer of the UNet.
+            Defaults to six layers each with 64 channels.
+        unet_kernels (int or tuple[int], optional): Sizes of the kernels. Defaults to
+            `5`.
+        activations (object or tuple[object], optional): Activation functions.
+        resize_convs (bool, optional): Use resize convolutions rather than
+            transposed convolutions. Defaults to `False`.
+        resize_conv_interp_method (str, optional): Interpolation method for the
+            resize convolutions. Can be set to "bilinear". Defaults to "nearest".
+        dtype (dtype, optional): Data type.
+
+    Attributes:
+        kernels (tuple[int]): Sizes of the kernels.
+        activations (tuple[function]): Activation functions.
+        num_halving_layers (int): Number of layers with striding equal to two.
+        receptive_fields (list[float]): Receptive field for every intermediate value.
+        receptive_field (float): Receptive field of the model.
+        before_turn_layers (list[module]): Layers before the U-turn.
+        after_turn_layers (list[module]): Layers after the U-turn
+    """
+
     def __init__(
         self,
         dim: int,
@@ -208,6 +248,24 @@ class UNet:
 
 @register_module
 class ConvNet:
+    """A depthwise-separable convolutional neural network.
+
+    Args:
+        dim (int): Dimensionality.
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        channels (int): Number of channels at every intermediate layer.
+        num_layers (int): Number of layers.
+        points_per_unit (float): Density of the discretisation corresponding to the
+            inputs.
+        receptive_field (float): Desired receptive field.
+        dtype (dtype, optional): Data type.
+
+    Attributes:
+        num_halving_layers (int): Number of layers with stride equal to two.
+        conv_net (module): The architecture.
+    """
+
     def __init__(
         self,
         dim: int,
@@ -274,6 +332,15 @@ class ConvNet:
 
 @register_module
 class Splitter:
+    """Split a tensor into multiple tensors.
+
+    Args:
+        *sizes (int): Size of every split
+
+    Attributes:
+        sizes (tuple[int]): Size of every split
+    """
+
     def __init__(self, *sizes):
         self.sizes = sizes
 

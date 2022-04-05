@@ -12,11 +12,21 @@ __all__ = ["num_params", "Module"]
 
 
 @_dispatch
-def num_params(x: tf.keras.Model):
-    return sum([int(np.prod(p.shape)) for p in x.variables])
+def num_params(model: tf.keras.Model):
+    """Get the number of parameters.
+
+    Args:
+        model (:class:`tf.keras.Model`): Keras model.
+
+    Returns:
+        int: Number of parameters.
+    """
+    return sum([int(np.prod(p.shape)) for p in model.variables])
 
 
 class ChannelsToFirst(tf.keras.Model):
+    """Convert from channels last format to channels first format."""
+
     def call(self, x, training=False):
         rank = B.rank(x)
         perm = [0, rank - 1] + list(range(1, rank - 1))
@@ -24,6 +34,8 @@ class ChannelsToFirst(tf.keras.Model):
 
 
 class ChannelsToLast(tf.keras.Model):
+    """Convert from channels first format to channels last format."""
+
     def call(self, x, training=False):
         rank = B.rank(x)
         perm = [0] + list(range(2, rank)) + [1]
@@ -43,6 +55,24 @@ def ConvNd(
     output_padding: Optional[int] = None,
     dtype=None,
 ):
+    """Convolutional layer.
+
+    Args:
+        dim (int): Dimensionality.
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        kernel (int): Kernel size.
+        stride (int, optional): Stride.
+        dilation (int, optional): Dilation.
+        groups (int, optional): Number of groups.
+        bias (bool, optional): Use a bias. Defaults to `True`.
+        transposed (bool, optional): Transposed convolution. Defaults to `False`.
+        output_padding (int, optional): Output padding.
+        dtype (dtype, optional): Data type.
+
+    Returns:
+        object: Convolutional layer.
+    """
     # Only set `data_format` on the GPU: there is no CPU support.
     if len(tf.config.list_physical_devices("GPU")) > 0:
         data_format = "channels_first"
@@ -91,6 +121,18 @@ def UpSamplingNd(
     interp_method: str = "nearest",
     dtype=None,
 ):
+    """Up-sampling layer.
+
+    Args:
+        dim (int): Dimensionality.
+        size (int, optional): Up-sampling factor. Defaults to `2`.
+        interp_method (str, optional): Interpolation method. Can be set to "bilinear".
+            Defaults to "nearest'.
+        dtype (dtype): Data type.
+
+    Returns:
+        object: Up-sampling layer.
+    """
     # Only set `data_format` on the GPU: there is no CPU support. Moreover,
     # `UpSampling1D` does not accept the keyword argument `data_format`.
     if len(tf.config.list_physical_devices("GPU")) > 0 and dim > 1:
@@ -137,6 +179,17 @@ def AvgPoolNd(
     stride: Union[None, int] = None,
     dtype=None,
 ):
+    """Average pooling layer.
+
+    Args:
+        dim (int): Dimensionality.
+        kernel (int): Kernel size.
+        stride (int, optional): Stride.
+        dtype (dtype): Data type.
+
+    Returns:
+        object: Average pooling layer.
+    """
     # Only set `data_format` on the GPU: there is no CPU support.
     if len(tf.config.list_physical_devices("GPU")) > 0:
         data_format = "channels_first"
@@ -164,19 +217,47 @@ def AvgPoolNd(
 
 
 class Interface:
+    """TensorFlow interface."""
+
     ReLU = tf.keras.layers.ReLU
 
     @staticmethod
-    def Sequential(*x):
-        return tf.keras.Sequential(x)
+    def Sequential(*modules):
+        """Put modules in a sequence.
+
+        Args:
+            *modules (object): Modules.
+
+        Returns:
+            :class:`tf.keras.Sequential`: `modules` in sequence.
+        """
+        return tf.keras.Sequential(modules)
 
     @staticmethod
-    def ModuleList(x):
+    def ModuleList(modules):
+        """Make a list of modules whose parameters are tracked.
+
+        Args:
+            modules (list): List of modules.
+
+        Returns:
+            list: List of `modules` whose parameters are tracked.
+        """
         # TensorFlow tracks regular lists just fine.
-        return list(x)
+        return list(modules)
 
     @staticmethod
-    def Linear(dim_in, dim_out, dtype=None):
+    def Linear(dim_in: int, dim_out: int, dtype=None):
+        """A linear layer.
+
+        Args:
+            dim_in (int): Input dimensionality.
+            dim_out (int): Output dimensionality.
+            dtype (dtype, optional): Data type.
+
+        Returns:
+            :class:`tf.keras.Dense`: Linear layer.
+        """
         return tf.keras.layers.Dense(dim_out, input_shape=(None, dim_in), dtype=dtype)
 
     Conv1d = partial(ConvNd, dim=1)
@@ -197,15 +278,26 @@ class Interface:
 
     @staticmethod
     def Parameter(x, dtype=None):
+        """A tracked parameter.
+
+        Args:
+            x (tensor): Initial value of the parameter.
+            dtype (dtype, optional): Data type.
+
+        Returns:
+            :class:`tf.Variable`: Parameter.
+        """
         dtype = dtype or tf.float32
         dtype = convert(dtype, B.TFDType)
         return tf.Variable(x, dtype=dtype)
 
 
-interface = Interface()
+interface = Interface()  #: The TensorFlow interface.
 
 
 class Module(tf.keras.Model):
+    """A TensorFlow module."""
+
     def __init__(self):
         super().__init__()
         self.nn = interface

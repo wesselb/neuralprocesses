@@ -18,6 +18,17 @@ __all__ = [
 
 @register_module
 class SetConv:
+    """A set convolution.
+
+    Args:
+        scale (float): Initial value for the length scale.
+        dtype (dtype, optional): Data type.
+
+    Attributes:
+        log_scale (scalar): Logarithm of the length scale.
+
+    """
+
     def __init__(self, scale, dtype=None):
         self.log_scale = self.nn.Parameter(B.log(scale), dtype=dtype)
 
@@ -120,6 +131,8 @@ def code(coder: SetConv, xz, z, x: AugmentedInput, **kw_args):
 
 @register_module
 class PrependDensityChannel:
+    """Prepend a density channel to the current encoding."""
+
     @_dispatch
     def __call__(self, z: B.Numeric):
         with B.on_device(z):
@@ -133,6 +146,15 @@ class PrependDensityChannel:
 
 @register_module
 class DivideByFirstChannel:
+    """Divide by the first channel.
+
+    Args:
+        epsilon (float): Value to add to the channel before dividing.
+
+    Attributes:
+        epsilon (float): Value to add to the channel before dividing.
+    """
+
     @_dispatch
     def __init__(self, epsilon: float = 1e-8):
         self.epsilon = epsilon

@@ -34,6 +34,31 @@ class GPGenerator:
         pred_logpdf_diag (bool, optional): Also compute the logpdf of the target set
             given the context set under the true diagonalised GP. Defaults to `True`.
         device (str, optional): Device on which to generate data. Defaults to `cpu`.
+
+    Attributes:
+        dtype (dtype): Data type.
+        float64 (dtype): Floating point version of `dtype` with 64 bits.
+        int64 (dtype): Integer version of `dtype` with 64 bits.
+        kernel (:class:`stheno.Kernel`): Kernel of the GP.
+        noise (float): Observation noise.
+        batch_size (int): Batch size.
+        num_tasks (int): Number of tasks to generate per epoch. Is an integer multiple
+            of `batch_size`.
+        num_batches (int): Number batches in an epoch.
+        dim_x (int): Dimensionality of the inputs.
+        dim_y (int): Dimensionality of the outputs.
+        dim_y_latent (int): If `dim_y > 1`, the number of latent processes.
+        h (int): If `dim_y > 1`, the mixing points.
+        num_context_points (tuple[int, int]): Lower and upper bound of the number of
+            context points.
+        num_target_points (tuple[int, int]): Lower and upper bound of the number of
+            target points.
+        pred_logpdf (bool): Also compute the logpdf of the target set given the context
+            set under the true GP.
+        pred_logpdf_diag (bool): Also compute the logpdf of the target set given the
+            context set under the true diagonalised GP.
+        state (random state): Random state.
+        device (str): Device.
     """
 
     def __init__(
@@ -109,8 +134,8 @@ class GPGenerator:
         """Generate a batch.
 
         Returns:
-            dict: A task, which is a dictionary with keys `xc`, `yc`, `xt`, and `yt`.
-                Also possibly contains the keys `pred_logpdf` and `pred_logpdf_diag`.
+            dict: A task, which is a dictionary with keys "xc", "yc", "xt", and "yt".
+                Also possibly contains the keys "pred_logpdf" and "pred_logpdf_diag".
         """
         with B.on_device(self.device):
             batch = {}

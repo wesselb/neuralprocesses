@@ -6,6 +6,22 @@ __all__ = ["construct_likelihood"]
 
 
 def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
+    """Construct the likelihood.
+
+    Args:
+        nps (module): Appropriate backend-specific module.
+        spec (str, optional): Specification. Must be one of "het", "lowrank", or
+            "lowrank-correlated". Defaults to "lowrank". Must be given as a keyword
+            argument.
+        dim_y (int): Dimensionality of the outputs. Must be given as a keyword argument.
+        num_basis_functions (int): Number of basis functions for the low-rank
+            likelihood. Must be given as a keyword argument.
+        dtype (dtype): Data type. Must be given as a keyword argument.
+
+    Returns:
+        tuple[int, coder]: Number of channels that the likelihood requires and the
+            likelihood.
+    """
     if spec == "het":
         num_channels = 2 * dim_y
         lik = nps.HeterogeneousGaussianLikelihood()

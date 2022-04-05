@@ -9,8 +9,21 @@ __all__ = ["code", "Materialise"]
 
 
 @_dispatch
-def code(f, xz, z, x, **kw_args):
-    return xz, f(z)
+def code(coder, xz, z, x, **kw_args):
+    """Perform a coding operation.
+
+    The default behaviour is to apply `coder` to `z` and return `(xz, coder(z))`.
+
+    Args:
+        coder (coder): Coder.
+        xz (input): Current inputs corresponding to current encoding.
+        z (tensor): Current encoding.
+        x (input): Desired inputs.
+
+    Returns:
+        tuple[input, tensor]: New encoding.
+    """
+    return xz, coder(z)
 
 
 @_dispatch
@@ -68,6 +81,23 @@ def _repeat_concat(z0: B.Numeric, *zs: B.Numeric):
 
 @register_module
 class Materialise:
+    """Materialise an aggregate encoding.
+
+    Args:
+        agg_x (function, optional): Aggregation of the inputs. Defaults to merging the
+            inputs.
+        agg_y (function, optional): Aggregation of the outputs. Defaults to
+            concatenating the outputs.
+        broadcast_y (bool, optional): Broadcast the data dimensions of the outputs
+            before performing `agg_y`. Defaults to `True`.
+
+    Attributes:
+        agg_x (function): Aggregation of the inputs.
+        agg_y (function): Aggregation of the outputs.
+        broadcast_y (bool): Broadcast the data dimensions of the outputs before
+            performing `agg_y`.
+    """
+
     def __init__(self, agg_x=_merge, agg_y=_repeat_concat, broadcast_y=True):
         self.agg_x = agg_x
         self.agg_y = agg_y

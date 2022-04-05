@@ -13,12 +13,36 @@ __all__ = ["Model"]
 
 @register_module
 class Model:
+    """Encoder-decoder model.
+
+    Args:
+        encoder (coder): Coder.
+        decoder (coder): Coder.
+
+    Attributes:
+        encoder (coder): Coder.
+        decoder (coder): Coder.
+    """
+
     def __init__(self, encoder, decoder):
         self.encoder = encoder
         self.decoder = decoder
 
     @_dispatch
     def __call__(self, xc, yc, xt, *, num_samples=1, aux_t=None, **kw_args):
+        """Run the model.
+
+        Args:
+            xc (input): Context inputs.
+            yc (tensor): Context outputs.
+            xt (input): Target inputs.
+            num_samples (int, optional): Number of samples, if applicable. Defaults
+                to `1`.
+            aux_t (tensor, optional): Target-specific auxiliary input, if applicable.
+
+        Returns:
+            tuple[input, tensor]: Target inputs and prediction for target outputs.
+        """
         # Perform augmentation of `xt` with auxiliary target information.
         if aux_t is not None:
             xt = AugmentedInput(xt, aux_t)

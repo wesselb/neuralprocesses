@@ -225,6 +225,13 @@ class Transform:
         untransform (function): Inverse of the transform.
         untransform_logdet (function): Log-determinant of the Jacobian of the inverse
             transform.
+
+    Attributes:
+        transform (function): The transform.
+        transform_derive (function): Derivative of the transform.
+        untransform (function): Inverse of the transform.
+        untransform_logdet (function): Log-determinant of the Jacobian of the inverse
+            transform.
     """
 
     def __init__(
@@ -299,6 +306,10 @@ class TransformedMultiOutputDistribution(AbstractMultiOutputDistribution):
     """A transformed multi-output distribution.
 
     Args:
+        dist (:class:`.AbstractMultiOutputDistribution`): Transformed distribution.
+        transform (:class:`.Transform`): Transform.
+
+    Attributes:
         dist (:class:`.AbstractMultiOutputDistribution`): Transformed distribution.
         transform (:class:`.Transform`): Transform.
     """
