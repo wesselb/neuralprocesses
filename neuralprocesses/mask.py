@@ -49,7 +49,7 @@ def mask_context(xc: tuple, yc: B.Numeric, multiple=50):
     """Mask a context set.
 
     Args:
-        xc (input): Context Inputs.
+        xc (input): Context inputs.
         yc (tensor): Context outputs.
         multiple (int or tuple[int], optional): Pad with zeros until the number of
             context points is a multiple of this number. Defaults to `50`.
