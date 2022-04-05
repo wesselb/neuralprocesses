@@ -46,6 +46,17 @@ def _determine_ns(xc: tuple, multiple: Union[int, tuple]):
 
 @_dispatch
 def mask_context(xc: tuple, yc: B.Numeric, multiple=50):
+    """Mask a context set.
+
+    Args:
+        xc (input): Context Inputs.
+        yc (tensor): Context outputs.
+        multiple (int or tuple[int], optional): Pad with zeros until the number of
+            context points is a multiple of this number. Defaults to `50`.
+
+    Returns:
+        tuple[input, :class:`.Masked`]: Masked context set with zeros appended.
+    """
     ns = _determine_ns(xc, multiple)
 
     # Construct the mask, not yet of the final size.
@@ -69,6 +80,16 @@ def mask_context(xc: B.Numeric, yc: B.Numeric, **kw_args):
 
 @_dispatch
 def merge_contexts(*contexts: Tuple[tuple, B.Numeric], multiple=50):
+    """Merge context sets.
+
+    Args:
+        *contexts (tuple[input, tensor]): Contexts to merge.
+        multiple (int or tuple[int], optional): Pad with zeros until the number of
+            context points is a multiple of this number. Defaults to `50`.
+
+    Returns:
+        tuple[input, :class:`.Masked`]: Merged context set.
+    """
     ns = tuple(map(max, zip(*(_determine_ns(xc, multiple) for xc, _ in contexts))))
     xcs, ycs = zip(*(mask_context(*context, multiple=ns) for context in contexts))
     ycs, masks = zip(*((yc.y, yc.mask) for yc in ycs))

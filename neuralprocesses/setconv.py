@@ -34,7 +34,7 @@ class SetConv:
         self.log_scale = self.nn.Parameter(B.log(scale), dtype=dtype)
 
 
-def _concrete_dim(x, i):
+def _dim_is_concrete(x, i):
     try:
         int(B.shape(x, 2))
         return True
@@ -45,7 +45,10 @@ def _concrete_dim(x, i):
 def _batch_targets(f):
     @wraps(f)
     def f_wrapped(coder, xz, z, x, batch_size=1024, **kw_args):
-        if _concrete_dim(x, 2) and B.shape(x, 2) > batch_size:
+        # If `x` is the internal discretisation and we're compiling this function
+        # with `tf.function`, then `B.shape(x, 2)` will be `None`. We therefore
+        # check that `B.shape(x, 2)` is concrete before attempting the comparison.
+        if _dim_is_concrete(x, 2) and B.shape(x, 2) > batch_size:
             i = 0
             outs = []
             while i < B.shape(x, 2):
