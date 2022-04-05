@@ -91,10 +91,10 @@ cnp = nps.construct_convgnp(
         1,  # First auxiliary variable has one dimension.
         2,  # Second auxiliary variable has two dimensions.
     ),
-    dim_yt=3,  # Predictions have three dimensions.
     # Third auxiliary variable has four dimensions and is auxiliary information specific
     # to the target inputs.
-    aux_t_dim=4,  
+    dim_aux_t=4,
+    dim_yt=3,  # Predictions have three dimensions.
     num_basis_functions=64, 
     likelihood="lowrank",
 )
@@ -123,7 +123,7 @@ aux_var_t = B.randn(tf.float32, 16, 4, 15)  # Has four dimensions.
 dist = cnp(
     [observed_data, aux_var1, aux_var2],
     B.randn(tf.float32, 16, 2, 15),
-    aux_t=aux_var_t,
+    aux_t=aux_var_t,  # This must be given as a keyword argument.
 )
 mean, var = dist.mean, dist.var
 

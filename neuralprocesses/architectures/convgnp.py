@@ -14,6 +14,7 @@ def construct_convgnp(
     dim_y=1,
     dim_yc=None,
     dim_yt=None,
+    dim_aux_t=None,
     points_per_unit=64,
     margin=0.1,
     likelihood="lowrank",
@@ -29,9 +30,9 @@ def construct_convgnp(
     num_basis_functions=512,
     encoder_scales=None,
     decoder_scale=None,
-    aux_t_dim=None,
-    aux_t_layers=(128,) * 3,
+    aux_t_mlp_layers=(128,) * 3,
     epsilon=1e-4,
+    transform=None,
     dtype=None,
     nps=nps,
 ):
@@ -60,14 +61,14 @@ def construct_convgnp(
     else:
         raise ValueError(f'Architecture "{conv_arch}" invalid.')
 
-    # If `aux_t_dim` is given, contruct an MLP which will use the auxiliary
+    # If `dim_aux_t` is given, contruct an MLP which will use the auxiliary
     # information from the augmented inputs.
-    if aux_t_dim:
+    if dim_aux_t:
         likelihood = nps.Augment(
             nps.Chain(
                 nps.MLP(
-                    in_dim=conv_out_channels + aux_t_dim,
-                    layers=aux_t_layers,
+                    in_dim=conv_out_channels + dim_aux_t,
+                    layers=aux_t_mlp_layers,
                     out_dim=likelihood_in_channels,
                     dtype=dtype,
                 ),
@@ -75,6 +76,15 @@ def construct_convgnp(
             )
         )
         likelihood_in_channels = unet_channels[0]
+
+    # If `transform` is set to a value, apply the transform.
+    if isinstance(transform, str) and transform.lower() == "positive":
+        likelihood = nps.Chain(likelihood, nps.Transform.positive())
+    elif isinstance(transform, tuple):
+        lower, upper = transform
+        likelihood = nps.Chain(likelihood, nps.Transform.bounded(lower, upper))
+    elif transform is not None:
+        raise ValueError(f'Cannot parse value "{transform}" for `transform`.')
 
     # Construct the core CNN architecture of the model.
     if conv_arch == "unet":
