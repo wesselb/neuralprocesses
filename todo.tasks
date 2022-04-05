@@ -10,6 +10,9 @@ TODOs:
 
     ☐ kvv covariance
 
+Test:
+    ☐ Transforms. Integrate with `probmods`?
+
 Short term:
     ☐ Change to channels last format
 
