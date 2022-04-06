@@ -224,8 +224,8 @@ but with _only one channel_ consisting of ones and zeros.
 If `mask[i, 0, j, k] = 1`, then that means that `yc_grid[i, :, j, k]` is observed.
 On the other hand, if `mask[i, 0, j, k] = 0`, then that means that `yc_grid[i, :, j, k]`
 is _not_ observed.
-`yc_grid[i, :, j, k]` will still have values, which must be not NaNs_, but those values will
-not be used.
+`yc_grid[i, :, j, k]` will still have values, _which must be not NaNs_, but those values
+will be ignored.
 To mask context outputs, use `nps.Masked(yc_grid, mask)`.
 
 Definition:
@@ -249,11 +249,11 @@ Masking is also possible for non-gridded contexts.
 Example:
 
 ```python
->>> mask = B.ones(torch.float32, 1, 1, B.shape(yc1, 2))
+>>> mask = B.ones(torch.float32, 1, 1, B.shape(yc, 2))
 
 >>> mask[:, :, 2:7] = 0   # Elements 3 to 7 are missing.
 
->>> pred = cnp([(xc1, nps.Masked(yc1, mask)), (xc2, yc2)], xt)
+>>> pred = cnp([(xc, nps.Masked(yc, mask)), (xc_grid, yc_grid)], xt)
 ```
 
 ### Using Masks to Batch Context Sets of Different Sizes
