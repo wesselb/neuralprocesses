@@ -146,9 +146,9 @@ def test_transform_bounded(nps):
         transform=(10, 11),
     )
     xc, yc, xt, yt = generate_data(nps, dim_x=1, dim_y=1)
-    # Force data in the range `(5, 6)`.
-    yc = 5 + 1 / B.exp(yc)
-    yt = 5 + 1 / B.exp(yt)
+    # Force data in the range `(10, 11)`.
+    yc = 10 + 1 / (1 + B.exp(yc))
+    yt = 10 + 1 / (1 + B.exp(yt))
 
     pred = model(xc, yc, xt)
     objective = B.sum(pred.logpdf(yt))
