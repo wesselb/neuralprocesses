@@ -113,3 +113,47 @@ def test_architectures(nps, float64, construct_name, kw_args):
     # Again check that the objective is finite and of the right data type.
     assert np.isfinite(B.to_numpy(objective))
     assert B.dtype(objective) == nps.dtype
+
+
+def test_transform_positive(nps):
+    model = nps.construct_convgnp(
+        dim_x=1,
+        dim_y=1,
+        points_per_unit=16,
+        unet_channels=(8, 16),
+        transform="positive",
+    )
+    xc, yc, xt, yt = generate_data(nps, dim_x=1, dim_y=1)
+    # Make data positive.
+    yc = B.exp(yc)
+    yt = B.exp(yt)
+
+    pred = model(xc, yc, xt)
+    objective = B.sum(pred.logpdf(yt))
+    # Again check that the objective is finite and of the right data type.
+    assert np.isfinite(B.to_numpy(objective))
+    # Check that predictions and samples satisfy the constraint.
+    assert B.all(pred.mean > 0)
+    assert B.all(pred.sample() > 0)
+
+
+def test_transform_bounded(nps):
+    model = nps.construct_convgnp(
+        dim_x=1,
+        dim_y=1,
+        points_per_unit=16,
+        unet_channels=(8, 16),
+        transform=(10, 11),
+    )
+    xc, yc, xt, yt = generate_data(nps, dim_x=1, dim_y=1)
+    # Force data in the range `(5, 6)`.
+    yc = 5 + 1 / B.exp(yc)
+    yt = 5 + 1 / B.exp(yt)
+
+    pred = model(xc, yc, xt)
+    objective = B.sum(pred.logpdf(yt))
+    # Again check that the objective is finite and of the right data type.
+    assert np.isfinite(B.to_numpy(objective))
+    # Check that predictions and samples satisfy the constraint.
+    assert B.all(pred.mean > 10) and B.all(pred.mean < 11)
+    assert B.all(pred.sample() > 10) and B.all(pred.sample() < 11)
