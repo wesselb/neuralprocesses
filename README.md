@@ -5,17 +5,23 @@
 [![Latest Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://wesselb.github.io/neuralprocesses)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
+*The package and manual are still under construction.*
+*If something is not working or unclear, please feel free to open an issue.*
+
 A framework for composing Neural Processes in Python.
 See also [NeuralProcesses.jl](https://github.com/wesselb/NeuralProcesses.jl).
-
-*This package is currently under construction.
-There will be more here soon. In the meantime, see
-[NeuralProcesses.jl](https://github.com/wesselb/NeuralProcesses.jl).*
 
 Contents:
 
 - [Installation](#installation)
 - [Examples of Predefined Models](#examples-of-predefined-models)
+  - [PyTorch](#pytorch)
+    - [GNP](#gnp)
+    - [ConvGNP](#convgnp)
+  - [TensorFlow](#tensorflow)
+    - [GNP](#gnp-1)
+    - [ConvGNP](#convgnp-1)
+    - [ConvGNP With Auxiliary Variables](#convgnp-with-auxiliary-variables)
 - [Masking](#masking)
     - [Masking Particular Inputs](#masking-particular-inputs)
     - [Using Masks to Batch Contexts of Different Sizes](#using-masks-to-batch-context-sets-of-different-sizes)
@@ -30,7 +36,59 @@ Then simply
 pip install neuralprocesses
 ```
 
+## Manual
+
+Inputs and outputs are always tensors with shape `(batch, d, n)` where `batch` is the
+batch size, `d` is the dimensionality of the input/output, and `n` is the number of data
+points.
+
 ## Examples of Predefined Models
+
+### PyTorch
+
+#### GNP
+
+```python
+import lab as B
+import torch
+
+import neuralprocesses.torch as nps
+
+cnp = nps.construct_gnp(dim_x=2, dim_y=3, likelihood="lowrank")
+dist = cnp(
+    B.randn(torch.float32, 16, 2, 10),  # Context inputs
+    B.randn(torch.float32, 16, 3, 10),  # Context outputs
+    B.randn(torch.float32, 16, 2, 15),  # Target inputs
+)
+mean, var = dist.mean, dist.var  # Prediction for target outputs
+
+print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
+print(dist.sample())
+print(dist.kl(dist))
+print(dist.entropy())
+```
+
+#### ConvGNP
+
+```python
+import lab as B
+import torch
+
+import neuralprocesses.torch as nps
+
+cnp = nps.construct_convgnp(dim_x=2, dim_y=3, likelihood="lowrank")
+dist = cnp(
+    B.randn(torch.float32, 16, 2, 10),  # Context inputs
+    B.randn(torch.float32, 16, 3, 10),  # Context outputs
+    B.randn(torch.float32, 16, 2, 15),  # Target inputs
+)
+mean, var = dist.mean, dist.var  # Prediction for target outputs
+
+print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
+print(dist.sample())
+print(dist.kl(dist))
+print(dist.entropy())
+```
 
 ### TensorFlow
 
@@ -44,11 +102,11 @@ import neuralprocesses.tensorflow as nps
 
 cnp = nps.construct_gnp(dim_x=2, dim_y=3, likelihood="lowrank")
 dist = cnp(
-    B.randn(tf.float32, 16, 2, 10),
-    B.randn(tf.float32, 16, 3, 10),
-    B.randn(tf.float32, 16, 2, 15),
+    B.randn(tf.float32, 16, 2, 10),  # Context inputs
+    B.randn(tf.float32, 16, 3, 10),  # Context outputs
+    B.randn(tf.float32, 16, 2, 15),  # Target inputs
 )
-mean, var = dist.mean, dist.var
+mean, var = dist.mean, dist.var  # Prediction for target outputs
 
 print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
 print(dist.sample())
@@ -65,13 +123,12 @@ import tensorflow as tf
 import neuralprocesses.tensorflow as nps
 
 cnp = nps.construct_convgnp(dim_x=2, dim_y=3, likelihood="lowrank")
-
 dist = cnp(
-    B.randn(tf.float32, 16, 2, 10),
-    B.randn(tf.float32, 16, 3, 10),
-    B.randn(tf.float32, 16, 2, 15),
+    B.randn(tf.float32, 16, 2, 10),  # Context inputs
+    B.randn(tf.float32, 16, 3, 10),  # Context outputs
+    B.randn(tf.float32, 16, 2, 15),  # Target inputs
 )
-mean, var = dist.mean, dist.var
+mean, var = dist.mean, dist.var  # Prediction for target outputs
 
 print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
 print(dist.sample())
@@ -131,52 +188,6 @@ dist = cnp(
 mean, var = dist.mean, dist.var
 
 print(dist.logpdf(B.randn(tf.float32, 16, 3, 15)))
-print(dist.sample())
-print(dist.kl(dist))
-print(dist.entropy())
-```
-
-### PyTorch
-
-#### GNP
-
-```python
-import lab as B
-import torch
-
-import neuralprocesses.torch as nps
-
-cnp = nps.construct_gnp(dim_x=2, dim_y=3, likelihood="lowrank")
-dist = cnp(
-    B.randn(torch.float32, 16, 2, 10),
-    B.randn(torch.float32, 16, 3, 10),
-    B.randn(torch.float32, 16, 2, 15),
-)
-mean, var = dist.mean, dist.var
-
-print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
-print(dist.sample())
-print(dist.kl(dist))
-print(dist.entropy())
-```
-
-#### ConvGNP
-
-```python
-import lab as B
-import torch
-
-import neuralprocesses.torch as nps
-
-cnp = nps.construct_convgnp(dim_x=2, dim_y=3, likelihood="lowrank")
-dist = cnp(
-    B.randn(torch.float32, 16, 2, 10),
-    B.randn(torch.float32, 16, 3, 10),
-    B.randn(torch.float32, 16, 2, 15),
-)
-mean, var = dist.mean, dist.var
-
-print(dist.logpdf(B.randn(torch.float32, 16, 3, 15)))
 print(dist.sample())
 print(dist.kl(dist))
 print(dist.entropy())
