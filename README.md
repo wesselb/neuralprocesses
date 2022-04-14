@@ -38,8 +38,8 @@ pip install neuralprocesses
 
 ## Manual
 
-Inputs and outputs are always tensors with shape `(batch, d, n)` where `batch` is the
-batch size, `d` is the dimensionality of the input/output, and `n` is the number of data
+Inputs and outputs are always tensors with shape `(b, d, n)` where `b` is the
+batch size, `d` is the dimensionality of the inputs/outputs, and `n` is the number of data
 points.
 
 ## Examples of Predefined Models
