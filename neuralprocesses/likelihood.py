@@ -109,7 +109,7 @@ def code(
     # Make a noiseless prediction.
     if noiseless:
         with B.on_device(noise):
-            noise = B.zero(noise)
+            noise = B.zeros(noise)
 
     pred = MultiOutputNormal.lowrank(mean, noise, var_factor)
 
