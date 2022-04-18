@@ -101,7 +101,7 @@ def code(
     var_factor = z[:, 2 * dim_y :, :] / B.sqrt(dim_inner)
 
     # Cast the parameters before constructing the distribution.
-    if lik_cast:
+    if dtype_lik:
         mean = B.cast(mean, dtype_lik)
         noise = B.cast(noise, dtype_lik)
         var_factor = B.cast(var_factor, dtype_lik)
