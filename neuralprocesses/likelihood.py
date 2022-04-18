@@ -47,8 +47,8 @@ def code(
 
     # Cast parameters to the right data type.
     if dtype_lik:
-        mean = B.cast(mean, dtype_lik)
-        noise = B.cast(noise, dtype_lik)
+        mean = B.cast(dtype_lik, mean)
+        noise = B.cast(dtype_lik, noise)
 
     # Make a noiseless prediction.
     if noiseless:
@@ -102,9 +102,9 @@ def code(
 
     # Cast the parameters before constructing the distribution.
     if dtype_lik:
-        mean = B.cast(mean, dtype_lik)
-        noise = B.cast(noise, dtype_lik)
-        var_factor = B.cast(var_factor, dtype_lik)
+        mean = B.cast(dtype_lik, mean)
+        noise = B.cast(dtype_lik, noise)
+        var_factor = B.cast(dtype_lik, var_factor)
 
     # Make a noiseless prediction.
     if noiseless:
