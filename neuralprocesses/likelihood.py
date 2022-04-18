@@ -88,19 +88,12 @@ def code(
     noise = coder.epsilon + B.softplus(z[:, dim_y : 2 * dim_y, :])
     if noiseless:
         with B.on_device(noise):
-            noise = B.zeros(noise)
+            # Don't set the noise to zero entirely, because otherwise the matrix
+            # inversion lemma fails.
+            noise = self.epsilon * B.ones(noise)
     pred = MultiOutputNormal.lowrank(
         z[:, :dim_y, :],
         noise,
         z[:, 2 * dim_y :, :] / B.sqrt(dim_inner),
     )
-
-    # If the nose was removed, always make the variance dense, because the matrix
-    # inversion lemma will otherwise fail.
-    if noiseless:
-        pred = MultiOutputNormal(
-            Normal(pred.normal.mean, B.dense(pred.normal.var)),
-            pred.num_outputs,
-        )
-
     return xz, pred
