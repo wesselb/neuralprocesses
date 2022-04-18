@@ -2,14 +2,15 @@ import argparse
 
 import lab as B
 import matplotlib.pyplot as plt
-import neuralprocesses.torch as nps
 import numpy as np
 import stheno
 import torch
 import wbml.out as out
-from neuralprocesses.data import GPGenerator
 from wbml.experiment import WorkingDirectory
 from wbml.plot import tweak
+
+import neuralprocesses.torch as nps
+from neuralprocesses.data import GPGenerator
 
 
 def with_err(vals):
@@ -38,7 +39,13 @@ def plot_first_of_batch(batch):
         x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
         x = B.tile(x, B.shape(batch["xt"], 0), 1, 1)
     pred = run_model(batch["xc"], batch["yc"], x)
-    pred_noiseless = run_model(batch["xc"], batch["yc"], x, noiseless=True)
+    pred_noiseless = run_model(
+        batch["xc"],
+        batch["yc"],
+        x,
+        dtype_lik=torch.float64,
+        noiseless=True,
+    )
 
     plt.figure(figsize=(6, 4))
     # Plot context and target.
@@ -139,6 +146,7 @@ if args.model in models_which_require_arch and not args.arch:
 
 # Setup script.
 out.report_time = True
+B.epsilon = 1e-8
 if args.learnable_channel:
     suffix = "_lc"
 else:
@@ -288,9 +296,8 @@ gen_eval = GPGenerator(
 
 def objective(xc, yc, xt, yt):
     """Objective function."""
-    pred = run_model(xc, yc, xt)
     # Use `float64`s for the logpdf computation.
-    pred = B.cast(torch.float64, pred)
+    pred = run_model(xc, yc, xt, dtype_lik=torch.float64)
     return -pred.logpdf(B.cast(torch.float64, yt))
 
 

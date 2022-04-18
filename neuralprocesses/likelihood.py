@@ -37,15 +37,25 @@ def code(
     z: B.Numeric,
     x,
     *,
+    dtype_lik=None,
     noiseless=False,
     **kw_args,
 ):
     dim_y = B.shape(z, 1) // 2
+    mean = z[:, :dim_y, :]
     noise = coder.epsilon + B.softplus(z[:, dim_y:, :])
+
+    # Cast parameters to the right data type.
+    if dtype_lik:
+        mean = B.cast(mean, dtype_lik)
+        noise = B.cast(noise, dtype_lik)
+
+    # Make a noiseless prediction.
     if noiseless:
         with B.on_device(noise):
             noise = B.zeros(noise)
-    return xz, MultiOutputNormal.diagonal(z[:, :dim_y, :], noise)
+
+    return xz, MultiOutputNormal.diagonal(mean, noise)
 
 
 @register_module
@@ -81,19 +91,34 @@ def code(
     x,
     *,
     noiseless=False,
+    dtype_lik=None,
     **kw_args,
 ):
     dim_y = B.shape(z, 1) // (2 + coder.rank)
     dim_inner = B.shape(z, 1) - 2 * dim_y
+    mean = z[:, :dim_y, :]
     noise = coder.epsilon + B.softplus(z[:, dim_y : 2 * dim_y, :])
+    var_factor = z[:, 2 * dim_y :, :] / B.sqrt(dim_inner)
+
+    # Cast the parameters before constructing the distribution.
+    if lik_cast:
+        mean = B.cast(mean, dtype_lik)
+        noise = B.cast(noise, dtype_lik)
+        var_factor = B.cast(var_factor, dtype_lik)
+
+    # Make a noiseless prediction.
     if noiseless:
         with B.on_device(noise):
-            # Don't set the noise to zero entirely, because otherwise the matrix
-            # inversion lemma fails.
-            noise = coder.epsilon * B.ones(noise)
-    pred = MultiOutputNormal.lowrank(
-        z[:, :dim_y, :],
-        noise,
-        z[:, 2 * dim_y :, :] / B.sqrt(dim_inner),
-    )
+            noise = B.zero(noise)
+
+    pred = MultiOutputNormal.lowrank(mean, noise, var_factor)
+
+    # If the noise was removed, convert the variance to dense, because the matrix
+    # inversion lemma will otherwise fail.
+    if noiseless:
+        pred = MultiOutputNormal(
+            Normal(pred.normal.mean, B.dense(pred.normal.var)),
+            pred.num_outputs,
+        )
+
     return xz, pred
