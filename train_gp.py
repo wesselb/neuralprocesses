@@ -315,7 +315,6 @@ for i in range(args.epochs):
 
         # Save current model.
         torch.save(model.state_dict(), wd.file(f"model-last.torch"))
-        save_model("last")
 
         # The epoch is done. Now evaluate.
         with torch.no_grad():
