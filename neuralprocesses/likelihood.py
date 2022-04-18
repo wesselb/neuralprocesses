@@ -42,8 +42,8 @@ def code(
     dim_y = B.shape(z, 1) // 2
     noise = coder.epsilon + B.softplus(z[:, dim_y:, :])
     if noiseless:
-        with B.on_device(var):
-            noise = B.zeros(var)
+        with B.on_device(noise):
+            noise = B.zeros(noise)
     return xz, MultiOutputNormal.diagonal(z[:, :dim_y, :], noise)
 
 
