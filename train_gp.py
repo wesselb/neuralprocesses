@@ -77,7 +77,7 @@ def plot_first_of_batch(batch):
         lw=0.5,
     )
     # Plot prediction by ground truth.
-    f = GP(kernel)
+    f = stheno.GP(kernel)
     # Make sure that everything is of `float64`s and on the GPU.
     noise = B.to_active_device(B.cast(torch.float64, gen_eval.noise))
     xc = B.transpose(B.cast(torch.float64, batch["xc"]))
