@@ -1,4 +1,5 @@
 import lab as B
+from stheno import Normal
 
 from . import _dispatch
 from .dist import MultiOutputNormal
@@ -88,8 +89,18 @@ def code(
     if noiseless:
         with B.on_device(noise):
             noise = B.zeros(noise)
-    return xz, MultiOutputNormal.lowrank(
+    pred = MultiOutputNormal.lowrank(
         z[:, :dim_y, :],
         noise,
         z[:, 2 * dim_y :, :] / B.sqrt(dim_inner),
     )
+
+    # If the nose was removed, always make the variance dense, because the matrix
+    # inversion lemma will otherwise fail.
+    if noiseless:
+        pred = MultiOutputNormal(
+            Normal(pred.normal.mean, B.dense(pred.normal.var)),
+            pred.num_outputs,
+        )
+
+    return xz, pred
