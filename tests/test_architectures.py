@@ -67,7 +67,7 @@ from .util import nps, generate_data  # noqa
         ]
         for dim_x in [1, 2]
         for dim_y in [1, 2]
-        for lik in ["het", "lowrank", "lowrank-correlated"]
+        for lik in ["het", "lowrank"]
     ],
 )
 @pytest.mark.flaky(reruns=3)

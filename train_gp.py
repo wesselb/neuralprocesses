@@ -38,6 +38,7 @@ def plot_first_of_batch(batch):
         x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
         x = B.tile(x, B.shape(batch["xt"], 0), 1, 1)
     pred = run_model(batch["xc"], batch["yc"], x)
+    pred_noiseless = run_model(batch["xc"], batch["yc"], x, noiseless=True)
 
     plt.figure(figsize=(6, 4))
     # Plot context and target.
@@ -71,7 +72,7 @@ def plot_first_of_batch(batch):
     )
     plt.plot(
         first_np(x),
-        first_np(pred.sample(5)),
+        first_np(pred_noiseless.sample(5)),
         style="pred",
         ls="-",
         lw=0.5,
