@@ -90,7 +90,7 @@ def code(
         with B.on_device(noise):
             # Don't set the noise to zero entirely, because otherwise the matrix
             # inversion lemma fails.
-            noise = self.epsilon * B.ones(noise)
+            noise = coder.epsilon * B.ones(noise)
     pred = MultiOutputNormal.lowrank(
         z[:, :dim_y, :],
         noise,
