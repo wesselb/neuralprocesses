@@ -131,14 +131,14 @@ def plot_first_of_batch(gen, run_model):
         style="pred",
     )
     # Try sampling with increasingly higher regularisation.
-    try:
-        samples = pred_noiseless.sample(5)
-    except Exception as e:
-        if B.epsilon < 1e-3:
+    while True:
+        try:
+            samples = pred_noiseless.sample(5)
+            break
+        except Exception as e:
             B.epsilon *= 10
-        else:
-            B.epsilon = 1e-8
-            raise e
+            if B.epsilon > 1e-3:
+                raise e
     B.epsilon = 1e-8  # Ensure to reset the regularisation.
     plt.plot(
         first_np(x),
