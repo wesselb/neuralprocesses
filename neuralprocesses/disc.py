@@ -75,22 +75,23 @@ class Discretisation:
 
         # Produce the grid.
         batch = B.shape(args[0], 0)
-        return B.tile(
-            B.expand_dims(
-                B.linspace(
-                    B.dtype(args[0]),
-                    grid_start,
-                    grid_start + (n - 1) * self.resolution,
-                    # Tell LAB that it can be interpreted as an integer.
-                    Dimension(B.cast(B.dtype_int(n), n)),
+        with B.on_device(args[0]):
+            return B.tile(
+                B.expand_dims(
+                    B.linspace(
+                        B.dtype(args[0]),
+                        grid_start,
+                        grid_start + (n - 1) * self.resolution,
+                        # Tell LAB that it can be interpreted as an integer.
+                        Dimension(B.cast(B.dtype_int(n), n)),
+                    ),
+                    axis=0,
+                    times=2,
                 ),
-                axis=0,
-                times=2,
-            ),
-            batch,
-            1,
-            1,
-        )
+                batch,
+                1,
+                1,
+            )
 
     def __call__(self, *args, margin=None, **kw_args):
         """Perform the discretisation for multi-dimensional inputs.
