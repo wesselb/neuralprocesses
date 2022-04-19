@@ -374,7 +374,7 @@ class SawtoothGenerator(SyntheticGenerator):
             offset = sample / freq
 
             # Construct the sawtooth and add noise.
-            f = (freq * (B.sum(x * direction, axis=1) - offset)) % (1 / freq)
+            f = (freq * (B.sum(x * direction, axis=1) - offset)) % 1
             y = f + B.sqrt(noise) * B.randn(f)
 
             # Convert to the right data type and save.
