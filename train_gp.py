@@ -2,13 +2,14 @@ import argparse
 
 import lab as B
 import matplotlib.pyplot as plt
-import neuralprocesses.torch as nps
 import numpy as np
 import stheno
 import torch
 import wbml.out as out
 from wbml.experiment import WorkingDirectory
 from wbml.plot import tweak
+
+import neuralprocesses.torch as nps
 
 
 def train(gen, objective):
@@ -129,9 +130,19 @@ def plot_first_of_batch(gen, run_model):
         first_np(pred.mean + err),
         style="pred",
     )
+    # Try sampling with increasingly higher regularisation.
+    try:
+        samples = pred_noiseless.sample(5)
+    except Exception as e:
+        if B.epsilon < 1e-3:
+            B.epsilon *= 10
+        else:
+            B.epsilon = 1e-8
+            raise e
+    B.epsilon = 1e-8  # Ensure to reset the regularisation.
     plt.plot(
         first_np(x),
-        first_np(pred_noiseless.sample(5)),
+        first_np(samples),
         style="pred",
         ls="-",
         lw=0.5,
