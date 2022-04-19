@@ -168,67 +168,26 @@ else:
 B.set_global_device(device)
 
 # Setup data.
-gen_config = {
-    "noise": 0.05,
-    "seed": 10,
-    "num_tasks": 2**14,
-    "batch_size": args.batch_size,
-    "x_ranges": ((-2, 2),) * args.dim_x,
-    "dim_y": args.dim_y,
-    "device": device,
-}
-gen_eval_config = dict(gen_config, seed=20, num_tasks=2**12)
-kernels = {
-    "eq": stheno.EQ().stretch(0.25),
-    "matern": stheno.Matern52().stretch(0.25),
-    "weakly-periodic": stheno.EQ().stretch(0.5) * stheno.EQ().periodic(period=0.25),
-}
-gens = {
-    name: nps.GPGenerator(
-        torch.float32,
-        kernel=kernel,
-        num_context_points=(0, 20),
-        num_target_points=50,
-        pred_logpdf=False,
-        pred_logpdf_diag=False,
-        **gen_config,
-    )
-    for name, kernel in kernels.items()
-}
-gens_eval = {
-    name: nps.GPGenerator(
-        torch.float32,
-        kernel=kernel,
-        num_context_points=(0, 20),
-        num_target_points=50,
-        pred_logpdf=True,
-        pred_logpdf_diag=True,
-        **gen_eval_config,
-    )
-    for name, kernel in kernels.items()
-}
-gens["sawtooth"] = nps.SawtoothGenerator(
-    torch.float32,
-    num_context_points=(0, 40),
-    num_target_points=100,
-    **gen_config,
-)
-gens_eval["sawtooth"] = nps.SawtoothGenerator(
-    torch.float32,
-    num_context_points=(0, 40),
-    num_target_points=100,
-    **gen_eval_config,
-)
-gens["mixture"] = nps.MixtureGenerator(
-    *gens.values(),
-    seed=gen_config["seed"],
-)
-gens_eval["mixture"] = nps.MixtureGenerator(
-    *gens_eval.values(),
-    seed=gen_eval_config["seed"],
-)
-gen = gens[args.data]
-gen_eval = gens_eval[args.data]
+gen = nps.construct_predefined_gens(
+    seed=10,
+    batch_size=args.batch_size,
+    num_tasks=2**14,
+    dim_x=args.dim_x,
+    dim_y=args.dim_y,
+    pred_logpdf=False,
+    pred_logpdf_diag=False,
+    device=device,
+)[args.data]
+gen_eval = nps.construct_predefined_gens(
+    seed=20,  # Use a different seed!
+    batch_size=args.batch_size,
+    num_tasks=2**12,
+    dim_x=args.dim_x,
+    dim_y=args.dim_y,
+    pred_logpdf=True,
+    pred_logpdf_diag=True,
+    device=device,
+)[args.data]
 
 # Setup architecture.
 unet_channels = (64,) * 6

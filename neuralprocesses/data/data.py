@@ -49,7 +49,7 @@ class SyntheticGenerator(DataGenerator):
     Args:
         dtype (dtype): Data type to generate.
         noise (float, optional): Observation noise. Defaults to `5e-2`.
-        seed (int, optional): Seed. Defaults to `0`.
+        seed (int, optional): Seed. Defaults to 0.
         batch_size (int, optional): Batch size. Defaults to 16.
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
@@ -64,7 +64,7 @@ class SyntheticGenerator(DataGenerator):
             points or a lower and upper bound. Defaults to the range `(1, 50)`.
         num_target_points (int or tuple[int, int], optional): A fixed number of target
             points or a lower and upper bound. Defaults to the fixed number `50`.
-        device (str, optional): Device on which to generate data. Defaults to `cpu`.
+        device (str, optional): Device on which to generate data. Defaults to `"cpu"`.
 
     Attributes:
         dtype (dtype): Data type.
@@ -343,8 +343,6 @@ class SawtoothGenerator(SyntheticGenerator):
     def __init__(self, *args, freqs=(3, 5), **kw_args):
         super().__init__(*args, **kw_args)
         self.freqs = freqs
-        if self.dim_y != 1:
-            raise NotImplementedError("Can only generate one-dimensional sawtooths.")
 
     def generate_batch(self):
         with B.on_device(self.device):
@@ -354,7 +352,13 @@ class SawtoothGenerator(SyntheticGenerator):
             x, num_context_points, noise = _sample_inputs(self)
 
             # Sample a frequency.
-            self.state, rand = B.rand(self.state, self.float64, self.batch_size, 1)
+            self.state, rand = B.rand(
+                self.state,
+                self.float64,
+                self.batch_size,
+                self.dim_y_latent,
+                1,
+            )
             lower, upper = self.freqs
             freq = lower + (upper - lower) * rand
 
@@ -363,24 +367,33 @@ class SawtoothGenerator(SyntheticGenerator):
                 self.state,
                 self.float64,
                 self.batch_size,
+                self.dim_y_latent,
                 self.dim_x,
-                1,
             )
-            norm = B.sqrt(B.sum(direction * direction, axis=1, squeeze=False))
+            norm = B.sqrt(B.sum(direction * direction, axis=2, squeeze=False))
             direction = direction / norm
 
             # Sample a uniformly distributed (conditional on frequency) offset.
-            self.state, sample = B.rand(self.state, self.float64, self.batch_size, 1)
+            self.state, sample = B.rand(
+                self.state,
+                self.float64,
+                self.batch_size,
+                self.dim_y_latent,
+                1,
+            )
             offset = sample / freq
 
             # Construct the sawtooth and add noise.
-            f = (freq * (B.sum(x * direction, axis=1) - offset)) % 1
+            f = (freq * (B.matmul(direction, x) - offset)) % 1
+            # Only mix the latent processes if we should generate more than one output.
+            if self.dim_y > 1:
+                f = B.matmul(self.h, f)
             y = f + B.sqrt(noise) * B.randn(f)
 
             # Convert to the right data type and save.
             batch["xc"] = B.cast(self.dtype, x[:, :, :num_context_points])
-            batch["yc"] = B.cast(self.dtype, y[:, None, :num_context_points])
+            batch["yc"] = B.cast(self.dtype, y[:, :, :num_context_points])
             batch["xt"] = B.cast(self.dtype, x[:, :, num_context_points:])
-            batch["yt"] = B.cast(self.dtype, y[:, None, num_context_points:])
+            batch["yt"] = B.cast(self.dtype, y[:, :, num_context_points:])
 
             return batch
