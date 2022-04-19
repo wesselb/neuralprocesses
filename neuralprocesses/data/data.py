@@ -190,7 +190,7 @@ class MixtureGenerator(DataGenerator):
         self.state = B.create_random_state(np.float64, seed=seed)
 
     def generate_batch(self):
-        self.state, i = B.randint(self.state, int, upper=len(self.gens))
+        self.state, i = B.randint(self.state, np.int64, upper=len(self.gens))
         return self.gens[i].generate_batch()
 
 
