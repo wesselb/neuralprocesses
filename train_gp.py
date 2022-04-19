@@ -2,6 +2,7 @@ import argparse
 
 import lab as B
 import matplotlib.pyplot as plt
+import neuralprocesses.torch as nps
 import numpy as np
 import stheno
 import torch
@@ -9,7 +10,45 @@ import wbml.out as out
 from wbml.experiment import WorkingDirectory
 from wbml.plot import tweak
 
-import neuralprocesses.torch as nps
+
+def train(gen, objective):
+    """Train for an epoch."""
+    for batch in gen.epoch():
+        val = B.mean(
+            objective(
+                batch["xc"],
+                batch["yc"],
+                batch["xt"],
+                batch["yt"],
+            )
+        )
+        opt.zero_grad(set_to_none=True)
+        val.backward()
+        opt.step()
+
+
+def eval(gen, objective):
+    """Perform evaluation."""
+    with torch.no_grad():
+        vals, kls, kls_diag = []
+        for batch in gen.epoch():
+            vs = objective(
+                batch["xc"],
+                batch["yc"],
+                batch["xt"],
+                batch["yt"],
+            )
+            nt = B.shape(batch["xt"], 2)
+            vals.append(B.to_numpy(vs) / nt)
+            if "pred_logpdf" in batch:
+                kls.append(B.to_numpy(vs + batch["pred_logpdf"]) / nt)
+            if "pred_logpdf_diag" in batch:
+                kls_diag.append(B.to_numpy(vs + batch["pred_logpdf_diag"]) / nt)
+        out.kv("Loglik", with_err(-B.concat(*vals)))
+        if kls:
+            out.kv("KL (full)", with_err(B.concat(*kls)))
+        if kls_diag:
+            out.kv("KL (diag)", with_err(B.concat(*kls_diag)))
 
 
 def with_err(vals):
@@ -32,21 +71,28 @@ def first_np(x):
         raise ValueError(f"Rank must be two, three, or four.")
 
 
-def plot_first_of_batch(batch):
+def plot_first_of_batch(gen, run_model):
     """Plot the prediction for the first element of a batch."""
+    batch = gen.generate_batch()
+
+    # Define points to predict at.
     with B.on_device(batch["xt"]):
         x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
         x = B.tile(x, B.shape(batch["xt"], 0), 1, 1)
-    pred = run_model(batch["xc"], batch["yc"], x)
-    pred_noiseless = run_model(
-        batch["xc"],
-        batch["yc"],
-        x,
-        dtype_lik=torch.float64,
-        noiseless=True,
-    )
+
+    # Run model.
+    with torch.no_grad():
+        pred = run_model(batch["xc"], batch["yc"], x)
+        pred_noiseless = run_model(
+            batch["xc"],
+            batch["yc"],
+            x,
+            dtype_lik=torch.float64,
+            noiseless=True,
+        )
 
     plt.figure(figsize=(6, 4))
+
     # Plot context and target.
     plt.scatter(
         first_np(batch["xc"]),
@@ -62,6 +108,7 @@ def plot_first_of_batch(batch):
         style="test",
         s=20,
     )
+
     # Plot prediction.
     err = 1.96 * B.sqrt(pred.var)
     plt.plot(
@@ -83,11 +130,12 @@ def plot_first_of_batch(batch):
         ls="-",
         lw=0.5,
     )
+
     # Plot prediction by ground truth.
-    if hasattr(gen_eval, "kernel"):
-        f = stheno.GP(gen_eval.kernel)
+    if hasattr(gen, "kernel"):
+        f = stheno.GP(gen.kernel)
         # Make sure that everything is of `float64`s and on the GPU.
-        noise = B.to_active_device(B.cast(torch.float64, gen_eval.noise))
+        noise = B.to_active_device(B.cast(torch.float64, gen.noise))
         xc = B.transpose(B.cast(torch.float64, batch["xc"]))
         yc = B.transpose(B.cast(torch.float64, batch["yc"]))
         x = B.transpose(B.cast(torch.float64, x))
@@ -110,6 +158,7 @@ def plot_first_of_batch(batch):
             first_np(upper),
             style="pred2",
         )
+
     plt.xlim(B.min(x), B.max(x))
     tweak()
     plt.savefig(wd.file(f"epoch-{i:03d}.pdf"))
@@ -266,10 +315,8 @@ elif args.model == "convgnp-linear":
 else:
     raise ValueError(f'Invalid model "{args.model}".')
 
-# Ensure that the model is on the GPU.
+# Ensure that the model is on the GPU and print some statistics.
 model = model.to(device)
-
-# Print the model's number of parameters.
 out.kv("Number of parameters", nps.num_params(model))
 
 
@@ -287,48 +334,13 @@ best_eval_loss = np.inf
 for i in range(args.epochs):
     with out.Section(f"Epoch {i + 1}"):
         # Perform an epoch.
-        for batch in gen.epoch():
-            val = B.mean(
-                objective(
-                    batch["xc"],
-                    batch["yc"],
-                    batch["xt"],
-                    batch["yt"],
-                )
-            )
-            opt.zero_grad(set_to_none=True)
-            val.backward()
-            opt.step()
+        train(gen, objective)
 
         # Save current model.
         torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
         # The epoch is done. Now evaluate.
-        with torch.no_grad():
-            vals = []
-            full_vals = []
-            diag_vals = []
-            for batch in gen_eval.epoch():
-                vs = objective(
-                    batch["xc"],
-                    batch["yc"],
-                    batch["xt"],
-                    batch["yt"],
-                )
-                nt = B.shape(batch["xt"], 2)
-                vals.append(B.to_numpy(vs) / nt)
-                if "pred_logpdf" in batch:
-                    full_vals.append(B.to_numpy(vs + batch["pred_logpdf"]) / nt)
-                if "pred_logpdf_diag" in batch:
-                    diag_vals.append(B.to_numpy(vs + batch["pred_logpdf_diag"]) / nt)
-            vals = B.concat(*vals)
-            out.kv("Loglik", with_err(-vals))
-            if full_vals:
-                full_vals = B.concat(*full_vals)
-                out.kv("KL (full)", with_err(full_vals))
-            if diag_vals:
-                diag_vals = B.concat(*diag_vals)
-                out.kv("KL (diag)", with_err(diag_vals))
+        eval(gen_eval, objective)
 
         # Check if the model is the new best. If so, save it.
         if B.mean(vals) < best_eval_loss:
@@ -338,5 +350,4 @@ for i in range(args.epochs):
 
         # Visualise a prediction by the model.
         if args.dim_x == 1 and args.dim_y == 1:
-            with torch.no_grad():
-                plot_first_of_batch(gen_eval.generate_batch())
+            plot_first_of_batch(gen, run_model)
