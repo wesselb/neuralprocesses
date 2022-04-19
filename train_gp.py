@@ -185,7 +185,7 @@ parser.add_argument("--learnable_channel", action="store_true")
 parser.add_argument("--subdir", type=str, nargs="*")
 parser.add_argument(
     "--model",
-    choices=["cnp", "convcnp", "convgnp-linear"],
+    choices=["cnp", "convcnp", "convgnp-linear", "fullconvgnp"],
     required=True,
 )
 parser.add_argument(
@@ -196,7 +196,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 # Ensure that the `arch` is specified when it is required.
-models_which_require_arch = {"convcnp", "convgnp-linear"}
+models_which_require_arch = {"convcnp", "convgnp-linear", "fullconvgnp"}
 if args.model in models_which_require_arch and not args.arch:
     raise RuntimeError(f"Model requires a choice of architecture. Please set `--arch`.")
 
@@ -320,6 +320,18 @@ elif args.model == "convgnp-linear":
         )
         run_model = model
 
+elif args.model == "fullconvgnp":
+    model = nps.construct_fullconvgnp(
+        points_per_unit=points_per_unit,
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        conv_arch=args.arch,
+        unet_channels=unet_channels,
+        dws_channels=dws_channels,
+        dws_receptive_field=dws_receptive_field,
+        margin=args.margin,
+    )
+    run_model = model
 else:
     raise ValueError(f'Invalid model "{args.model}".')
 
