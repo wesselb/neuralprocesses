@@ -10,7 +10,6 @@ from wbml.experiment import WorkingDirectory
 from wbml.plot import tweak
 
 import neuralprocesses.torch as nps
-from neuralprocesses.data import GPGenerator
 
 
 def with_err(vals):
@@ -134,7 +133,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--data",
-    choices=["eq", "matern", "weakly-periodic"],
+    choices=["eq", "matern", "weakly-periodic", "sawtooth", "mixture"],
     default="eq",
 )
 args = parser.parse_args()
@@ -160,27 +159,74 @@ wd = WorkingDirectory(
 )
 
 # Setup data.
-noise = 0.05
-if args.data == "eq":
-    kernel = stheno.EQ().stretch(0.25)
-elif args.data == "matern":
-    kernel = stheno.Matern().stretch(0.25)
-elif args.data == "weakly-periodic":
-    kernel = stheno.EQ().stretch(0.5) * stheno.EQ().periodic(period=0.25)
-else:
-    raise RuntimeError(f'Unknown data set "{args.data}".')
+gen_config = {
+    "noise": 0.05,
+    "seed": 10,
+    "num_tasks": 2**14,
+    "batch_size": args.batch_size,
+    "x_ranges": ((-2, 2),) * args.dim_x,
+    "dim_y": args.dim_y,
+}
+gen_eval_config = dict(gen_config, seed=20, num_tasks=2**12)
+kernels = {
+    "eq": stheno.EQ().stretch(0.25),
+    "matern": stheno.Matern52().stretch(0.25),
+    "weakly-periodic": stheno.EQ().stretch(0.5) * stheno.EQ().periodic(period=0.25),
+}
+gens = {
+    name: nps.GPGenerator(
+        torch.float32,
+        kernel=kernel,
+        num_context_points=(0, 20),
+        num_target_points=50,
+        pred_logpdf=False,
+        pred_logpdf_diag=False,
+        **gen_config,
+    )
+    for name, kernel in kernels.items()
+}
+gens_eval = {
+    name: nps.GPGenerator(
+        torch.float32,
+        kernel=kernel,
+        num_context_points=(0, 20),
+        num_target_points=50,
+        pred_logpdf=True,
+        pred_logpdf_diag=True,
+        **gen_eval_config,
+    )
+    for name, kernel in kernels.items()
+}
+gens["sawtooth"] = nps.SawtoothGenerator(
+    torch.float32,
+    num_context_points=(0, 40),
+    num_target_points=100,
+    **gen_config,
+)
+gens_eval["sawtooth"] = nps.SawtoothGenerator(
+    torch.float32,
+    num_context_points=(0, 40),
+    num_target_points=100,
+    **gen_eval_config,
+)
+gens["mixture"] = nps.MixtureGenerator(
+    *gens.values(),
+    seed=gen_config["seed"],
+)
+gens_eval["mixture"] = nps.MixtureGenerator(
+    *gens_eval.values(),
+    seed=gen_eval_config["seed"],
+)
+gen = gens[args.data]
+gen_eval = gens_eval[args.data]
 
 # Setup architecture.
+unet_channels = (64,) * 6
+dws_channels = 128
+dws_receptive_field = 2
 if args.dim_x == 1:
-    unet_channels = (64,) * 6
-    dws_channels = 128
-    dws_receptive_field = 2
     points_per_unit = 64
 elif args.dim_x == 2:
-    kernel = EQ().stretch(0.25)
-    unet_channels = (64,) * 6
-    dws_channels = 128
-    dws_receptive_field = 2
     # Need to reduce the PPU to reduce memory consumption.
     points_per_unit = 64 / 2
 else:
@@ -264,35 +310,6 @@ model = model.to(device)
 # Print the model's number of parameters.
 out.kv("Number of parameters", nps.num_params(model))
 
-# Set up the training and validation data generators.
-gen = GPGenerator(
-    torch.float32,
-    kernel=kernel,
-    noise=noise,
-    batch_size=args.batch_size,
-    num_context_points=(3, 20),
-    num_target_points=50,
-    x_ranges=((-2, 2),) * args.dim_x,
-    dim_y=args.dim_y,
-    pred_logpdf=False,
-    pred_logpdf_diag=False,
-    device=device,
-)
-gen_eval = GPGenerator(
-    torch.float32,
-    kernel=kernel,
-    noise=noise,
-    num_tasks=2**12,
-    batch_size=args.batch_size,
-    num_context_points=(3, 20),
-    num_target_points=50,
-    x_ranges=((-2, 2),) * args.dim_x,
-    dim_y=args.dim_y,
-    pred_logpdf=True,
-    pred_logpdf_diag=True,
-    device=device,
-)
-
 
 def objective(xc, yc, xt, yt):
     """Objective function."""
@@ -338,14 +355,18 @@ for i in range(args.epochs):
                 )
                 nt = B.shape(batch["xt"], 2)
                 vals.append(B.to_numpy(vs) / nt)
-                full_vals.append(B.to_numpy(vs + batch["pred_logpdf"]) / nt)
-                diag_vals.append(B.to_numpy(vs + batch["pred_logpdf_diag"]) / nt)
+                if "pred_logpdf" in batch:
+                    full_vals.append(B.to_numpy(vs + batch["pred_logpdf"]) / nt)
+                if "pred_logpdf_diag" in batch:
+                    diag_vals.append(B.to_numpy(vs + batch["pred_logpdf_diag"]) / nt)
             vals = B.concat(*vals)
-            full_vals = B.concat(*full_vals)
-            diag_vals = B.concat(*diag_vals)
             out.kv("Loglik", with_err(-vals))
-            out.kv("KL (diag)", with_err(diag_vals))
-            out.kv("KL (full)", with_err(full_vals))
+            if full_vals:
+                full_vals = B.concat(*full_vals)
+                out.kv("KL (full)", with_err(full_vals))
+            if diag_vals:
+                diag_vals = B.concat(*diag_vals)
+                out.kv("KL (diag)", with_err(diag_vals))
 
         # Check if the model is the new best. If so, save it.
         if B.mean(vals) < best_eval_loss:

@@ -1,18 +1,48 @@
+import abc
+
 import lab as B
-import matrix
 import numpy as np
 import stheno
+from plum import Dispatcher
 
-__all__ = ["GPGenerator"]
+__all__ = ["MixtureGenerator", "GPGenerator", "SawtoothGenerator"]
+
+_dispatch = Dispatcher()
 
 
-class GPGenerator:
-    """GP generator.
+class DataGenerator(metaclass=abc.ABCMeta):
+    """Data generator.
+
+    Attributes:
+        num_batches (int): Number of batches in an epoch.
+    """
+
+    @abc.abstractmethod
+    def generate_batch(self):
+        """Generate a batch.
+
+        Returns:
+            dict: A batch, which is a dictionary with keys "xc", "yc", "xt", and "yt".
+        """
+
+    def epoch(self):
+        """Construct a generator for an epoch.
+
+        Returns:
+            generator: Generator for an epoch.
+        """
+
+        def lazy_gen_batch():
+            return self.generate_batch()
+
+        return (lazy_gen_batch() for _ in range(self.num_batches))
+
+
+class SyntheticGenerator(DataGenerator):
+    """Synthetic data generator.
 
     Args:
         dtype (dtype): Data type to generate.
-        kernel (:class:`stheno.Kernel`, optional): Kernel of the GP. Defaults to an
-            EQ kernel with length scale `0.25`.
         noise (float, optional): Observation noise. Defaults to `5e-2`.
         seed (int, optional): Seed. Defaults to `0`.
         batch_size (int, optional): Batch size. Defaults to 16.
@@ -29,17 +59,12 @@ class GPGenerator:
             points or a lower and upper bound. Defaults to the range `(1, 50)`.
         num_target_points (int or tuple[int, int], optional): A fixed number of target
             points or a lower and upper bound. Defaults to the fixed number `50`.
-        pred_logpdf (bool, optional): Also compute the logpdf of the target set given
-            the context set under the true GP. Defaults to `True`.
-        pred_logpdf_diag (bool, optional): Also compute the logpdf of the target set
-            given the context set under the true diagonalised GP. Defaults to `True`.
         device (str, optional): Device on which to generate data. Defaults to `cpu`.
 
     Attributes:
         dtype (dtype): Data type.
         float64 (dtype): Floating point version of `dtype` with 64 bits.
         int64 (dtype): Integer version of `dtype` with 64 bits.
-        kernel (:class:`stheno.Kernel`): Kernel of the GP.
         noise (float): Observation noise.
         batch_size (int): Batch size.
         num_tasks (int): Number of tasks to generate per epoch. Is an integer multiple
@@ -53,10 +78,6 @@ class GPGenerator:
             context points.
         num_target_points (tuple[int, int]): Lower and upper bound of the number of
             target points.
-        pred_logpdf (bool): Also compute the logpdf of the target set given the context
-            set under the true GP.
-        pred_logpdf_diag (bool): Also compute the logpdf of the target set given the
-            context set under the true diagonalised GP.
         state (random state): Random state.
         device (str): Device.
     """
@@ -64,9 +85,8 @@ class GPGenerator:
     def __init__(
         self,
         dtype,
-        kernel=stheno.EQ().stretch(0.25),
-        noise=0.05**2,
         seed=0,
+        noise=0.05**2,
         batch_size=16,
         num_tasks=2**14,
         x_ranges=((-2, 2),),
@@ -74,22 +94,21 @@ class GPGenerator:
         dim_y_latent=None,
         num_context_points=(1, 50),
         num_target_points=50,
-        pred_logpdf=True,
-        pred_logpdf_diag=True,
         device="cpu",
     ):
         self.dtype = dtype
+
         # Derive the right floating and integral data types from `dtype`.
         self.float64 = B.promote_dtypes(dtype, np.float64)
         self.int64 = B.dtype_int(self.float64)
-        self.device = device
 
-        self.kernel = kernel
-        self.noise = noise
+        self.device = device
 
         # The random state must be created on the right device.
         with B.on_device(self.device):
             self.state = B.create_random_state(dtype, seed)
+
+        self.noise = noise
 
         self.batch_size = batch_size
         self.num_tasks = num_tasks
@@ -101,7 +120,7 @@ class GPGenerator:
             )
 
         self.dim_x = len(x_ranges)
-        # Contruct tensors for the bounds on the input range. These must be `float64`s.
+        # Construct tensors for the bounds on the input range. These must be `float64`s.
         with B.on_device(self.device):
             lower = B.stack(*(B.cast(self.float64, l) for l, _ in x_ranges))[None, :]
             upper = B.stack(*(B.cast(self.float64, u) for _, u in x_ranges))[None, :]
@@ -127,44 +146,126 @@ class GPGenerator:
         self.num_context_points = num_context_points
         self.num_target_points = num_target_points
 
+    def epoch(self):
+        """Construct a generator for an epoch.
+
+        Returns:
+            generator: Generator for an epoch.
+        """
+
+        def lazy_gen_batch():
+            return self.generate_batch()
+
+        return (lazy_gen_batch() for _ in range(self.num_batches))
+
+
+class MixtureGenerator(DataGenerator):
+    """A mixture of data generators.
+
+    Args:
+        *gens (:class:`.data.SyntheticGenerator`): Components of the mixture.
+        seed (int, optional): Random seed. Defaults to `0`.
+
+    Attributes:
+        gens (tuple[:class:`.data.SyntheticGenerator`]): Components of the mixture.
+        num_batches (int): Number batches in an epoch.
+        state (random state): Random state.
+    """
+
+    @_dispatch
+    def __init__(self, *gens: SyntheticGenerator, seed=0):
+        self.gens = gens
+        if not all(gen.num_batches == gens[0].num_batches for gen in gens):
+            raise ValueError(
+                "Components of the mixture generate a different number of "
+                "batches per epoch."
+            )
+        self.num_batches = gens[0].num_batches
+        self.state = B.create_random_state(np.float64, seed=seed)
+
+    def generate_batch(self):
+        self.state, i = B.randint(self.state, int, upper=len(self.gens))
+        return self.gens[i].generate_batch()
+
+
+def _sample_inputs(gen):
+    # Sample number of context and target points.
+    lower, upper = gen.num_context_points
+    gen.state, num_context_points = B.randint(
+        gen.state, gen.int64, lower=lower, upper=upper + 1
+    )
+    lower, upper = gen.num_target_points
+    gen.state, num_target_points = B.randint(
+        gen.state, gen.int64, lower=lower, upper=upper + 1
+    )
+
+    # Sample inputs.
+    gen.state, rand = B.rand(
+        gen.state,
+        gen.float64,
+        gen.batch_size,
+        gen.dim_x,
+        int(num_context_points + num_target_points),
+    )
+    lower, upper = gen.x_ranges
+    x = lower + rand * (upper - lower)
+
+    # Cast `noise` before moving it to the active device, because Python scalars will
+    # not be interpreted as tensors and hence will not be moved to the GPU.
+    noise = B.to_active_device(B.cast(gen.float64, gen.noise))
+
+    return x, num_context_points, noise
+
+
+class GPGenerator(SyntheticGenerator):
+    """GP generator.
+
+    Further takes in arguments and keyword arguments from the constructor of
+    :class:`.data.SyntheticGenerator`. Moreover, also has the attributes of
+    :class:`.data.SyntheticGenerator`.
+
+    Args:
+        kernel (:class:`stheno.Kernel`, optional): Kernel of the GP. Defaults to an
+            EQ kernel with length scale `0.25`.
+        pred_logpdf (bool, optional): Also compute the logpdf of the target set given
+            the context set under the true GP. Defaults to `True`.
+        pred_logpdf_diag (bool, optional): Also compute the logpdf of the target set
+            given the context set under the true diagonalised GP. Defaults to `True`.
+
+    Attributes:
+        kernel (:class:`stheno.Kernel`): Kernel of the GP.
+        pred_logpdf (bool): Also compute the logpdf of the target set given the context
+            set under the true GP.
+        pred_logpdf_diag (bool): Also compute the logpdf of the target set given the
+            context set under the true diagonalised GP.
+    """
+
+    def __init__(
+        self,
+        *args,
+        kernel=stheno.EQ().stretch(0.25),
+        pred_logpdf=True,
+        pred_logpdf_diag=True,
+        **kw_args,
+    ):
+        self.kernel = kernel
         self.pred_logpdf = pred_logpdf
         self.pred_logpdf_diag = pred_logpdf_diag
+        super().__init__(*args, **kw_args)
 
     def generate_batch(self):
         """Generate a batch.
 
         Returns:
-            dict: A task, which is a dictionary with keys "xc", "yc", "xt", and "yt".
+            dict: A batch, which is a dictionary with keys "xc", "yc", "xt", and "yt".
                 Also possibly contains the keys "pred_logpdf" and "pred_logpdf_diag".
         """
         with B.on_device(self.device):
             batch = {}
 
-            # Sample number of context and target points.
-            lower, upper = self.num_context_points
-            self.state, num_context_points = B.randint(
-                self.state, self.int64, lower=lower, upper=upper + 1
-            )
-            lower, upper = self.num_target_points
-            self.state, num_target_points = B.randint(
-                self.state, self.int64, lower=lower, upper=upper + 1
-            )
-
             # Sample inputs.
-            self.state, rand = B.rand(
-                self.state,
-                self.float64,
-                self.batch_size,
-                int(num_context_points + num_target_points),
-                self.dim_x,
-            )
-            lower, upper = self.x_ranges
-            x = lower + rand * (upper - lower)
+            x, num_context_points, noise = _sample_inputs(self)
 
-            # Construct prior. Cast `noise` before moving it to the active device,
-            # because Python scalars will not be interpreted as tensors and hence will
-            # not be moved to the GPU.
-            noise = B.to_active_device(B.cast(self.float64, self.noise))
             # If `self.y_dim > 1`, then we create a multi-output GP. Otherwise, we
             # use a simple regular GP.
             if self.dim_y == 1:
@@ -182,13 +283,12 @@ class GPGenerator:
                     f = stheno.cross(*fs)
 
             # Sample context and target set.
-            self.state, y = f(x, noise).sample(self.state)
+            self.state, y = f(B.transpose(x), noise).sample(self.state)
             # Shuffle the dimensions to line up with the convention in the package.
             # Afterwards, when computing logpdfs, we'll have to be careful to reshape
             # things back. Moreover, we need to be super careful when extracting
             # multiple outputs from the sample: reshape to `(self.y_dim, -1)` or to
             # `(-1, self.y_dim)`?
-            x = B.transpose(x)
             y = B.reshape(y, self.batch_size, self.dim_y, -1)
             xc = x[:, :, :num_context_points]
             yc = y[:, :, :num_context_points]
@@ -197,7 +297,7 @@ class GPGenerator:
 
             # Compute predictive logpdfs.
             if self.pred_logpdf or self.pred_logpdf_diag:
-                # Compute posterior and preditive distribution.
+                # Compute posterior and predictive distribution.
                 obs = (f(B.transpose(xc), noise), B.reshape(yc, self.batch_size, -1, 1))
                 f_post = f | obs
                 fdd = f_post(B.transpose(xt), noise)
@@ -206,10 +306,9 @@ class GPGenerator:
             if self.pred_logpdf:
                 batch["pred_logpdf"] = fdd.logpdf(yt_reshaped)
             if self.pred_logpdf_diag:
-                fdd_diag = stheno.Normal(fdd.mean, matrix.Diagonal(fdd.var_diag))
-                batch["pred_logpdf_diag"] = fdd_diag.logpdf(yt_reshaped)
+                batch["pred_logpdf_diag"] = fdd.diagonalise().logpdf(yt_reshaped)
 
-            # Convert to the data type and save.
+            # Convert to the right data type and save.
             batch["xc"] = B.cast(self.dtype, xc)
             batch["yc"] = B.cast(self.dtype, yc)
             batch["xt"] = B.cast(self.dtype, xt)
@@ -217,14 +316,64 @@ class GPGenerator:
 
             return batch
 
-    def epoch(self):
-        """Construct a generator for an epoch.
 
-        Returns:
-            generator: Generator for an epoch.
-        """
+class SawtoothGenerator(SyntheticGenerator):
+    """GP generator.
 
-        def lazy_gen_batch():
-            return self.generate_batch()
+    Further takes in arguments and keyword arguments from the constructor of
+    :class:`.data.SyntheticGenerator`. Moreover, also has the attributes of
+    :class:`.data.SyntheticGenerator`.
 
-        return (lazy_gen_batch() for _ in range(self.num_batches))
+    Args:
+        freqs (tuple[float, float], optional): Lower and upper bound of the uniform
+            distribution over frequencies. Defaults to `(3, 5)`.
+
+    Attributes:
+        freqs (tuple[float, float]): Lower and upper bound of the uniform distribution
+            over frequencies.
+    """
+
+    def __init__(self, *args, freqs=(3, 5), **kw_args):
+        super().__init__(*args, **kw_args)
+        self.freqs = freqs
+        if self.dim_y != 1:
+            raise NotImplementedError("Can only generate one-dimensional sawtooths.")
+
+    def generate_batch(self):
+        with B.on_device(self.device):
+            batch = {}
+
+            # Sample inputs.
+            x, num_context_points, noise = _sample_inputs(self)
+
+            # Sample a frequency.
+            self.state, sample = B.rand(self.state, self.float64, self.batch_size, 1)
+            lower, upper = self.freqs
+            freq = lower + (upper - lower) * sample
+
+            # Sample a direction.
+            self.state, direction = B.randn(
+                self.state,
+                self.float64,
+                self.batch_size,
+                self.dim_x,
+                1,
+            )
+            norm = B.sqrt(B.sum(direction * direction, axis=1, squeeze=False))
+            direction = direction / norm
+
+            # Sample a uniformly distributed (conditional on frequency) offset.
+            self.state, sample = B.rand(self.state, self.float64, self.batch_size, 1)
+            offset = sample / freq
+
+            # Construct the sawtooth and add noise.
+            f = (freq * (B.sum(x * direction, axis=1) - offset)) % (1 / freq)
+            y = f + B.sqrt(noise) * B.randn(f)
+
+            # Convert to the right data type and save.
+            batch["xc"] = B.cast(self.dtype, x[:, :, :num_context_points])
+            batch["yc"] = B.cast(self.dtype, y[:, None, :num_context_points])
+            batch["xt"] = B.cast(self.dtype, x[:, :, num_context_points:])
+            batch["yt"] = B.cast(self.dtype, y[:, None, num_context_points:])
+
+            return batch
