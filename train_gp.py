@@ -158,6 +158,13 @@ wd = WorkingDirectory(
     f"x{args.dim_x}_y{args.dim_y}{suffix}",
 )
 
+# Use a GPU if one is available.
+if torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
+B.set_global_device(device)
+
 # Setup data.
 gen_config = {
     "noise": 0.05,
@@ -166,6 +173,7 @@ gen_config = {
     "batch_size": args.batch_size,
     "x_ranges": ((-2, 2),) * args.dim_x,
     "dim_y": args.dim_y,
+    "device": device,
 }
 gen_eval_config = dict(gen_config, seed=20, num_tasks=2**12)
 kernels = {
@@ -231,13 +239,6 @@ elif args.dim_x == 2:
     points_per_unit = 64 / 2
 else:
     raise RuntimeError("Could not determine kernel for input dimensionality.")
-
-# Use a GPU if one is available.
-if torch.cuda.is_available():
-    device = "cuda"
-else:
-    device = "cpu"
-B.set_global_device(device)
 
 # Construct the model.
 if args.model == "convcnp":
