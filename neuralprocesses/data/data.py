@@ -14,8 +14,13 @@ class DataGenerator(metaclass=abc.ABCMeta):
     """Data generator.
 
     Attributes:
+        batch_size (int): Number of tasks per batch.
         num_batches (int): Number of batches in an epoch.
     """
+
+    def __init__(self, batch_size, num_batches):
+        self.batch_size = batch_size
+        self.num_batches = num_batches
 
     @abc.abstractmethod
     def generate_batch(self):
@@ -110,9 +115,8 @@ class SyntheticGenerator(DataGenerator):
 
         self.noise = noise
 
-        self.batch_size = batch_size
+        super().__init__(batch_size, num_tasks // batch_size)
         self.num_tasks = num_tasks
-        self.num_batches = num_tasks // batch_size
         if self.num_batches * batch_size != num_tasks:
             raise ValueError(
                 f"Number of tasks {num_tasks} must be a multiple of "
@@ -169,18 +173,20 @@ class MixtureGenerator(DataGenerator):
     Attributes:
         gens (tuple[:class:`.data.SyntheticGenerator`]): Components of the mixture.
         num_batches (int): Number batches in an epoch.
+        batch_size (int): Number of tasks per batch.
         state (random state): Random state.
     """
 
     @_dispatch
     def __init__(self, *gens: SyntheticGenerator, seed=0):
+        for attr in ["batch_size", "num_batches"]:
+            if not all(getattr(gen, attr) == getattr(gens[0], attr) for gen in gens):
+                raise ValueError(
+                    f"Components of the mixture do not have consistent values for "
+                    f"attribute `{attr}`."
+                )
+        super().__init__(gens[0].batch_size, gens[0].num_batches)
         self.gens = gens
-        if not all(gen.num_batches == gens[0].num_batches for gen in gens):
-            raise ValueError(
-                "Components of the mixture generate a different number of "
-                "batches per epoch."
-            )
-        self.num_batches = gens[0].num_batches
         self.state = B.create_random_state(np.float64, seed=seed)
 
     def generate_batch(self):
