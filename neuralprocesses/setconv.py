@@ -14,6 +14,7 @@ __all__ = [
     "SetConv",
     "PrependDensityChannel",
     "DivideByFirstChannel",
+    "PrependIdentityChannel",
 ]
 
 
@@ -205,3 +206,27 @@ def code(
 ):
     xzs, zs = zip(*(code(coder, xzi, zi, x, **kw_args) for xzi, zi in zip(xz, z)))
     return Parallel(*xzs), Parallel(*zs)
+
+
+@register_module
+class PrependIdentityChannel:
+    """Prepend a density channel to the current encoding."""
+
+    @_dispatch
+    def __call__(self, z: B.Numeric):
+        dim = B.rank(z) - 2
+        with B.on_device(z):
+            if dim == 2:
+                identity_channel = B.diag_construct(B.ones(B.dtype(z), B.shape(z, 2)))
+            else:
+                raise RuntimeError(
+                    f"Cannot construct identity channels for encoding of "
+                    f"dimensionality {dim}."
+                )
+        identity_channel = B.tile(
+            B.expand_dims(identity_channel, axis=0, times=2),
+            B.shape(z, 0),
+            1,
+            *((1,) * dim),
+        )
+        return B.concat(identity_channel, z, axis=1)

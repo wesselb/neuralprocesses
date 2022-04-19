@@ -114,7 +114,7 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
             mean (tensor): Mean of shape `(b, c, n)`.
             var (tensor): Variance of shape `(b, c, n, c, n)`.
         """
-        b, c, n = B.shape_matrix(mean)
+        b, c, n = B.shape(mean)
         return cls(
             Normal(B.reshape(mean, b, c * n, -1), B.reshape(var, b, c * n, c * n)),
             c,

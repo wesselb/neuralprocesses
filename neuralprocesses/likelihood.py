@@ -1,11 +1,17 @@
 import lab as B
+from matrix import Diagonal
 from stheno import Normal
 
 from . import _dispatch
 from .dist import MultiOutputNormal
+from .parallel import Parallel
 from .util import register_module
 
-__all__ = ["HeterogeneousGaussianLikelihood", "LowRankGaussianLikelihood"]
+__all__ = [
+    "HeterogeneousGaussianLikelihood",
+    "LowRankGaussianLikelihood",
+    "DenseGaussianLikelihood",
+]
 
 
 @register_module
@@ -60,7 +66,7 @@ def code(
 
 @register_module
 class LowRankGaussianLikelihood:
-    """Gaussian likelihood with low-rank noise.
+    """Gaussian likelihood with low-rank covariance and heterogeneous noise.
 
     Args:
         rank (int): Rank of the low-rank part of the noise variance.
@@ -122,3 +128,66 @@ def code(
         )
 
     return xz, pred
+
+
+@register_module
+class DenseGaussianLikelihood:
+    """Gaussian likelihood with dense covariance matrix and heterogeneous noise.
+
+    Args:
+        epsilon (float, optional): Smallest allowable variance. Defaults to `1e-6`.
+
+    Args:
+        epsilon (float): Smallest allowable variance.
+    """
+
+    @_dispatch
+    def __init__(self, epsilon: float = 1e-6):
+        self.epsilon = epsilon
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return "DenseGaussianLikelihood()"
+
+
+@_dispatch
+def code(
+    coder: DenseGaussianLikelihood,
+    xz: Parallel,
+    z: Parallel,
+    x,
+    *,
+    dtype_lik=None,
+    noiseless=False,
+    **kw_args,
+):
+    z_mean_noise, var = z
+
+    # We do not support higher-dimensional outputs.
+    if not (B.shape(z_mean_noise, 1) == 2 and B.shape(var, 1) == 1):
+        raise NotImplementedError(
+            "`DenseGaussianLikelihood` so far only works for a single channel."
+        )
+
+    # Disentangle mean and noise.
+    mean = z_mean_noise[:, :1, :]
+    noise = coder.epsilon + B.softplus(z_mean_noise[:, 1:, :])
+
+    # Cast parameters to the right data type.
+    if dtype_lik:
+        mean = B.cast(dtype_lik, mean)
+        noise = B.cast(dtype_lik, noise)
+        var = B.cast(dtype_lik, var)
+
+    # Make a noiseless prediction.
+    if noiseless:
+        with B.on_device(noise):
+            noise = B.zeros(noise)
+
+    # Add noise to variance and shape correctly.
+    var = B.dense(B.add(Diagonal(noise), var))[:, None, :, None, :]
+
+    # Return the inputs for the mean.
+    return xz[0], MultiOutputNormal.dense(mean, var)

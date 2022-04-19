@@ -1,4 +1,3 @@
-import lab as B
 from matrix.util import indent
 
 from . import _dispatch
@@ -12,7 +11,7 @@ class Parallel:
     """A parallel of elements.
 
     Args:
-        *elements (tuple): Objects to put in parallel.
+        *elements (object): Objects to put in parallel.
 
     Attributes:
         elements (tuple): Objects in parallel.

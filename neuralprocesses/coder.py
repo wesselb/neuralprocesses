@@ -4,7 +4,7 @@ import matrix  # noqa
 from . import _dispatch
 from .util import register_module
 
-__all__ = ["InputsCoder", "FunctionalCoder", "DeepSet"]
+__all__ = ["InputsCoder", "FunctionalCoder", "DeepSet", "MapDiagonal"]
 
 
 @register_module
@@ -74,3 +74,34 @@ def code(coder: DeepSet, xz, z, x, **kw_args):
     z = coder.agg(z)  # This aggregates over the data dimension.
     z = coder.rho(z)
     return x, z
+
+
+@register_module
+class MapDiagonal:
+    """Map to the diagonal of the squared space.
+
+    Args:
+        coder (coder): Coder to apply the mapped vales to.
+        map_encoding (bool, optional): Also map the encoding to the diagonal. Set
+            this to `False` if the encoder had already been mapped to the diagonal.
+            Defaults to `True`.
+
+    Attributes:
+        coder (function): Pre-aggregation function.
+        map_encoding (bool): Map the encoding to the diagonal.
+    """
+
+    def __init__(self, coder, map_encoding=True):
+        self.coder = coder
+        self.map_encoding = map_encoding
+
+
+@_dispatch
+def code(coder: MapDiagonal, xz, z, x, **kw_args):
+    if coder.map_encoding:
+        xz = B.concat(xz, xz, axis=1)
+    return code(coder.coder, xz, z, (x, x))
+
+
+def _map_encoding_to_diagonal(xz: B.Numeric):
+    return B.concat(xz, xz, axis=1)

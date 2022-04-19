@@ -5,6 +5,35 @@ import pytest
 from .util import nps, generate_data  # noqa
 
 
+def generate_arch_variations(name, **kw_args):
+    variations = [
+        {
+            "unet_channels": (4, 8),
+            "unet_kernels": (5,) * 2,
+            "unet_activations": (B.relu,) * 2,
+        },
+        {
+            "unet_channels": (8, 16),
+            "unet_kernels": (5,) * 2,
+            "unet_activations": (B.relu,) * 2,
+            "unet_resize_convs": False,
+        },
+        {
+            "unet_channels": (8, 16),
+            "unet_kernels": (5,) * 2,
+            "unet_activations": (B.relu,) * 2,
+            "unet_resize_convs": True,
+        },
+        {
+            "conv_arch": "dws",
+            "dws_channels": 8,
+            "dws_layers": 4,
+            "dws_receptive_field": 0.5,
+        },
+    ]
+    return [(name, dict(config, **kw_args)) for config in variations]
+
+
 @pytest.mark.parametrize("float64", [False, True])
 @pytest.mark.parametrize(
     "construct_name, kw_args",
@@ -13,62 +42,26 @@ from .util import nps, generate_data  # noqa
         for model, base_kw_args in [
             (
                 "construct_gnp",
-                {
-                    "num_basis_functions": 4,
-                },
-            ),
-            (
-                "construct_convgnp",
-                {
-                    "num_basis_functions": 4,
-                    "points_per_unit": 16,
-                    "unet_channels": (4, 8),
-                    "unet_kernels": (5,) * 2,
-                    "unet_activations": (B.relu,) * 2,
-                    "epsilon": 1e-2,
-                },
-            ),
-            (
-                "construct_convgnp",
-                {
-                    "num_basis_functions": 4,
-                    "points_per_unit": 16,
-                    "unet_channels": (8, 16),
-                    "unet_kernels": (5,) * 2,
-                    "unet_activations": (B.relu,) * 2,
-                    "unet_resize_convs": False,
-                    "epsilon": 1e-2,
-                },
-            ),
-            (
-                "construct_convgnp",
-                {
-                    "num_basis_functions": 4,
-                    "points_per_unit": 16,
-                    "unet_channels": (8, 16),
-                    "unet_kernels": (5,) * 2,
-                    "unet_activations": (B.relu,) * 2,
-                    "unet_resize_convs": True,
-                    "epsilon": 1e-2,
-                },
-            ),
-            (
-                "construct_convgnp",
-                {
-                    "num_basis_functions": 4,
-                    "points_per_unit": 16,
-                    "conv_arch": "dws",
-                    "dws_channels": 8,
-                    "dws_layers": 4,
-                    "dws_receptive_field": 0.5,
-                    "epsilon": 1e-2,
-                },
-            ),
+                {"num_basis_functions": 4},
+            )
         ]
+        + generate_arch_variations(
+            "construct_convgnp",
+            points_per_unit=16,
+            num_basis_functions=16,
+            epsilon=1e-4,
+        )
         for dim_x in [1, 2]
         for dim_y in [1, 2]
         for lik in ["het", "lowrank"]
-    ],
+    ]
+    + generate_arch_variations(
+        "construct_fullconvgnp",
+        dim_x=1,
+        dim_y=1,
+        points_per_unit=16,
+        epsilon=1e-4,
+    ),
 )
 @pytest.mark.flaky(reruns=3)
 def test_architectures(nps, float64, construct_name, kw_args):
