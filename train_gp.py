@@ -54,7 +54,7 @@ def eval(gen, objective):
         if kls_diag:
             out.kv("KL (diag)", with_err(B.concat(*kls_diag)))
 
-        return B.mean(val)
+        return B.mean(B.concat(*vals))
 
 
 def with_err(vals):
@@ -348,12 +348,12 @@ for i in range(args.epochs):
         torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
         # The epoch is done. Now evaluate.
-        eval(gen_eval, objective)
+        val = eval(gen_eval, objective)
 
         # Check if the model is the new best. If so, save it.
-        if B.mean(vals) < best_eval_loss:
+        if val < best_eval_loss:
             out.out("New best model!")
-            best_eval_loss = B.mean(vals)
+            best_eval_loss = val
             torch.save(model.state_dict(), wd.file(f"model-best.torch"))
 
         # Visualise a prediction by the model.
