@@ -30,7 +30,7 @@ def train(gen, objective):
 def eval(gen, objective):
     """Perform evaluation."""
     with torch.no_grad():
-        vals, kls, kls_diag = []
+        vals, kls, kls_diag = [], [], []
         for batch in gen.epoch():
             vs = objective(
                 batch["xc"],
@@ -38,17 +38,23 @@ def eval(gen, objective):
                 batch["xt"],
                 batch["yt"],
             )
+
+            # Save numbers, normalised by the numbers of target points.
             nt = B.shape(batch["xt"], 2)
             vals.append(B.to_numpy(vs) / nt)
             if "pred_logpdf" in batch:
                 kls.append(B.to_numpy(vs + batch["pred_logpdf"]) / nt)
             if "pred_logpdf_diag" in batch:
                 kls_diag.append(B.to_numpy(vs + batch["pred_logpdf_diag"]) / nt)
+
+        # Report numbers.
         out.kv("Loglik", with_err(-B.concat(*vals)))
         if kls:
             out.kv("KL (full)", with_err(B.concat(*kls)))
         if kls_diag:
             out.kv("KL (diag)", with_err(B.concat(*kls_diag)))
+
+        return B.mean(val)
 
 
 def with_err(vals):
