@@ -169,6 +169,7 @@ B.set_global_device(device)
 
 # Setup data.
 gen = nps.construct_predefined_gens(
+    torch.float32,
     seed=10,
     batch_size=args.batch_size,
     num_tasks=2**14,
@@ -179,6 +180,7 @@ gen = nps.construct_predefined_gens(
     device=device,
 )[args.data]
 gen_eval = nps.construct_predefined_gens(
+    torch.float32,
     seed=20,  # Use a different seed!
     batch_size=args.batch_size,
     num_tasks=2**12,
