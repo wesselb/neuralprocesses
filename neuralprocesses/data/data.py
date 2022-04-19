@@ -126,8 +126,8 @@ class SyntheticGenerator(DataGenerator):
         self.dim_x = len(x_ranges)
         # Construct tensors for the bounds on the input range. These must be `float64`s.
         with B.on_device(self.device):
-            lower = B.stack(*(B.cast(self.float64, l) for l, _ in x_ranges))[None, :]
-            upper = B.stack(*(B.cast(self.float64, u) for _, u in x_ranges))[None, :]
+            lower = B.stack(*(B.cast(self.float64, l) for l, _ in x_ranges))
+            upper = B.stack(*(B.cast(self.float64, u) for _, u in x_ranges))
             self.x_ranges = B.to_active_device(lower), B.to_active_device(upper)
         self.dim_y = dim_y
         self.dim_y_latent = dim_y_latent or dim_y
@@ -214,7 +214,8 @@ def _sample_inputs(gen):
         int(num_context_points + num_target_points),
     )
     lower, upper = gen.x_ranges
-    x = lower + rand * (upper - lower)
+    # Make sure the appropriately shape the lower and upper bounds.
+    x = lower[None, :, None] + rand * (upper[None, :, None] - lower[None, :, None])
 
     # Cast `noise` before moving it to the active device, because Python scalars will
     # not be interpreted as tensors and hence will not be moved to the GPU.
@@ -353,9 +354,9 @@ class SawtoothGenerator(SyntheticGenerator):
             x, num_context_points, noise = _sample_inputs(self)
 
             # Sample a frequency.
-            self.state, sample = B.rand(self.state, self.float64, self.batch_size, 1)
+            self.state, rand = B.rand(self.state, self.float64, self.batch_size, 1)
             lower, upper = self.freqs
-            freq = lower + (upper - lower) * sample
+            freq = lower + (upper - lower) * rand
 
             # Sample a direction.
             self.state, direction = B.randn(
