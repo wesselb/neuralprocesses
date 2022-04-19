@@ -84,31 +84,32 @@ def plot_first_of_batch(batch):
         lw=0.5,
     )
     # Plot prediction by ground truth.
-    f = stheno.GP(kernel)
-    # Make sure that everything is of `float64`s and on the GPU.
-    noise = B.to_active_device(B.cast(torch.float64, gen_eval.noise))
-    xc = B.transpose(B.cast(torch.float64, batch["xc"]))
-    yc = B.transpose(B.cast(torch.float64, batch["yc"]))
-    x = B.transpose(B.cast(torch.float64, x))
-    # Compute posterior GP.
-    f_post = f | (f(xc, noise), yc)
-    mean, lower, upper = f_post(x).marginal_credible_bounds()
-    plt.plot(
-        first_np(B.transpose(x)),
-        first_np(mean),
-        label="Truth",
-        style="pred2",
-    )
-    plt.plot(
-        first_np(B.transpose(x)),
-        first_np(lower),
-        style="pred2",
-    )
-    plt.plot(
-        first_np(B.transpose(x)),
-        first_np(upper),
-        style="pred2",
-    )
+    if hasattr(gen_eval, "kernel"):
+        f = stheno.GP(gen_eval.kernel)
+        # Make sure that everything is of `float64`s and on the GPU.
+        noise = B.to_active_device(B.cast(torch.float64, gen_eval.noise))
+        xc = B.transpose(B.cast(torch.float64, batch["xc"]))
+        yc = B.transpose(B.cast(torch.float64, batch["yc"]))
+        x = B.transpose(B.cast(torch.float64, x))
+        # Compute posterior GP.
+        f_post = f | (f(xc, noise), yc)
+        mean, lower, upper = f_post(x).marginal_credible_bounds()
+        plt.plot(
+            first_np(B.transpose(x)),
+            first_np(mean),
+            label="Truth",
+            style="pred2",
+        )
+        plt.plot(
+            first_np(B.transpose(x)),
+            first_np(lower),
+            style="pred2",
+        )
+        plt.plot(
+            first_np(B.transpose(x)),
+            first_np(upper),
+            style="pred2",
+        )
     plt.xlim(B.min(x), B.max(x))
     tweak()
     plt.savefig(wd.file(f"epoch-{i:03d}.pdf"))
@@ -124,6 +125,7 @@ parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--rate", type=float, default=1e-4)
 parser.add_argument("--margin", type=float, default=2)
 parser.add_argument("--arch", type=str)
+parser.add_argument("--receptive_field", type=float, default=2)
 parser.add_argument("--learnable_channel", action="store_true")
 parser.add_argument("--subdir", type=str, nargs="*")
 parser.add_argument(
@@ -231,11 +233,11 @@ gen_eval = gens_eval[args.data]
 # Setup architecture.
 unet_channels = (64,) * 6
 dws_channels = 128
-dws_receptive_field = 2
+dws_receptive_field = args.receptive_field
 if args.dim_x == 1:
     points_per_unit = 64
 elif args.dim_x == 2:
-    # Need to reduce the PPU to reduce memory consumption.
+    # Reduce the PPU to reduce memory consumption.
     points_per_unit = 64 / 2
 else:
     raise RuntimeError("Could not determine kernel for input dimensionality.")
