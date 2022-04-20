@@ -73,7 +73,7 @@ def code(coder: DeepSet, xz, z, x, **kw_args):
     z = coder.phi(z)
     z = coder.agg(z)  # This aggregates over the data dimension.
     z = coder.rho(z)
-    return x, z
+    return None, z
 
 
 @register_module

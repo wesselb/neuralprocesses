@@ -29,6 +29,11 @@ def data_dims(x: B.Numeric):
 
 
 @_dispatch
+def data_dims(x: None):
+    return 1
+
+
+@_dispatch
 def data_dims(x: tuple):
     return len(x)
 

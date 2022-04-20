@@ -1,5 +1,6 @@
 import lab as B
 import matrix  # noqa
+from plum import Union
 
 from . import _dispatch
 from .parallel import Parallel
@@ -27,7 +28,7 @@ def code(coder, xz, z, x, **kw_args):
 
 
 @_dispatch
-def _merge(z: B.Numeric):
+def _merge(z: Union[B.Numeric, None]):
     return z
 
 
@@ -37,7 +38,7 @@ def _merge(zs: Parallel):
 
 
 @_dispatch
-def _merge(z0: B.Numeric, *zs: B.Numeric):
+def _merge(z0: Union[B.Numeric, None], *zs: Union[B.Numeric, None]):
     zs = (z0,) + zs
     # Remove all `None`s: those correspond to global features.
     zs = [z for z in zs if z is not None]
@@ -69,9 +70,13 @@ def _repeat_concat(xz: Parallel, z: Parallel):
 @_dispatch
 def _repeat_concat_parallel(z0: B.Numeric, *zs: B.Numeric, dims):
     zs = (z0,) + zs
+    # Some may be batched, but not all.
+    max_rank = max([B.rank(z) for z in zs])
+    zs = [B.expand_dims(z, axis=0) if B.rank(z) < max_rank else z for z in zs]
     # Broadcast the data dimensions. There are `dims` many of them, so perform a loop.
+    # Also incoporate the first dimension, because that might be a batch dimension.
     shapes = [list(B.shape(z)) for z in zs]
-    for i in range(B.rank(z0) - 1, B.rank(z0) - 1 - dims, -1):
+    for i in [0] + list(range(B.rank(z0) - 1, B.rank(z0) - 1 - dims, -1)):
         shape_n = max(shape[i] for shape in shapes)
         for shape in shapes:
             shape[i] = shape_n
