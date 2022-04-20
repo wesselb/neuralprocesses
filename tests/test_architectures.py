@@ -204,6 +204,7 @@ def test_convgnp_auxiliary_variable(nps):
     assert B.dtype(objective) == nps.dtype
 
 
+@pytest.mark.flaky(rerun=3)
 def test_convgnp_masking(nps):
     model = nps.construct_convgnp(
         num_basis_functions=16,
