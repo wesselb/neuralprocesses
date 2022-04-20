@@ -184,16 +184,12 @@ def plot_first_of_batch(gen, run_model):
 
 # Setup arguments.
 parser = argparse.ArgumentParser()
+parser.add_argument("--subdir", type=str, nargs="*")
 parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
 parser.add_argument("--epochs", type=int, default=100)
-parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument("--rate", type=float, default=1e-4)
-parser.add_argument("--margin", type=float, default=2)
-parser.add_argument("--arch", type=str)
-parser.add_argument("--receptive_field", type=float, default=2)
-parser.add_argument("--learnable_channel", action="store_true")
-parser.add_argument("--subdir", type=str, nargs="*")
+parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument(
     "--model",
     choices=[
@@ -202,11 +198,15 @@ parser.add_argument(
         "acnp",
         "agnp",
         "convcnp",
-        "convgnp-linear",
+        "convgnp",
+        "convgnp-lc",
         "fullconvgnp",
     ],
     default="convcnp",
 )
+parser.add_argument("--arch", type=str)
+parser.add_argument("--margin", type=float, default=2)
+parser.add_argument("--receptive_field", type=float, default=2)
 parser.add_argument(
     "--data",
     choices=[
@@ -220,24 +220,25 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-# Ensure that the `arch` is specified when it is required.
-models_which_require_arch = {"convcnp", "convgnp-linear", "fullconvgnp"}
+# Ensure that the `arch` is and only is specified when it is required.
+models_which_require_arch = {"convcnp", "convgnp", "convgnp-lc", "fullconvgnp"}
 if args.model in models_which_require_arch and not args.arch:
     raise RuntimeError(f"Model requires a choice of architecture. Please set `--arch`.")
+elif args.arch:
+    raise RuntimeError(
+        f"Model does not allow choice of architecture. Please unset `--arch`."
+    )
 
 # Setup script.
 out.report_time = True
 B.epsilon = 1e-8
-if args.learnable_channel:
-    suffix = "_lc"
-else:
-    suffix = ""
 wd = WorkingDirectory(
     "_experiments",
     *(args.subdir or ()),
-    f"{args.model}",
+    args.data,
+    args.model,
     *((args.arch,) if args.arch else ()),
-    f"x{args.dim_x}_y{args.dim_y}{suffix}",
+    f"x{args.dim_x}_y{args.dim_y}",
 )
 
 # Use a GPU if one is available.
@@ -281,7 +282,7 @@ elif args.dim_x == 2:
     # Reduce the PPU to reduce memory consumption.
     points_per_unit = 64 / 2
 else:
-    raise RuntimeError("Could not determine kernel for input dimensionality.")
+    raise RuntimeError(f"Invalid input dimensionality {args.dim_x}.")
 
 # Construct the model.
 if args.model == "cnp":
@@ -325,46 +326,47 @@ elif args.model == "convcnp":
         margin=args.margin,
     )
     run_model = model
-elif args.model == "convgnp-linear":
-    if args.learnable_channel:
-        model = nps.construct_convgnp(
-            points_per_unit=points_per_unit,
-            dim_x=args.dim_x,
-            dim_y=args.dim_y,
-            dim_yc=(args.dim_y, 128),
-            likelihood="lowrank",
-            conv_arch=args.arch,
-            unet_channels=unet_channels,
-            dws_channels=dws_channels,
-            dws_receptive_field=dws_receptive_field,
-            num_basis_functions=512,
-            margin=args.margin,
+elif args.model == "convgnp":
+    model = nps.construct_convgnp(
+        points_per_unit=points_per_unit,
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        likelihood="lowrank",
+        conv_arch=args.arch,
+        unet_channels=unet_channels,
+        dws_channels=dws_channels,
+        dws_receptive_field=dws_receptive_field,
+        num_basis_functions=512,
+        margin=args.margin,
+    )
+    run_model = model
+elif args.model == "convgnp-lc":
+    if args.dim_x != 1:
+        raise NotImplementedError(
+            "`convgnp-lc` currently only supports one-dimensional inputs."
         )
+    model = nps.construct_convgnp(
+        points_per_unit=points_per_unit,
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        dim_yc=(args.dim_y, 128),
+        likelihood="lowrank",
+        conv_arch=args.arch,
+        unet_channels=unet_channels,
+        dws_channels=dws_channels,
+        dws_receptive_field=dws_receptive_field,
+        num_basis_functions=512,
+        margin=args.margin,
+    )
 
-        with B.on_device(device):
-            x_lc = B.linspace(torch.float32, -2, 2, 256 + 1)[None, None, :]
-            x_lc = B.tile(x_lc, args.batch_size, 1, 1)
-            y_lc = B.randn(torch.float32, args.batch_size, 128, 256 + 1)
-        model.y_lc = model.nn.Parameter(y_lc)
+    with B.on_device(device):
+        x_lc = B.linspace(torch.float32, -2, 2, 256 + 1)[None, None, :]
+        x_lc = B.tile(x_lc, args.batch_size, 1, 1)
+        y_lc_init = B.randn(torch.float32, args.batch_size, 128, 256 + 1)
+    model.y_lc = model.nn.Parameter(y_lc_init)
 
-        def run_model(xc, yc, xt):
-            return model([(xc, yc), (x_lc, model.y_lc)], xt)
-
-    else:
-
-        model = nps.construct_convgnp(
-            points_per_unit=points_per_unit,
-            dim_x=args.dim_x,
-            dim_y=args.dim_y,
-            likelihood="lowrank",
-            conv_arch=args.arch,
-            unet_channels=unet_channels,
-            dws_channels=dws_channels,
-            dws_receptive_field=dws_receptive_field,
-            num_basis_functions=512,
-            margin=args.margin,
-        )
-        run_model = model
+    def run_model(xc, yc, xt):
+        return model([(xc, yc), (x_lc, model.y_lc)], xt)
 
 elif args.model == "fullconvgnp":
     model = nps.construct_fullconvgnp(
