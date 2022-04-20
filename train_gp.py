@@ -75,7 +75,7 @@ def first_np(x):
     elif B.rank(x) == 3:
         return B.to_numpy(x[0, 0, :])
     elif B.rank(x) == 4:
-        return B.transpose(B.to_numpy(x[0, :, 0, :]))
+        return B.transpose(B.to_numpy(x[:, 0, 0, :]))
     else:
         raise ValueError(f"Rank must be two, three, or four.")
 
@@ -89,17 +89,32 @@ def plot_first_of_batch(gen, model):
         x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
         x = B.tile(x, B.shape(batch["xt"], 0), 1, 1)
 
-    # Run model.
+    # Run model and produce five noiseless samples.
     with torch.no_grad():
         pred = model(batch["xc"], batch["yc"], x)
-        pred_noiseless = model(
-            batch["xc"],
-            batch["yc"],
-            x,
-            dtype_enc_sample=torch.float32,
-            dtype_lik=torch.float64,
-            noiseless=True,
-        )
+
+        # Produce samples.
+        noiseless_samples = []
+        for _ in range(5):
+            pred_noiseless = model(
+                batch["xc"],
+                batch["yc"],
+                x,
+                dtype_enc_sample=torch.float32,
+                dtype_lik=torch.float64,
+                noiseless=True,
+            )
+            # Try sampling with increasingly higher regularisation.
+            while True:
+                try:
+                    noiseless_samples.append(pred_noiseless.sample())
+                    break
+                except Exception as e:
+                    B.epsilon *= 10
+                    if B.epsilon > 1e-3:
+                        raise e
+            B.epsilon = 1e-8  # Ensure to reset the regularisation.
+        noiseless_samples = B.stack(*noiseless_samples, axis=0)
 
     plt.figure(figsize=(6, 4))
 
@@ -133,19 +148,9 @@ def plot_first_of_batch(gen, model):
         first_np(pred.mean + err),
         style="pred",
     )
-    # Try sampling with increasingly higher regularisation.
-    while True:
-        try:
-            samples = pred_noiseless.sample(5)
-            break
-        except Exception as e:
-            B.epsilon *= 10
-            if B.epsilon > 1e-3:
-                raise e
-    B.epsilon = 1e-8  # Ensure to reset the regularisation.
     plt.plot(
         first_np(x),
-        first_np(samples),
+        first_np(noiseless_samples),
         style="pred",
         ls="-",
         lw=0.5,
