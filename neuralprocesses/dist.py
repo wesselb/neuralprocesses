@@ -119,7 +119,7 @@ class Dirac(AbstractMultiOutputDistribution):
 
     def kl(self, other: "Dirac"):
         with B.on_device(self.x):
-            return B.zeros(B.dtype(self.x), *batch(x, 2))
+            return B.zeros(B.dtype(self.x), *batch(self.x, 2))
 
 
 @_dispatch

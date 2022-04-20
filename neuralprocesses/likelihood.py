@@ -19,8 +19,20 @@ __all__ = [
 class DeterministicLikelihood:
     """Deterministic likelihood."""
 
-    def __call__(self, z: B.Numeric):
-        return Dirac(z)
+
+@_dispatch
+def code(
+    coder: DeterministicLikelihood,
+    xz,
+    z: B.Numeric,
+    x,
+    *,
+    dtype_lik=None,
+    **kw_args,
+):
+    if dtype_lik:
+        z = B.cast(dtype_lik, z)
+    return xz, Dirac(z)
 
 
 @register_module

@@ -1,4 +1,5 @@
 import argparse
+from functools import partial
 
 import lab as B
 import matplotlib.pyplot as plt
@@ -15,7 +16,8 @@ import neuralprocesses.torch as nps
 def train(gen, objective):
     """Train for an epoch."""
     for batch in gen.epoch():
-        val = B.mean(
+        # Be sure to negate the output of `objective`.
+        val = -B.mean(
             objective(
                 batch["xc"],
                 batch["yc"],
@@ -33,23 +35,22 @@ def eval(gen, objective):
     with torch.no_grad():
         vals, kls, kls_diag = [], [], []
         for batch in gen.epoch():
-            vs = objective(
+            obj = objective(
                 batch["xc"],
                 batch["yc"],
                 batch["xt"],
                 batch["yt"],
             )
 
-            # Save numbers, normalised by the numbers of target points.
-            nt = B.shape(batch["xt"], 2)
-            vals.append(B.to_numpy(vs) / nt)
+            # Save numbers.
+            vals.append(B.to_numpy(obj))
             if "pred_logpdf" in batch:
-                kls.append(B.to_numpy(vs + batch["pred_logpdf"]) / nt)
+                kls.append(B.to_numpy(batch["pred_logpdf"] - obj))
             if "pred_logpdf_diag" in batch:
-                kls_diag.append(B.to_numpy(vs + batch["pred_logpdf_diag"]) / nt)
+                kls_diag.append(B.to_numpy(batch["pred_logpdf_diag"] - obj))
 
         # Report numbers.
-        out.kv("Loglik", with_err(-B.concat(*vals)))
+        out.kv("Loglik", with_err(B.concat(*vals)))
         if kls:
             out.kv("KL (full)", with_err(B.concat(*kls)))
         if kls_diag:
@@ -78,7 +79,7 @@ def first_np(x):
         raise ValueError(f"Rank must be two, three, or four.")
 
 
-def plot_first_of_batch(gen, run_model):
+def plot_first_of_batch(gen, model):
     """Plot the prediction for the first element of a batch."""
     batch = gen.generate_batch()
 
@@ -89,8 +90,8 @@ def plot_first_of_batch(gen, run_model):
 
     # Run model.
     with torch.no_grad():
-        pred = run_model(batch["xc"], batch["yc"], x)
-        pred_noiseless = run_model(
+        pred = model(batch["xc"], batch["yc"], x)
+        pred_noiseless = model(
             batch["xc"],
             batch["yc"],
             x,
@@ -195,11 +196,14 @@ parser.add_argument(
     choices=[
         "cnp",
         "gnp",
+        "np",
         "acnp",
         "agnp",
+        "anp",
         "convcnp",
         "convgnp",
         "convgnp-lc",
+        "convnp",
         "fullconvgnp",
     ],
     default="convcnp",
@@ -218,10 +222,18 @@ parser.add_argument(
     ],
     default="eq",
 )
+parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
+parser.add_argument("--num_samples", type=int, default=1)
 args = parser.parse_args()
 
 # Ensure that the `arch` is and only is specified when it is required.
-models_which_require_arch = {"convcnp", "convgnp", "convgnp-lc", "fullconvgnp"}
+models_which_require_arch = {
+    "convcnp",
+    "convgnp",
+    "convgnp-lc",
+    "convnp",
+    "fullconvgnp",
+}
 if args.model in models_which_require_arch and not args.arch:
     raise RuntimeError(f"Model requires a choice of architecture. Please set `--arch`.")
 elif args.model not in models_which_require_arch and args.arch:
@@ -291,28 +303,40 @@ if args.model == "cnp":
         dim_y=args.dim_y,
         likelihood="het",
     )
-    run_model = model
 elif args.model == "gnp":
     model = nps.construct_gnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
         likelihood="lowrank",
+        num_basis_functions=512,
     )
-    run_model = model
+elif args.model == "np":
+    model = nps.construct_gnp(
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        likelihood="het",
+        dim_lv=128,
+    )
 elif args.model == "acnp":
     model = nps.construct_agnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
         likelihood="het",
     )
-    run_model = model
 elif args.model == "agnp":
     model = nps.construct_agnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
         likelihood="lowrank",
+        num_basis_functions=512,
     )
-    run_model = model
+elif args.model == "anp":
+    model = nps.construct_agnp(
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        likelihood="het",
+        dim_lv=128,
+    )
 elif args.model == "convcnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
@@ -325,7 +349,6 @@ elif args.model == "convcnp":
         dws_receptive_field=dws_receptive_field,
         margin=args.margin,
     )
-    run_model = model
 elif args.model == "convgnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
@@ -339,7 +362,6 @@ elif args.model == "convgnp":
         num_basis_functions=512,
         margin=args.margin,
     )
-    run_model = model
 elif args.model == "convgnp-lc":
     if args.dim_x != 1:
         raise NotImplementedError(
@@ -365,9 +387,22 @@ elif args.model == "convgnp-lc":
         y_lc_init = B.randn(torch.float32, args.batch_size, 128, 256 + 1)
     model.y_lc = model.nn.Parameter(y_lc_init)
 
-    def run_model(xc, yc, xt):
-        return model([(xc, yc), (x_lc, model.y_lc)], xt)
+    def run_model(xc, yc, xt, **kw_args):
+        return model([(xc, yc), (x_lc, model.y_lc)], xt, **kw_args)
 
+elif args.model == "convnp":
+    model = nps.construct_convgnp(
+        points_per_unit=points_per_unit,
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        likelihood="het",
+        conv_arch=args.arch,
+        unet_channels=unet_channels,
+        dws_channels=dws_channels,
+        dws_receptive_field=dws_receptive_field,
+        dim_lv=16,
+        margin=args.margin,
+    )
 elif args.model == "fullconvgnp":
     model = nps.construct_fullconvgnp(
         points_per_unit=points_per_unit,
@@ -379,7 +414,6 @@ elif args.model == "fullconvgnp":
         dws_receptive_field=dws_receptive_field,
         margin=args.margin,
     )
-    run_model = model
 else:
     raise ValueError(f'Invalid model "{args.model}".')
 
@@ -387,13 +421,13 @@ else:
 model = model.to(device)
 out.kv("Number of parameters", nps.num_params(model))
 
-
-def objective(xc, yc, xt, yt):
-    """Objective function."""
-    # Use `float64`s for the logpdf computation.
-    pred = run_model(xc, yc, xt, dtype_lik=torch.float64)
-    return -pred.logpdf(B.cast(torch.float64, yt))
-
+# Setup objective.
+if args.objective == "loglik":
+    objective = partial(nps.loglik, model, num_samples=args.num_samples, normalise=True)
+elif args.objective == "elbo":
+    objective = partial(nps.elbo, model, num_samples=args.num_samples, normalise=True)
+else:
+    raise RuntimeError(f'Invalid objective "{args.objective}".')
 
 # Setup training loop.
 opt = torch.optim.Adam(model.parameters(), args.rate)
@@ -418,4 +452,4 @@ for i in range(args.epochs):
 
         # Visualise a prediction by the model.
         if args.dim_x == 1 and args.dim_y == 1:
-            plot_first_of_batch(gen, run_model)
+            plot_first_of_batch(gen, model)

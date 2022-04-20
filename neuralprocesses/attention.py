@@ -35,7 +35,9 @@ class Attention:
         num_heads,
         num_enc_layers,
         dtype=None,
+        _self=False,
     ):
+        self._self = False
         self.num_heads = num_heads
         self.dim_head = dim_embedding // num_heads
         self.encoder_x = self.nps.MLP(
@@ -85,6 +87,10 @@ class Attention:
 
 @_dispatch
 def code(coder: Attention, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
+    if coder._self:
+        # Perform self-attention rather than cross-attention.
+        x = xz
+
     if B.shape(z, -1) == 0:
         # Handle the case of empty context set.
         queries = coder.encoder_x(x)
@@ -116,3 +122,31 @@ def code(coder: Attention, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args)
     z = coder.ln2(z + coder.mlp2(z))
 
     return x, z
+
+
+@register_module
+class SelfAttention(Attention):
+    """Self-attention module.
+
+    Args:
+        dim_x (int): Dimensionality of the inputs.
+        dim_y (int): Dimensionality of the outputs.
+        dim_embedding (int): Dimensionality of the embedding.
+        num_heads (int): Number of heads.
+        num_enc_layers (int): Number of layers in the encoders.
+        dtype (dtype, optional): Data type.
+
+    Attributes:
+        num_heads (int): Number of heads.
+        dim_head (int): Dimensionality of a head.
+        encoder_x (function): Encoder for the inputs.
+        encoder_xy (function): Encoder for the inputs-output pairs.
+        mixer (function): Mixer.
+        mlp1 (function): First MLP for the final normalisation layers.
+        ln1 (function): First normaliser for the final normalisation layers.
+        mlp2 (function): Second MLP for the final normalisation layers.
+        ln2 (function): Second normaliser for the final normalisation layers.
+    """
+
+    def __init__(self, *args, **kw_args):
+        Attention.__init__(self, *args, _self=True, **kw_args)

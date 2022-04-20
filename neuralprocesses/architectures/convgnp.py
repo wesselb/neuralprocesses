@@ -28,6 +28,8 @@ def construct_convgnp(
     dws_layers=8,
     dws_channels=64,
     num_basis_functions=512,
+    dim_lv=0,
+    lv_likelihood="het",
     encoder_scales=None,
     decoder_scale=None,
     aux_t_mlp_layers=(128,) * 3,
@@ -80,6 +82,9 @@ def construct_convgnp(
         dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to `512`.
+        dim_lv (bool, optional): Dimensionality of the latent variable.
+        lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
+            `"het"` or `"lowrank"`. Defaults to `"het"`.
         encoder_scales (float or tuple[float], optional): Initial value for the length
             scales of the set convolutions for the context sets embeddings. Defaults
             to `2 / points_per_unit`.
@@ -107,6 +112,22 @@ def construct_convgnp(
     dim_yt = dim_yt or dim_y
     # `len(dim_yc)` is equal to the number of density channels.
     conv_in_channels = sum(dim_yc) + len(dim_yc)
+
+    # Construct likelihood of the encoder, which depends on whether we're using a
+    # latent variable or not.
+    if dim_lv > 0:
+        lv_likelihood_in_channels, lv_likelihood = construct_likelihood(
+            nps,
+            spec=lv_likelihood,
+            dim_y=dim_lv,
+            num_basis_functions=num_basis_functions,
+            dtype=dtype,
+        )
+        encoder_likelihood = lv_likelihood
+    else:
+        encoder_likelihood = nps.DeterministicLikelihood()
+
+    # Construct likelihood of the decoder.
     likelihood_in_channels, likelihood = construct_likelihood(
         nps,
         spec=likelihood,
@@ -140,23 +161,53 @@ def construct_convgnp(
                 likelihood,
             )
         )
-        likelihood_in_channels = unet_channels[0]
+    else:
+        # There is no auxiliary MLP available, so the CNN will have to produce the
+        # right number of channels.
+        conv_out_channels = likelihood_in_channels
 
     # If `transform` is set to a value, apply the transform.
     if isinstance(transform, str) and transform.lower() == "positive":
-        likelihood = nps.Chain(likelihood, nps.Transform.positive())
+        transform = nps.Transform.positive()
     elif isinstance(transform, tuple):
         lower, upper = transform
-        likelihood = nps.Chain(likelihood, nps.Transform.bounded(lower, upper))
+        transform = nps.Transform.bounded(lower, upper)
     elif transform is not None:
         raise ValueError(f'Cannot parse value "{transform}" for `transform`.')
+    else:
+        transform = lambda x: x
 
-    # Construct the core CNN architecture of the model.
+    # Construct the core CNN architectures for the encoder, which is only necessary
+    # if we're using a latent variable, and for the decoder. First, we determine
+    # how many channels these architectures should take in and produce.
+    if dim_lv > 0:
+        lv_in_channels = conv_in_channels
+        lv_out_channels = lv_likelihood_in_channels
+        in_channels = dim_lv
+        out_channels = conv_out_channels
+    else:
+        in_channels = conv_in_channels
+        out_channels = conv_out_channels
     if conv_arch == "unet":
+        if dim_lv > 0:
+            lv_conv = nps.UNet(
+                dim=dim_x,
+                in_channels=lv_in_channels,
+                out_channels=lv_out_channels,
+                channels=unet_channels,
+                kernels=unet_kernels,
+                activations=unet_activations,
+                resize_convs=unet_resize_convs,
+                resize_conv_interp_method=unet_resize_conv_interp_method,
+                dtype=dtype,
+            )
+        else:
+            lv_conv = lambda x: x
+
         conv = nps.UNet(
             dim=dim_x,
-            in_channels=conv_in_channels,
-            out_channels=likelihood_in_channels,
+            in_channels=in_channels,
+            out_channels=out_channels,
             channels=unet_channels,
             kernels=unet_kernels,
             activations=unet_activations,
@@ -166,10 +217,24 @@ def construct_convgnp(
         )
         receptive_field = conv.receptive_field / points_per_unit
     elif conv_arch == "dws":
+        if dim_lv > 0:
+            lv_conv = nps.ConvNet(
+                dim=dim_x,
+                in_channels=lv_in_channels,
+                out_channels=lv_out_channels,
+                channels=dws_channels,
+                num_layers=dws_layers,
+                points_per_unit=points_per_unit,
+                receptive_field=dws_receptive_field,
+                dtype=dtype,
+            )
+        else:
+            lv_conv = lambda x: x
+
         conv = nps.ConvNet(
             dim=dim_x,
-            in_channels=conv_in_channels,
-            out_channels=likelihood_in_channels,
+            in_channels=in_channels,
+            out_channels=out_channels,
             channels=dws_channels,
             num_layers=dws_layers,
             points_per_unit=points_per_unit,
@@ -215,13 +280,15 @@ def construct_convgnp(
                 encoder_set_conv,
                 density_divisor,
                 nps.Materialise(),
-                nps.DeterministicLikelihood(),
+                lv_conv,
+                encoder_likelihood,
             ),
         ),
         nps.Chain(
             conv,
             nps.SetConv(decoder_scale, dtype=dtype),
             likelihood,
+            transform,
         ),
     )
 

@@ -2,6 +2,7 @@ from matrix.util import indent
 
 from . import _dispatch
 from .util import register_module
+import lab as B
 
 __all__ = ["Parallel", "broadcast_coder_over_parallel"]
 
@@ -44,6 +45,19 @@ class Parallel:
 
 
 @_dispatch
+def data_dims(x: Parallel):
+    dims = [data_dims(xi) for xi in x]
+    if not all(d == dims[0] for d in dims[1:]):
+        raise RuntimeError("Inconsistent data dimensions.")
+    return dims[0]
+
+
+@B.cast.dispatch
+def cast(dtype, x: Parallel):
+    return Parallel(*(B.cast(dtype, xi) for xi in x))
+
+
+@_dispatch
 def code(p: Parallel, xz, z, x, **kw_args):
     xz, z = zip(*[code(pi, xz, z, x, **kw_args) for pi in p])
     return Parallel(*xz), Parallel(*z)
@@ -55,22 +69,67 @@ def code(p: Parallel, xz, z: Parallel, x, **kw_args):
     return Parallel(*xz), Parallel(*z)
 
 
-def broadcast_coder_over_parallel(Coder):
-    @_dispatch
-    def code(p: Coder, xz: Parallel, z: Parallel, x, **kw_args):
-        xz, z = zip(*[code(p, xzi, zi, x, **kw_args) for (xzi, zi) in zip(xz, z)])
-        return Parallel(*xz), Parallel(*z)
-
-
 @_dispatch
 def code(p: Parallel, xz: Parallel, z: Parallel, x, **kw_args):
     xz, z = zip(*[code(pi, xzi, zi, x, **kw_args) for (pi, xzi, zi) in zip(p, xz, z)])
     return Parallel(*xz), Parallel(*z)
 
 
+def broadcast_coder_over_parallel(coder_type):
+    """Broadcast a coder over parallel encodings.
+
+    Args:
+        coder_type (type): Type of coder.
+    """
+
+    @_dispatch
+    def code(p: coder_type, xz: Parallel, z: Parallel, x, **kw_args):
+        xz, z = zip(*[code(p, xzi, zi, x, **kw_args) for (xzi, zi) in zip(xz, z)])
+        return Parallel(*xz), Parallel(*z)
+
+
 @_dispatch
-def data_dims(x: Parallel):
-    dims = [data_dims(xi) for xi in x]
-    if not all(d == dims[0] for d in dims[1:]):
-        raise RuntimeError("Inconsistent data dimensions.")
-    return dims[0]
+def code_track(p: Parallel, xz, z, x, h, **kw_args):
+    xz, z, hs = zip(*[code_track(pi, xz, z, x, [], **kw_args) for pi in p])
+    return Parallel(*xz), Parallel(*z), h + [Parallel(*hs)]
+
+
+@_dispatch
+def code_track(p: Parallel, xz, z: Parallel, x, h, **kw_args):
+    xz, z, hs = zip(
+        *[code_track(pi, xz, zi, x, [], **kw_args) for (pi, zi) in zip(p, z)]
+    )
+    return Parallel(*xz), Parallel(*z), h + [Parallel(*hs)]
+
+
+@_dispatch
+def code_track(p: Parallel, xz: Parallel, z: Parallel, x, h, **kw_args):
+    xz, z, hs = zip(
+        *[code_track(pi, xzi, zi, x, [], **kw_args) for (pi, xzi, zi) in zip(p, xz, z)]
+    )
+    return Parallel(*xz), Parallel(*z), h + [Parallel(*hs)]
+
+
+@_dispatch
+def recode(p: Parallel, xz, z, h, **kw_args):
+    xz, z, _ = zip(*[recode(pi, xz, z, hi, **kw_args) for pi, hi in zip(p, h[0])])
+    return Parallel(*xz), Parallel(*z), h[1:]
+
+
+@_dispatch
+def recode(p: Parallel, xz, z: Parallel, h, **kw_args):
+    xz, z, _ = zip(
+        *[recode(pi, xz, zi, hi, **kw_args) for (pi, zi, hi) in zip(p, z, h[0])]
+    )
+    return Parallel(*xz), Parallel(*z), h[1:]
+
+
+@_dispatch
+def recode(p: Parallel, xz: Parallel, z: Parallel, h, **kw_args):
+    xz, z, _ = zip(
+        *[
+            recode(pi, xzi, zi, hi, **kw_args)
+            for (pi, xzi, zi, hi) in zip(p, xz, z, h[0])
+        ]
+    )
+    return Parallel(*xz), Parallel(*z), h[1:]

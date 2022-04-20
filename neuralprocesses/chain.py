@@ -52,3 +52,17 @@ def code(chain: Chain, xz, z, x, **kw_args):
     for link in chain:
         xz, z = code(link, xz, z, x, **kw_args)
     return xz, z
+
+
+@_dispatch
+def code_track(chain: Chain, xz, z, x, h, **kw_args):
+    for link in chain:
+        xz, z, h = code_track(link, xz, z, x, h, **kw_args)
+    return xz, z, h
+
+
+@_dispatch
+def recode(chain: Chain, xz, z, h, **kw_args):
+    for link in chain:
+        xz, z, h = recode(link, xz, z, h, **kw_args)
+    return xz, z, h
