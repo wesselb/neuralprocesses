@@ -21,19 +21,16 @@ def construct_agnp(
     """An Attentive Gaussian Neural Process.
 
     Args:
-        dim_x (int, optional): Dimensionality of the inputs. Defaults to `1`.
-        dim_y (int, optional): Dimensionality of the outputs. Defaults to `1`.
-        dim_embedding (int, optional): Dimensionality of the embedding. Defaults to
-            `256`.
-        num_heads (int, optional): Number of heads. Defaults to `16`.
-        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to
-            `6`.
-        num_dec_layers (int, optional): Number of layers in the decoder. Defaults to
-            `6`.
-        likelihood (str, optional): Likelihood. Must be one of "het", "lowrank", or
-            "lowrank-correlated". Defaults to "lowrank".
+        dim_x (int, optional): Dimensionality of the inputs. Defaults to 1.
+        dim_y (int, optional): Dimensionality of the outputs. Defaults to 1.
+        dim_embedding (int, optional): Dimensionality of the embedding. Defaults to 256.
+        num_heads (int, optional): Number of heads. Defaults to 16.
+        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 6.
+        num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
+        likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
+            Defaults to `"lowrank"`.
         num_basis_functions (int, optional): Number of basis functions for the
-            low-rank likelihood. Defaults to `512`.
+            low-rank likelihood. Defaults to 512.
         dtype (dtype, optional): Data type.
 
     Returns:

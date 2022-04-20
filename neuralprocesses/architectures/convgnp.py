@@ -41,8 +41,8 @@ def construct_convgnp(
     Sets the attribute `receptive_field` to the receptive field of the model.
 
     Args:
-        dim_x (int, optional): Dimensionality of the inputs. Defaults to `1`.
-        dim_y (int, optional): Dimensionality of the outputs. Defaults to `1`.
+        dim_x (int, optional): Dimensionality of the inputs. Defaults to 1.
+        dim_y (int, optional): Dimensionality of the outputs. Defaults to 1.
         dim_yc (int or tuple[int], optional): Dimensionality of the outputs of the
             context set. You should set this if the dimensionality of the outputs
             of the context set is not equal to the dimensionality of the outputs
@@ -55,9 +55,9 @@ def construct_convgnp(
         dim_aux_t (int, optional): Dimensionality of target-specific auxiliary
             variables.
         points_per_unit (float, optional): Density of the internal discretisation.
-            Defaults to `64`.
+            Defaults to 64.
         margin (float, optional): Margin of the internal discretisation. Defaults to
-            `0.1`
+            0.1.
         likelihood (str, optional): Likelihood. Must be one of "het", "lowrank", or
             "lowrank-correlated". Defaults to "lowrank".
         conv_arch (str, optional): Convolutional architecture to use. Must be one of
@@ -65,7 +65,7 @@ def construct_convgnp(
         unet_channels (tuple[int], optional): Channels of every layer of the UNet.
             Defaults to six layers each with 64 channels.
         unet_kernels (int or tuple[int], optional): Sizes of the kernels in the UNet.
-            Defaults to `5`.
+            Defaults to 5.
         unet_activations (object or tuple[object], optional): Activation functions
             used by the UNet.
         unet_resize_convs (bool, optional): Use resize convolutions rather than
@@ -75,9 +75,8 @@ def construct_convgnp(
             to "nearest".
         dws_receptive_field (float, optional): Receptive field of the DWS architecture.
             Must be specified if `conv_arch` is set to "dws".
-        dws_layers (int, optional): Layers of the DWS architecture. Defaults to `8`.
-        dws_channels (int, optional): Channels of the DWS architecture. Defaults to
-            `64`.
+        dws_layers (int, optional): Layers of the DWS architecture. Defaults to 8.
+        dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to `512`.
         encoder_scales (float or tuple[float], optional): Initial value for the length

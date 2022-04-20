@@ -37,8 +37,8 @@ def construct_fullconvgnp(
     Sets the attribute `receptive_field` to the receptive field of the model.
 
     Args:
-        dim_x (int, optional): Dimensionality of the inputs. Defaults to `1`.
-        dim_y (int, optional): Dimensionality of the outputs. Defaults to `1`.
+        dim_x (int, optional): Dimensionality of the inputs. Defaults to 1.
+        dim_y (int, optional): Dimensionality of the outputs. Defaults to 1.
         dim_yc (int or tuple[int], optional): Dimensionality of the outputs of the
             context set. You should set this if the dimensionality of the outputs
             of the context set is not equal to the dimensionality of the outputs
@@ -49,15 +49,15 @@ def construct_fullconvgnp(
             should set this if the dimensionality of the outputs of the target set is
             not equal to the dimensionality of the outputs of the context set.
         points_per_unit (float, optional): Density of the internal discretisation.
-            Defaults to `64`.
+            Defaults to 64.
         margin (float, optional): Margin of the internal discretisation. Defaults to
-            `0.1`
+            0.1.
         conv_arch (str, optional): Convolutional architecture to use. Must be one of
-            "unet" or "dws". Defaults to "unet.
+            `"unet"` or `"dws"`. Defaults to `"unet"`.
         unet_channels (tuple[int], optional): Channels of every layer of the UNet.
             Defaults to six layers each with 64 channels.
         unet_kernels (int or tuple[int], optional): Sizes of the kernels in the UNet.
-            Defaults to `5`.
+            Defaults to 5.
         unet_activations (object or tuple[object], optional): Activation functions
             used by the UNet.
         unet_resize_convs (bool, optional): Use resize convolutions rather than
@@ -67,9 +67,8 @@ def construct_fullconvgnp(
             to "nearest".
         dws_receptive_field (float, optional): Receptive field of the DWS architecture.
             Must be specified if `conv_arch` is set to "dws".
-        dws_layers (int, optional): Layers of the DWS architecture. Defaults to `8`.
-        dws_channels (int, optional): Channels of the DWS architecture. Defaults to
-            `64`.
+        dws_layers (int, optional): Layers of the DWS architecture. Defaults to 8.
+        dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
         encoder_scales (float or tuple[float], optional): Initial value for the length
             scales of the set convolutions for the context sets embeddings. Defaults
             to `2 / points_per_unit`.
@@ -163,7 +162,7 @@ def construct_fullconvgnp(
             out_channels=1,  # Kernel matrix
             channels=dws_channels,
             num_layers=dws_layers,
-            points_per_unit=points_per_unit // 2,  # Keep memory in control
+            points_per_unit=points_per_unit // 2,  # Keep memory in control.
             receptive_field=dws_receptive_field,
             dtype=dtype,
         )
@@ -180,7 +179,7 @@ def construct_fullconvgnp(
         dim=dim_x,
     )
     disc_kernel = nps.Discretisation(
-        points_per_unit=points_per_unit // 2,  # Keep memory in control
+        points_per_unit=points_per_unit // 2,  # Keep memory in control.
         multiple=2**conv_kernel.num_halving_layers,
         margin=margin,
         dim=dim_x,  # Only 1D, because the input is later repeated to make it 2D.
@@ -201,7 +200,7 @@ def construct_fullconvgnp(
         *(nps.SetConv(2 * s, dtype=dtype) for s in encoder_kernel_scales)
     )
 
-    # Resolve length scale for decoder.
+    # Resolve length scales for decoders.
     decoder_mean_scale = decoder_scale or 2 / disc_mean.points_per_unit
     decoder_kernel_scale = decoder_scale or 2 / disc_kernel.points_per_unit
     # Multiply by two since we halved the PPU.
@@ -250,6 +249,8 @@ def construct_fullconvgnp(
                         lambda x: B.matmul(x, x, tr_b=True) / 1000,
                         nps.SetConv(decoder_kernel_scale, dtype=dtype),
                     ),
+                    # The inputs of the encoding already are in the squared space, so
+                    # no need to map those again.
                     map_encoding=False,
                 ),
             ),
