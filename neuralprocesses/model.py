@@ -62,8 +62,14 @@ class Model:
         if aux_t is not None:
             xt = AugmentedInput(xt, aux_t)
 
-        xz, pz = code(self.encoder, xc, yc, xt, **kw_args)
+        # If the keyword `noiseless` is set to `True`, then that only applies to the
+        # decoder.
+        enc_kw_args = dict(kw_args)
+        if "noiseless" in enc_kw_args:
+            del enc_kw_args["noiseless"]
+        xz, pz = code(self.encoder, xc, yc, xt, **enc_kw_args)
 
+        # Sample and convert sample to the right data type.
         z = _sample(pz, num=num_samples)
         if dtype_enc_sample:
             z = B.cast(dtype_enc_sample, z)

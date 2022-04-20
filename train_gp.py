@@ -89,32 +89,33 @@ def plot_first_of_batch(gen, model):
         x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
         x = B.tile(x, B.shape(batch["xt"], 0), 1, 1)
 
-    # Run model and produce five noiseless samples.
+    # Predict with model and produce five noiseless samples.
     with torch.no_grad():
-        pred = model(batch["xc"], batch["yc"], x)
+        pred = model(batch["xc"], batch["yc"], x, num_samples=50)
+        m1 = B.mean(pred.mean, axis=0)
+        m2 = B.mean(pred.var + pred.mean**2, axis=0)
+        mean, var = m1, m2 - m1**2
 
         # Produce samples.
-        noiseless_samples = []
-        for _ in range(5):
-            pred_noiseless = model(
-                batch["xc"],
-                batch["yc"],
-                x,
-                dtype_enc_sample=torch.float32,
-                dtype_lik=torch.float64,
-                noiseless=True,
-            )
-            # Try sampling with increasingly higher regularisation.
-            while True:
-                try:
-                    noiseless_samples.append(pred_noiseless.sample())
-                    break
-                except Exception as e:
-                    B.epsilon *= 10
-                    if B.epsilon > 1e-3:
-                        raise e
-            B.epsilon = 1e-8  # Ensure to reset the regularisation.
-        noiseless_samples = B.stack(*noiseless_samples, axis=0)
+        pred_noiseless = model(
+            batch["xc"],
+            batch["yc"],
+            x,
+            dtype_enc_sample=torch.float32,
+            dtype_lik=torch.float64,
+            noiseless=True,
+            num_samples=5,
+        )
+        # Try sampling with increasingly higher regularisation.
+        while True:
+            try:
+                noiseless_samples = pred_noiseless.sample()
+                break
+            except Exception as e:
+                B.epsilon *= 10
+                if B.epsilon > 1e-3:
+                    raise e
+        B.epsilon = 1e-8  # Ensure to reset the regularisation.
 
     plt.figure(figsize=(6, 4))
 
@@ -135,17 +136,17 @@ def plot_first_of_batch(gen, model):
     )
 
     # Plot prediction.
-    err = 1.96 * B.sqrt(pred.var)
+    err = 1.96 * B.sqrt(var)
     plt.plot(
         first_np(x),
-        first_np(pred.mean),
+        first_np(mean),
         label="Prediction",
         style="pred",
     )
     plt.fill_between(
         first_np(x),
-        first_np(pred.mean - err),
-        first_np(pred.mean + err),
+        first_np(mean - err),
+        first_np(mean + err),
         style="pred",
     )
     plt.plot(
@@ -256,6 +257,7 @@ wd = WorkingDirectory(
     *(args.subdir or ()),
     args.data,
     args.model,
+    args.objective,
     *((args.arch,) if args.arch else ()),
     f"x{args.dim_x}_y{args.dim_y}",
 )
