@@ -91,31 +91,7 @@ def plot_first_of_batch(gen, model):
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
-        pred = model(batch["xc"], batch["yc"], x, num_samples=50)
-        m1 = B.mean(pred.mean, axis=0)
-        m2 = B.mean(pred.var + pred.mean**2, axis=0)
-        mean, var = m1, m2 - m1**2
-
-        # Produce samples.
-        pred_noiseless = model(
-            batch["xc"],
-            batch["yc"],
-            x,
-            dtype_enc_sample=torch.float32,
-            dtype_lik=torch.float64,
-            noiseless=True,
-            num_samples=5,
-        )
-        # Try sampling with increasingly higher regularisation.
-        while True:
-            try:
-                noiseless_samples = pred_noiseless.sample()
-                break
-            except Exception as e:
-                B.epsilon *= 10
-                if B.epsilon > 1e-3:
-                    raise e
-        B.epsilon = 1e-8  # Ensure to reset the regularisation.
+        mean, var, samples = nps.predict(model, batch["xc"], batch["yc"], x)
 
     plt.figure(figsize=(6, 4))
 
@@ -151,7 +127,7 @@ def plot_first_of_batch(gen, model):
     )
     plt.plot(
         first_np(x),
-        first_np(noiseless_samples),
+        first_np(samples),
         style="pred",
         ls="-",
         lw=0.5,

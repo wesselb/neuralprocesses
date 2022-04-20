@@ -1,17 +1,17 @@
 import lab as B
+import numpy as np
 from matrix.util import indent
 from plum import List, Tuple, Union
-import numpy as np
 
 from . import _dispatch
 from .augment import AugmentedInput
-from .coding import code, code_track, recode, recode_stochastic
+from .coding import code, code_track, recode_stochastic
 from .dist import AbstractMultiOutputDistribution
 from .mask import Masked
 from .parallel import Parallel
 from .util import register_module
 
-__all__ = ["Model", "loglik", "elbo"]
+__all__ = ["Model", "loglik", "elbo", "predict"]
 
 
 @register_module
@@ -237,3 +237,54 @@ def _kl(q: AbstractMultiOutputDistribution, p: AbstractMultiOutputDistribution):
 @_dispatch
 def _kl(q: Parallel, p: Parallel):
     return sum([_kl(qi, pi) for qi, pi in zip(q, p)], 0)
+
+
+def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
+    """Use a model to predict.
+
+    Args:
+        model (:class:`.Model`): Model.
+        xc (tensor): Inputs of the context set.
+        yc (tensor): Output of the context set.
+        xt (tensor): Inputs of the target set.
+        pred_num_samples (int, optional): Number of samples to use for prediction.
+            Defaults to 50.
+        num_samples (int, optional): Number of noiseless samples to produce. Defaults
+            to 5.
+
+    Returns:
+        tensor: Marignal mean.
+        tensor: Marginal variance.
+        tensor: `num_samples` noiseless samples.
+    """
+    # Predict marginal statistics.
+    pred = model(xc, yc, xt, num_samples=pred_num_samples)
+    m1 = B.mean(pred.mean, axis=0)
+    m2 = B.mean(pred.var + pred.mean**2, axis=0)
+    mean, var = m1, m2 - m1**2
+
+    # Produce noiseless samples.
+    pred_noiseless = model(
+        batch["xc"],
+        batch["yc"],
+        x,
+        dtype_enc_sample=torch.float32,
+        dtype_lik=torch.float64,
+        noiseless=True,
+        num_samples=num_samples,
+    )
+    # Try sampling with increasingly higher regularisation.
+    epsilon_before = B.epsilon
+    while True:
+        try:
+            samples = pred_noiseless.sample()
+            break
+        except Exception as e:
+            B.epsilon *= 10
+            if B.epsilon > 1e-3:
+                # Reset regularisation before failing.
+                B.epsilon = epsilon_before
+                raise e
+    B.epsilon = epsilon_before  # Reset regularisation after success.
+
+    return mean, var, samples
