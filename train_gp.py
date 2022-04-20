@@ -43,11 +43,12 @@ def eval(gen, objective):
             )
 
             # Save numbers.
+            n = B.shape(batch["xt"], -1)
             vals.append(B.to_numpy(obj))
             if "pred_logpdf" in batch:
-                kls.append(B.to_numpy(batch["pred_logpdf"] - obj))
+                kls.append(B.to_numpy(batch["pred_logpdf"] / n - obj))
             if "pred_logpdf_diag" in batch:
-                kls_diag.append(B.to_numpy(batch["pred_logpdf_diag"] - obj))
+                kls_diag.append(B.to_numpy(batch["pred_logpdf_diag"] / n - obj))
 
         # Report numbers.
         out.kv("Loglik", with_err(B.concat(*vals)))
