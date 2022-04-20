@@ -224,7 +224,7 @@ args = parser.parse_args()
 models_which_require_arch = {"convcnp", "convgnp", "convgnp-lc", "fullconvgnp"}
 if args.model in models_which_require_arch and not args.arch:
     raise RuntimeError(f"Model requires a choice of architecture. Please set `--arch`.")
-elif args.arch:
+elif args.model not in models_which_require_arch and args.arch:
     raise RuntimeError(
         f"Model does not allow choice of architecture. Please unset `--arch`."
     )
