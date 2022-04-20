@@ -43,7 +43,11 @@ def generate_arch_variations(name, **kw_args):
             (
                 "construct_gnp",
                 {"num_basis_functions": 4},
-            )
+            ),
+            (
+                "construct_agnp",
+                {"num_basis_functions": 4},
+            ),
         ]
         + generate_arch_variations(
             "construct_convgnp",

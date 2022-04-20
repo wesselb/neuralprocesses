@@ -5,7 +5,9 @@ import lab.torch as B
 import numpy as np
 import torch
 from plum import convert
+from wbml.util import inv_perm
 
+import neuralprocesses as nps
 from .. import _dispatch
 
 __all__ = ["num_params", "Module"]
@@ -147,6 +149,44 @@ class _LambdaModule(torch.nn.Module):
         return self.f(x)
 
 
+def LayerNorm(*sizes: Union[int, None], dtype=None):
+    """Layer normalisation.
+
+    Args:
+        *sizes (int or None): Sizes of the final dimensions to normalise. Set a size
+            to `None` if it need not be normalised.
+        dtype (dtype): Data type.
+
+    Returns:
+        object: Layer normalisation.
+    """
+
+    def compute_perm(x):
+        start = B.rank(x) - len(sizes)
+        perm = list(range(start))
+        # First put in `None`s.
+        perm += [start + i for i, s in enumerate(sizes) if s is None]
+        # Then put in the others.
+        perm += [start + i for i, s in enumerate(sizes) if s is not None]
+        return perm
+
+    def permute(x):
+        return B.transpose(x, perm=compute_perm(x))
+
+    def unpermute(x):
+        return B.transpose(x, perm=inv_perm(compute_perm(x)))
+
+    return torch.nn.Sequential(
+        _LambdaModule(permute),
+        torch.nn.LayerNorm(
+            # Filter out `None`s.
+            [s for s in sizes if s is not None],
+            dtype=dtype,
+        ),
+        _LambdaModule(unpermute),
+    )
+
+
 class Interface:
     """PyTorch interface."""
 
@@ -185,6 +225,8 @@ class Interface:
     AvgPool2d = partial(AvgPoolNd, dim=2)
     AvgPool3d = partial(AvgPoolNd, dim=3)
 
+    LayerNorm = staticmethod(LayerNorm)
+
     @staticmethod
     def Parameter(x, dtype=None):
         """A tracked parameter.
@@ -214,3 +256,4 @@ class Module(torch.nn.Module):
     def __init__(self):
         super().__init__()
         self.nn = interface
+        self.nps = nps.torch

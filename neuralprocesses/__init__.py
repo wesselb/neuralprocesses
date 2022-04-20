@@ -4,6 +4,7 @@ _dispatch = plum.Dispatcher()
 
 from .dist import *
 from .nn import *
+from .attention import *
 from .coder import *
 from .coding import *
 from .parallel import *

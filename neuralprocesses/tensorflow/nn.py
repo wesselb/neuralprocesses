@@ -6,6 +6,7 @@ import numpy as np
 import tensorflow as tf
 from plum import convert
 
+import neuralprocesses as nps
 from .. import _dispatch
 
 __all__ = ["num_params", "Module"]
@@ -216,6 +217,23 @@ def AvgPoolNd(
         )
 
 
+def LayerNorm(*sizes: Union[int, None], dtype=None):
+    """Layer normalisation.
+
+    Args:
+        *sizes (int or None): Sizes of the final dimensions to normalise. Set a size
+            to `None` if it need not be normalised.
+        dtype (dtype): Data type.
+
+    Returns:
+        object: Layer normalisation.
+    """
+    return tf.keras.layers.LayerNormalization(
+        [-len(sizes) + i for i, s in enumerate(sizes) if s is not None],
+        dtype=dtype,
+    )
+
+
 class Interface:
     """TensorFlow interface."""
 
@@ -276,6 +294,8 @@ class Interface:
     AvgPool2d = partial(AvgPoolNd, dim=2)
     AvgPool3d = partial(AvgPoolNd, dim=3)
 
+    LayerNorm = LayerNorm
+
     @staticmethod
     def Parameter(x, dtype=None):
         """A tracked parameter.
@@ -301,3 +321,4 @@ class Module(tf.keras.Model):
     def __init__(self):
         super().__init__()
         self.nn = interface
+        self.nps = nps.tensorflow
