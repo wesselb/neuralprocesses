@@ -59,7 +59,7 @@ def construct_agnp(
                     dtype=dtype,
                 ),
                 nps.DeterministicLikelihood(),
-            )
+            ),
         ),
     )
     decoder = nps.Chain(

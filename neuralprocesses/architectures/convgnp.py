@@ -215,7 +215,7 @@ def construct_convgnp(
                 encoder_set_conv,
                 density_divisor,
                 nps.Materialise(),
-                nps.DeterministicLikelihood()
+                nps.DeterministicLikelihood(),
             ),
         ),
         nps.Chain(
