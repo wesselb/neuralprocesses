@@ -60,7 +60,7 @@ class DeepSet:
         self,
         phi,
         rho,
-        agg=lambda x: B.sum(x, axis=2, squeeze=False),
+        agg=lambda x: B.sum(x, axis=-1, squeeze=False),
     ):
         self.phi = phi
         self.rho = rho
@@ -69,7 +69,7 @@ class DeepSet:
 
 @_dispatch
 def code(coder: DeepSet, xz, z, x, **kw_args):
-    z = B.concat(xz, z, axis=1)
+    z = B.concat(xz, z, axis=-2)
     z = coder.phi(z)
     z = coder.agg(z)  # This aggregates over the data dimension.
     z = coder.rho(z)
@@ -99,9 +99,9 @@ class MapDiagonal:
 @_dispatch
 def code(coder: MapDiagonal, xz, z, x, **kw_args):
     if coder.map_encoding:
-        xz = B.concat(xz, xz, axis=1)
+        xz = B.concat(xz, xz, axis=-2)
     return code(coder.coder, xz, z, (x, x))
 
 
 def _map_encoding_to_diagonal(xz: B.Numeric):
-    return B.concat(xz, xz, axis=1)
+    return B.concat(xz, xz, axis=-2)

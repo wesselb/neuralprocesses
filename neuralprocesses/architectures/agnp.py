@@ -45,15 +45,21 @@ def construct_agnp(
     )
     encoder = nps.Chain(
         nps.Parallel(
-            nps.InputsCoder(),
-            nps.Attention(
-                dim_x=dim_x,
-                dim_y=dim_y,
-                dim_embedding=dim_embedding,
-                num_heads=num_heads,
-                num_enc_layers=num_enc_layers,
-                dtype=dtype,
+            nps.Chain(
+                nps.InputsCoder(),
+                nps.DeterministicLikelihood(),
             ),
+            nps.Chain(
+                nps.Attention(
+                    dim_x=dim_x,
+                    dim_y=dim_y,
+                    dim_embedding=dim_embedding,
+                    num_heads=num_heads,
+                    num_enc_layers=num_enc_layers,
+                    dtype=dtype,
+                ),
+                nps.DeterministicLikelihood(),
+            )
         ),
     )
     decoder = nps.Chain(

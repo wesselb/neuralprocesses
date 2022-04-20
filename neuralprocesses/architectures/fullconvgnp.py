@@ -216,6 +216,7 @@ def construct_fullconvgnp(
                     encoder_mean_set_conv,
                     nps.DivideByFirstChannel(epsilon=epsilon),
                     nps.Materialise(),
+                    nps.DeterministicLikelihood(),
                 ),
             ),
             nps.FunctionalCoder(
@@ -229,6 +230,7 @@ def construct_fullconvgnp(
                         # We only need the identity channel once, so insert it after
                         # materialising.
                         nps.PrependIdentityChannel(),
+                        nps.DeterministicLikelihood(),
                     ),
                 ),
             ),

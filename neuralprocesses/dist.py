@@ -5,8 +5,9 @@ from matrix import Diagonal, LowRank
 from plum import Dispatcher, Union
 from stheno import Normal
 from wbml.util import indented_kv
+from .util import batch
 
-__all__ = ["MultiOutputNormal", "Transform"]
+__all__ = ["Dirac", "MultiOutputNormal", "Transform"]
 
 _dispatch = Dispatcher()
 
@@ -75,6 +76,48 @@ class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
         raise NotImplementedError(f"Cannot compute the entropy of {self}.")
 
 
+class Dirac(AbstractMultiOutputDistribution):
+    """A Dirac delta.
+
+    Args:
+        x (tensor): Position of the Dirac delta of shape `(b, c, n)`.
+    """
+
+    def __init__(self, x):
+        self.x = x
+
+    def __repr__(self):
+        return f"<Dirac:\n" + indented_kv("x", repr(self.x), suffix=">")
+
+    def __str__(self):
+        return f"<Dirac:\n" + indented_kv("x", str(self.x), suffix=">")
+
+    @property
+    def mean(self):
+        return self.x
+
+    @property
+    def var(self):
+        with B.on_device(self.x):
+            return B.zeros(x)
+
+    def logpdf(self, x):
+        with B.on_device(self.x):
+            return B.zeros(B.dtype(self.x), B.shape(x, 0))
+
+    @_dispatch
+    def sample(self, state: B.RandomState, num=1):
+        return state, self.x
+
+    @_dispatch
+    def sample(self, num=1):
+        return self.x
+
+    def kl(self, other: "Dirac"):
+        with B.on_device(self.x):
+            return B.zeros(B.dtype(self.x), B.shape(x, 0))
+
+
 @_dispatch
 def _map_sample_output(f, state_res: tuple):
     state, res = state_res
@@ -114,9 +157,12 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
             mean (tensor): Mean of shape `(b, c, n)`.
             var (tensor): Variance of shape `(b, c, n, c, n)`.
         """
-        b, c, n = B.shape(mean)
+        c, n = B.shape(mean, -2, -1)
         return cls(
-            Normal(B.reshape(mean, b, c * n, -1), B.reshape(var, b, c * n, c * n)),
+            Normal(
+                B.reshape(mean, *batch(mean, 2), c * n, -1),
+                B.reshape(var, *batch(var, 4), c * n, c * n),
+            ),
             c,
         )
 
@@ -128,9 +174,12 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
             mean (tensor): Mean of shape `(b, c, n)`.
             var (tensor): Marginal variances of shape `(b, c, n)`.
         """
-        b, c, n = B.shape(mean)
+        c, n = B.shape(mean, -2, -1)
         return cls(
-            Normal(B.reshape(mean, b, c * n, -1), Diagonal(B.reshape(var, b, c * n))),
+            Normal(
+                B.reshape(mean, *batch(mean, 2), c * n, -1),
+                Diagonal(B.reshape(var, *batch(var, 2), c * n)),
+            ),
             c,
         )
 
@@ -153,17 +202,20 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
             var_middle (tensor, optional): Covariance of the factors of shape
                 `(b, num_factors, num_factors)`.
         """
-        b, c, n = B.shape(mean)
+        c, n = B.shape(mean, -2, -1)
         # Separate out factor channels.
-        var_factor = B.reshape(var_factor, b, c, -1, n)
+        var_factor = B.reshape(var_factor, *batch(var_factor, 2), c, -1, n)
         var_factor = B.transpose(var_factor)
         # Construct variance.
-        var = Diagonal(B.reshape(var_diag, b, c * n))
-        var = var + LowRank(left=B.reshape(var_factor, b, c * n, -1), middle=var_middle)
+        var = Diagonal(B.reshape(var_diag, *batch(var_diag, 2), c * n))
+        var += LowRank(
+            left=B.reshape(var_factor, *batch(var_factor, 3), c * n, -1),
+            middle=var_middle,
+        )
         # Do not retain structure if it doesn't give computational savings.
         if var.lr.rank >= B.shape_matrix(var, 0):
             var = B.dense(var)
-        return cls(Normal(B.reshape(mean, b, c * n, -1), var), c)
+        return cls(Normal(B.reshape(mean, *batch(mean, 2), c * n, -1), var), c)
 
     def __repr__(self):
         return (  # Comment to preserve formatting.
@@ -189,7 +241,7 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
         return self._unreshape(B.diag(self.normal.var))
 
     def logpdf(self, x):
-        return self.normal.logpdf(B.reshape(x, *B.shape(x)[:-2], -1, 1))
+        return self.normal.logpdf(B.reshape(x, *batch(x, 2), -1, 1))
 
     def sample(self, *args, **kw_args):
         def f(res):
@@ -342,7 +394,7 @@ class TransformedMultiOutputDistribution(AbstractMultiOutputDistribution):
         return deriv * deriv * self.dist.var
 
     def logpdf(self, x):
-        logdet = B.sum(self.transform.untransform_logdet(x), axis=(1, 2))
+        logdet = B.sum(self.transform.untransform_logdet(x), axis=(-2, -1))
         return self.dist.logpdf(self.transform.untransform(x)) + logdet
 
     def sample(self, *args, **kw_args):

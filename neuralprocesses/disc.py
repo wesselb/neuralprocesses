@@ -7,7 +7,7 @@ from plum import List
 from . import _dispatch
 from .augment import AugmentedInput
 from .parallel import Parallel
-from .util import register_module, is_nonempty
+from .util import register_module, is_nonempty, batch
 
 __all__ = ["Discretisation"]
 
@@ -74,7 +74,7 @@ class Discretisation:
         grid_start = B.round(grid_start / self.resolution) * self.resolution
 
         # Produce the grid.
-        batch = B.shape(args[0], 0)
+        b = batch(args[0], 2)
         with B.on_device(args[0]):
             return B.tile(
                 B.expand_dims(
@@ -86,9 +86,9 @@ class Discretisation:
                         Dimension(B.cast(B.dtype_int(n), n)),
                     ),
                     axis=0,
-                    times=2,
+                    times=len(b) + 1,
                 ),
-                batch,
+                *b,
                 1,
                 1,
             )
@@ -116,8 +116,8 @@ def _split_coordinates(
     x: B.Numeric, dim: Optional[int] = None
 ) -> List[List[B.Numeric]]:
     # Cast with `int` so we can safely pass it to `range` below!
-    dim = dim or int(B.shape(x, 1))
-    return [[x[:, i, :]] for i in range(dim)]
+    dim = dim or int(B.shape(x, -2))
+    return [[x[..., i, :]] for i in range(dim)]
 
 
 @_dispatch

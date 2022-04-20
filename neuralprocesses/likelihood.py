@@ -3,15 +3,24 @@ from matrix import Diagonal
 from stheno import Normal
 
 from . import _dispatch
-from .dist import MultiOutputNormal
+from .dist import MultiOutputNormal, Dirac
 from .parallel import Parallel
 from .util import register_module
 
 __all__ = [
+    "DeterministicLikelihood",
     "HeterogeneousGaussianLikelihood",
     "LowRankGaussianLikelihood",
     "DenseGaussianLikelihood",
 ]
+
+
+@register_module
+class DeterministicLikelihood:
+    """Deterministic likelihood."""
+
+    def __call__(self, z: B.Numeric):
+        return Dirac(z)
 
 
 @register_module
@@ -47,9 +56,9 @@ def code(
     noiseless=False,
     **kw_args,
 ):
-    dim_y = B.shape(z, 1) // 2
-    mean = z[:, :dim_y, :]
-    noise = coder.epsilon + B.softplus(z[:, dim_y:, :])
+    dim_y = B.shape(z, -2) // 2
+    mean = z[..., :dim_y, :]
+    noise = coder.epsilon + B.softplus(z[..., dim_y:, :])
 
     # Cast parameters to the right data type.
     if dtype_lik:
@@ -100,11 +109,11 @@ def code(
     dtype_lik=None,
     **kw_args,
 ):
-    dim_y = B.shape(z, 1) // (2 + coder.rank)
-    dim_inner = B.shape(z, 1) - 2 * dim_y
-    mean = z[:, :dim_y, :]
-    noise = coder.epsilon + B.softplus(z[:, dim_y : 2 * dim_y, :])
-    var_factor = z[:, 2 * dim_y :, :] / B.sqrt(dim_inner)
+    dim_y = B.shape(z, -2) // (2 + coder.rank)
+    dim_inner = B.shape(z, -2) - 2 * dim_y
+    mean = z[..., :dim_y, :]
+    noise = coder.epsilon + B.softplus(z[..., dim_y : 2 * dim_y, :])
+    var_factor = z[..., 2 * dim_y :, :] / B.sqrt(dim_inner)
 
     # Cast the parameters before constructing the distribution.
     if dtype_lik:
@@ -166,14 +175,14 @@ def code(
     z_mean_noise, var = z
 
     # We do not support higher-dimensional outputs.
-    if not (B.shape(z_mean_noise, 1) == 2 and B.shape(var, 1) == 1):
+    if not (B.shape(z_mean_noise, -2) == 2 and B.shape(var, -3) == 1):
         raise NotImplementedError(
             "`DenseGaussianLikelihood` so far only works for a single channel."
         )
 
     # Disentangle mean and noise.
-    mean = z_mean_noise[:, :1, :]
-    noise = coder.epsilon + B.softplus(z_mean_noise[:, 1:, :])
+    mean = z_mean_noise[..., :1, :]
+    noise = coder.epsilon + B.softplus(z_mean_noise[..., 1:, :])
 
     # Cast parameters to the right data type.
     if dtype_lik:
@@ -187,7 +196,7 @@ def code(
             noise = B.zeros(noise)
 
     # Add noise to variance and shape correctly.
-    var = B.dense(B.add(Diagonal(noise), var))[:, None, :, None, :]
+    var = B.dense(B.add(Diagonal(noise), var))[..., 0, None, :, None, :]
 
     # Return the inputs for the mean.
     return xz[0], MultiOutputNormal.dense(mean, var)

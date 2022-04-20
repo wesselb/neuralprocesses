@@ -2,10 +2,11 @@ import math
 from typing import Tuple, Union
 
 import lab as B
+import numpy as np
 from plum import Dispatcher
 
 from .parallel import Parallel
-from .util import register_module
+from .util import register_module, batch, compress_batch_dimensions
 
 __all__ = ["MLP", "UNet", "ConvNet", "Splitter"]
 
@@ -54,10 +55,11 @@ class MLP:
             self.net = self.nn.Sequential(*net)
 
     def __call__(self, x):
+        x, uncompress = compress_batch_dimensions(x, 2)
         x = B.transpose(x)
         x = self.net(x)
         x = B.transpose(x)
-        return x
+        return uncompress(x)
 
 
 @register_module
@@ -80,6 +82,7 @@ class UNet:
         dtype (dtype, optional): Data type.
 
     Attributes:
+        dim (int): Dimensionality.
         kernels (tuple[int]): Sizes of the kernels.
         activations (tuple[function]): Activation functions.
         num_halving_layers (int): Number of layers with striding equal to two.
@@ -101,6 +104,7 @@ class UNet:
         resize_conv_interp_method: str = "nearest",
         dtype=None,
     ):
+        self.dim = dim
 
         # If `kernel` is an integer, repeat it for every layer.
         if not isinstance(kernels, (tuple, list)):
@@ -226,6 +230,8 @@ class UNet:
         )
 
     def __call__(self, x):
+        x, uncompress = compress_batch_dimensions(x, self.dim + 1)
+
         hs = [self.activations[0](self.before_turn_layers[0](x))]
         for layer, activation in zip(
             self.before_turn_layers[1:],
@@ -243,7 +249,7 @@ class UNet:
         ):
             h = activation(layer(B.concat(h_prev, h, axis=1)))
 
-        return self.final_linear(h)
+        return uncompress(self.final_linear(h))
 
 
 @register_module
@@ -262,6 +268,7 @@ class ConvNet:
         dtype (dtype, optional): Data type.
 
     Attributes:
+        dim (int): Dimensionality.
         num_halving_layers (int): Number of layers with stride equal to two.
         conv_net (module): The architecture.
     """
@@ -277,6 +284,8 @@ class ConvNet:
         receptive_field: float,
         dtype=None,
     ):
+        self.dim = dim
+
         activation = self.nn.ReLU()
 
         # Make it a drop-in substitute for :class:`UNet`.
@@ -326,8 +335,9 @@ class ConvNet:
         )
         self.conv_net = self.nn.Sequential(*layers)
 
-    def __call__(self, z):
-        return self.conv_net(z)
+    def __call__(self, x):
+        x, uncompress = compress_batch_dimensions(x, self.dim + 1)
+        return uncompress(self.conv_net(x))
 
 
 @register_module
@@ -349,6 +359,6 @@ class Splitter:
         i = 0
         splits = []
         for size in self.sizes:
-            splits.append(z[:, i : i + size, :])
+            splits.append(z[..., i : i + size, :])
             i += size
         return Parallel(*splits)

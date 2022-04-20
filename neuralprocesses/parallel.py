@@ -3,7 +3,7 @@ from matrix.util import indent
 from . import _dispatch
 from .util import register_module
 
-__all__ = ["Parallel"]
+__all__ = ["Parallel", "broadcast_coder_over_parallel"]
 
 
 @register_module
@@ -55,7 +55,22 @@ def code(p: Parallel, xz, z: Parallel, x, **kw_args):
     return Parallel(*xz), Parallel(*z)
 
 
+def broadcast_coder_over_parallel(Coder):
+    @_dispatch
+    def code(p: Coder, xz: Parallel, z: Parallel, x, **kw_args):
+        xz, z = zip(*[code(p, xzi, zi, x, **kw_args) for (xzi, zi) in zip(xz, z)])
+        return Parallel(*xz), Parallel(*z)
+
+
 @_dispatch
 def code(p: Parallel, xz: Parallel, z: Parallel, x, **kw_args):
     xz, z = zip(*[code(pi, xzi, zi, x, **kw_args) for (pi, xzi, zi) in zip(p, xz, z)])
     return Parallel(*xz), Parallel(*z)
+
+
+@_dispatch
+def data_dims(x: Parallel):
+    dims = [data_dims(xi) for xi in x]
+    if not all(d == dims[0] for d in dims[1:]):
+        raise RuntimeError("Inconsistent data dimensions.")
+    return dims[0]

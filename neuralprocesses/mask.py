@@ -1,4 +1,5 @@
 import lab as B
+from lab.util import resolve_axis
 from plum import Tuple, Union
 
 from . import _dispatch
@@ -25,6 +26,7 @@ class Masked:
 
 @_dispatch
 def _pad_zeros(x: B.Numeric, up_to: int, axis: int):
+    axis = resolve_axis(x, axis)
     shape = list(B.shape(x))
     shape[axis] = up_to - shape[axis]
     with B.on_device(x):
@@ -45,14 +47,14 @@ def _determine_ns(xc: tuple, multiple: Union[int, tuple]):
 
 
 @_dispatch
-def mask_context(xc: tuple, yc: B.Numeric, multiple=50):
+def mask_context(xc: tuple, yc: B.Numeric, multiple=1):
     """Mask a context set.
 
     Args:
         xc (input): Context inputs.
         yc (tensor): Context outputs.
         multiple (int or tuple[int], optional): Pad with zeros until the number of
-            context points is a multiple of this number. Defaults to `50`.
+            context points is a multiple of this number. Defaults to 1.
 
     Returns:
         tuple[input, :class:`.Masked`]: Masked context set with zeros appended.
@@ -79,13 +81,13 @@ def mask_context(xc: B.Numeric, yc: B.Numeric, **kw_args):
 
 
 @_dispatch
-def merge_contexts(*contexts: Tuple[tuple, B.Numeric], multiple=50):
+def merge_contexts(*contexts: Tuple[tuple, B.Numeric], multiple=1):
     """Merge context sets.
 
     Args:
         *contexts (tuple[input, tensor]): Contexts to merge.
         multiple (int or tuple[int], optional): Pad with zeros until the number of
-            context points is a multiple of this number. Defaults to `50`.
+            context points is a multiple of this number. Defaults to 1.
 
     Returns:
         tuple[input, :class:`.Masked`]: Merged context set.

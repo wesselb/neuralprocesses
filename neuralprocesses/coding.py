@@ -3,7 +3,7 @@ import matrix  # noqa
 
 from . import _dispatch
 from .parallel import Parallel
-from .util import register_module
+from .util import register_module, data_dims
 
 __all__ = ["code", "Materialise"]
 
@@ -57,53 +57,33 @@ def _merge(z0: tuple, *zs: tuple):
 
 
 @_dispatch
-def _repeat_concat(z: B.Numeric):
+def _repeat_concat(xz: B.Numeric, z: B.Numeric):
     return z
 
 
 @_dispatch
-def _repeat_concat(zs: Parallel):
-    return _repeat_concat(*zs)
+def _repeat_concat(xz: Parallel, z: Parallel):
+    return _repeat_concat_parallel(*z, dims=data_dims(xz))
 
 
 @_dispatch
-def _repeat_concat(z0: B.Numeric, *zs: B.Numeric):
-    # Broadcast the data dimensions before concatenating.
+def _repeat_concat_parallel(z0: B.Numeric, *zs: B.Numeric, dims):
     zs = (z0,) + zs
-    # Broadcast the data dimensions.
+    # Broadcast the data dimensions. There are `dims` many of them, so perform a loop.
     shapes = [list(B.shape(z)) for z in zs]
-    shape_n = max(shape[2] for shape in shapes)
-    for shape in shapes:
-        shape[2] = shape_n
+    for i in range(B.rank(z0) - 1, B.rank(z0) - 1 - dims, -1):
+        shape_n = max(shape[i] for shape in shapes)
+        for shape in shapes:
+            shape[i] = shape_n
     zs = [B.broadcast_to(z, *shape) for (z, shape) in zip(zs, shapes)]
-    return B.concat(*zs, axis=1)
+    return B.concat(*zs, axis=-1 - dims)
 
 
 @register_module
 class Materialise:
-    """Materialise an aggregate encoding.
-
-    Args:
-        agg_x (function, optional): Aggregation of the inputs. Defaults to merging the
-            inputs.
-        agg_y (function, optional): Aggregation of the outputs. Defaults to
-            concatenating the outputs.
-        broadcast_y (bool, optional): Broadcast the data dimensions of the outputs
-            before performing `agg_y`. Defaults to `True`.
-
-    Attributes:
-        agg_x (function): Aggregation of the inputs.
-        agg_y (function): Aggregation of the outputs.
-        broadcast_y (bool): Broadcast the data dimensions of the outputs before
-            performing `agg_y`.
-    """
-
-    def __init__(self, agg_x=_merge, agg_y=_repeat_concat, broadcast_y=True):
-        self.agg_x = agg_x
-        self.agg_y = agg_y
-        self.broadcast_y = broadcast_y
+    """Materialise an aggregate encoding."""
 
 
 @_dispatch
 def code(coder: Materialise, xz, z, x, **kw_args):
-    return coder.agg_x(xz), coder.agg_y(z)
+    return _merge(xz), _repeat_concat(xz, z)

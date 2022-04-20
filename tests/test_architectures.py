@@ -2,7 +2,7 @@ import lab as B
 import numpy as np
 import pytest
 
-from .util import nps, generate_data  # noqa
+from .util import nps, approx, generate_data  # noqa
 
 
 def generate_arch_variations(name, **kw_args):
@@ -97,7 +97,18 @@ def test_architectures(nps, float64, construct_name, kw_args):
     assert np.isfinite(B.to_numpy(objective))
     assert B.dtype(objective) == nps.dtype
 
-    # Also check passing the edge case of an empty context set.
+    # Check that batching works correctly.
+    pred2 = model(
+        B.reshape(xc, 2, -1, *B.shape(xc, 1, 2)),
+        B.reshape(yc, 2, -1, *B.shape(yc, 1, 2)),
+        B.reshape(xt, 2, -1, *B.shape(xt, 1, 2)),
+        batch_size=2,
+        unused_arg=None,
+    )
+    approx(pred.mean, B.reshape(pred2.mean, -1, *B.shape(pred2.mean, 2, 3)))
+    approx(pred.var, B.reshape(pred2.var, -1, *B.shape(pred2.var, 2, 3)))
+
+    # Check passing the edge case of an empty context set.
     if isinstance(xc, B.Numeric):
         xc = xc[:, :, :0]
     elif isinstance(xc, tuple):
@@ -154,3 +165,67 @@ def test_transform_bounded(nps):
     # Check that predictions and samples satisfy the constraint.
     assert B.all(pred.mean > 10) and B.all(pred.mean < 11)
     assert B.all(pred.sample() > 10) and B.all(pred.sample() < 11)
+
+
+def test_convgnp_auxiliary_variable(nps):
+    model = nps.construct_convgnp(
+        dim_x=2,
+        dim_yc=(3, 1, 2),
+        dim_aux_t=4,
+        dim_yt=3,
+        num_basis_functions=16,
+        points_per_unit=16,
+        likelihood="lowrank",
+    )
+
+    observed_data = (
+        B.randn(nps.dtype, 16, 2, 10),
+        B.randn(nps.dtype, 16, 3, 10),
+    )
+    aux_var1 = (
+        B.randn(nps.dtype, 16, 2, 12),
+        B.randn(nps.dtype, 16, 1, 12),
+    )
+    aux_var2 = (
+        (B.randn(nps.dtype, 16, 1, 25), B.randn(nps.dtype, 16, 1, 35)),
+        B.randn(nps.dtype, 16, 2, 25, 35),
+    )
+    aux_var_t = B.randn(nps.dtype, 16, 4, 15)
+    pred = model(
+        [observed_data, aux_var1, aux_var2],
+        B.randn(nps.dtype, 16, 2, 15),
+        aux_t=aux_var_t,
+    )
+    mean, var = pred.mean, pred.var
+
+    # Check that the logpdf at the mean is finite and of the right data type.
+    objective = B.sum(pred.logpdf(pred.mean))
+    assert np.isfinite(B.to_numpy(objective))
+    assert B.dtype(objective) == nps.dtype
+
+
+def test_convgnp_masking(nps):
+    model = nps.construct_convgnp(
+        num_basis_functions=16,
+        points_per_unit=16,
+        conv_arch="dws",
+        dws_receptive_field=0.5,
+        dws_layers=1,
+        dws_channels=1,
+        # Dividing by the density channel makes the forward very sensitive to the
+        # numerics.
+        divide_by_density=False,
+    )
+    xc, yc, xt, yt = generate_data(nps)
+
+    # Predict without the final three points.
+    pred = model(xc[:, :, :-3], yc[:, :, :-3], xt)
+    # Predict using a mask instead.
+    mask = B.to_numpy(B.ones(yc))  # Perform assignment in NumPy.
+    mask[:, :, -3:] = 0
+    mask = B.cast(B.dtype(yc), mask)
+    pred_masked = model(xc, nps.Masked(yc, mask), xt)
+
+    # Check that they coincide.
+    approx(pred.mean, pred_masked.mean)
+    approx(pred.var, pred_masked.var)

@@ -1,7 +1,7 @@
 import lab as B
 
 from . import _dispatch
-from .util import register_module
+from .util import register_module, data_dims
 
 __all__ = ["AugmentedInput", "Augment"]
 
@@ -54,12 +54,8 @@ def code(
 
 @_dispatch
 def _augment(xz: AugmentedInput, z: B.Numeric):
-    return xz.x, B.concat(z, xz.augmentation, axis=1)
-
-
-@_dispatch
-def _augment(xz: AugmentedInput):
-    return xz.x
+    d = data_dims(xz.x)
+    return xz.x, B.concat(z, xz.augmentation, axis=-1 - d)
 
 
 @_dispatch
@@ -68,13 +64,10 @@ def _augment(xz: B.Numeric, z: B.Numeric):
 
 
 @_dispatch
-def _augment(xz: B.Numeric):
+def _augment(xz: AugmentedInput):
     return xz.x
 
 
 @_dispatch
-def _augment(xz: AugmentedInput, z=None):
-    if z is None:
-        return xz.x
-    else:
-        return xz.x, B.concat(z, xz.augmentation, axis=1)
+def _augment(xz: B.Numeric):
+    return xz

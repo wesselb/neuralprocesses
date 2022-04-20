@@ -43,20 +43,26 @@ def construct_gnp(
     )
     encoder = nps.Chain(
         nps.Parallel(
-            nps.InputsCoder(),
-            nps.DeepSet(
-                nps.MLP(
-                    in_dim=dim_x + dim_y,
-                    layers=(512,) * (num_enc_layers // 2),
-                    out_dim=dim_embedding,
-                    dtype=dtype,
+            nps.Chain(
+                nps.InputsCoder(),
+                nps.DeterministicLikelihood(),
+            ),
+            nps.Chain(
+                nps.DeepSet(
+                    nps.MLP(
+                        in_dim=dim_x + dim_y,
+                        layers=(512,) * (num_enc_layers // 2),
+                        out_dim=dim_embedding,
+                        dtype=dtype,
+                    ),
+                    nps.MLP(
+                        in_dim=dim_embedding,
+                        layers=(512,) * (num_enc_layers - num_enc_layers // 2),
+                        out_dim=dim_embedding,
+                        dtype=dtype,
+                    ),
                 ),
-                nps.MLP(
-                    in_dim=dim_embedding,
-                    layers=(512,) * (num_enc_layers - num_enc_layers // 2),
-                    out_dim=dim_embedding,
-                    dtype=dtype,
-                ),
+                nps.DeterministicLikelihood(),
             ),
         ),
     )

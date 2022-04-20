@@ -8,6 +8,7 @@ from .coding import code
 from .mask import Masked
 from .parallel import Parallel
 from .util import register_module
+from .dist import AbstractMultiOutputDistribution
 
 __all__ = ["Model"]
 
@@ -38,17 +39,20 @@ class Model:
             yc (tensor): Context outputs.
             xt (input): Target inputs.
             num_samples (int, optional): Number of samples, if applicable. Defaults
-                to `1`.
+                to 1.
             aux_t (tensor, optional): Target-specific auxiliary input, if applicable.
 
         Returns:
             tuple[input, tensor]: Target inputs and prediction for target outputs.
         """
+        # TODO: Handle random state.
+
         # Perform augmentation of `xt` with auxiliary target information.
         if aux_t is not None:
             xt = AugmentedInput(xt, aux_t)
 
         xz, z = code(self.encoder, xc, yc, xt, **kw_args)
+        z = _sample(z, num=num_samples)
         _, d = code(self.decoder, xz, z, xt, **kw_args)
 
         return d
@@ -84,3 +88,13 @@ class Model:
             + indent(repr(self.decoder), " " * 4)
             + "\n)"
         )
+
+
+@_dispatch
+def _sample(x: Parallel, num: B.Int = 1):
+    return Parallel(*[_sample(xi, num=num) for xi in x])
+
+
+@_dispatch
+def _sample(x: AbstractMultiOutputDistribution, num: B.Int = 1):
+    return x.sample(num=num)

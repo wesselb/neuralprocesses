@@ -31,6 +31,7 @@ def construct_convgnp(
     encoder_scales=None,
     decoder_scale=None,
     aux_t_mlp_layers=(128,) * 3,
+    divide_by_density=True,
     epsilon=1e-4,
     transform=None,
     dtype=None,
@@ -58,10 +59,10 @@ def construct_convgnp(
             Defaults to 64.
         margin (float, optional): Margin of the internal discretisation. Defaults to
             0.1.
-        likelihood (str, optional): Likelihood. Must be one of "het", "lowrank", or
-            "lowrank-correlated". Defaults to "lowrank".
+        likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank".
+            Defaults to `"lowrank"`.
         conv_arch (str, optional): Convolutional architecture to use. Must be one of
-            "unet" or "dws". Defaults to "unet.
+            `"unet"` or `"dws"`. Defaults to `"unet"`.
         unet_channels (tuple[int], optional): Channels of every layer of the UNet.
             Defaults to six layers each with 64 channels.
         unet_kernels (int or tuple[int], optional): Sizes of the kernels in the UNet.
@@ -87,6 +88,8 @@ def construct_convgnp(
         aux_t_mlp_layers (tuple[int], optional): Widths of the layers of the MLP
             for the target-specific auxiliary variable. Defaults to three layers of
             width 128.
+        divide_by_density (bool, optional): Divide by the density channel. Defaults
+            to `True`.
         epsilon (float, optional): Epsilon added by the set convolutions before
             dividing by the density channel. Defaults to `1e-4`.
         transform (str or tuple[float, float], optional): Bijection applied to the
@@ -194,6 +197,12 @@ def construct_convgnp(
         *(nps.SetConv(s, dtype=dtype) for s in encoder_scales)
     )
 
+    # Check if we want to divide by the density channel.
+    if divide_by_density:
+        density_divisor = nps.DivideByFirstChannel(epsilon=epsilon)
+    else:
+        density_divisor = lambda x: x
+
     # Resolve length scale for decoder.
     decoder_scale = decoder_scale or 2 / disc.points_per_unit
 
@@ -204,8 +213,9 @@ def construct_convgnp(
             nps.Chain(
                 nps.PrependDensityChannel(),
                 encoder_set_conv,
-                nps.DivideByFirstChannel(epsilon=epsilon),
+                density_divisor,
                 nps.Materialise(),
+                nps.DeterministicLikelihood()
             ),
         ),
         nps.Chain(

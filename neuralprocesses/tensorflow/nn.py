@@ -2,12 +2,13 @@ from functools import partial
 from typing import Optional, Union
 
 import lab.tensorflow as B
+import neuralprocesses as nps
 import numpy as np
 import tensorflow as tf
 from plum import convert
 
-import neuralprocesses as nps
 from .. import _dispatch
+from ..util import compress_batch_dimensions
 
 __all__ = ["num_params", "Module"]
 
@@ -41,6 +42,26 @@ class ChannelsToLast(tf.keras.Model):
         rank = B.rank(x)
         perm = [0] + list(range(2, rank)) + [1]
         return B.transpose(x, perm=perm)
+
+
+class CompressBatchDimensions(tf.keras.Model):
+    """Compress batch dimensions.
+
+    Args:
+        module (module): Module to wrap.
+        other_dims (int): Number of other dimensions.
+        dtype (dtype, optional): Data type.
+    """
+
+    def __init__(self, module, other_dims, dtype=None):
+        super().__init__(dtype=dtype)
+        self.module = module
+        self.other_dims = other_dims
+
+    def call(self, x, training=False):
+        x, uncompress = compress_batch_dimensions(x, self.other_dims)
+        x = self.module(x)
+        return uncompress(x)
 
 
 def ConvNd(
@@ -228,8 +249,12 @@ def LayerNorm(*sizes: Union[int, None], dtype=None):
     Returns:
         object: Layer normalisation.
     """
-    return tf.keras.layers.LayerNormalization(
-        [-len(sizes) + i for i, s in enumerate(sizes) if s is not None],
+    return CompressBatchDimensions(
+        tf.keras.layers.LayerNormalization(
+            [-len(sizes) + i for i, s in enumerate(sizes) if s is not None],
+            dtype=dtype,
+        ),
+        len(sizes),
         dtype=dtype,
     )
 
@@ -294,7 +319,7 @@ class Interface:
     AvgPool2d = partial(AvgPoolNd, dim=2)
     AvgPool3d = partial(AvgPoolNd, dim=3)
 
-    LayerNorm = LayerNorm
+    LayerNorm = staticmethod(LayerNorm)
 
     @staticmethod
     def Parameter(x, dtype=None):
