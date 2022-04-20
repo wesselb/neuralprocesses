@@ -196,12 +196,26 @@ parser.add_argument("--learnable_channel", action="store_true")
 parser.add_argument("--subdir", type=str, nargs="*")
 parser.add_argument(
     "--model",
-    choices=["cnp", "convcnp", "convgnp-linear", "fullconvgnp"],
-    required=True,
+    choices=[
+        "cnp",
+        "gnp",
+        "acnp",
+        "agnp",
+        "convcnp",
+        "convgnp-linear",
+        "fullconvgnp",
+    ],
+    default="convcnp",
 )
 parser.add_argument(
     "--data",
-    choices=["eq", "matern", "weakly-periodic", "sawtooth", "mixture"],
+    choices=[
+        "eq",
+        "matern",
+        "weakly-periodic",
+        "sawtooth",
+        "mixture",
+    ],
     default="eq",
 )
 args = parser.parse_args()
@@ -270,7 +284,35 @@ else:
     raise RuntimeError("Could not determine kernel for input dimensionality.")
 
 # Construct the model.
-if args.model == "convcnp":
+if args.model == "cnp":
+    model = nps.construct_gnp(
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        likelihood="het",
+    )
+    run_model = model
+elif args.model == "gnp":
+    model = nps.construct_gnp(
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        likelihood="lowrank",
+    )
+    run_model = model
+elif args.model == "acnp":
+    model = nps.construct_agnp(
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        likelihood="het",
+    )
+    run_model = model
+elif args.model == "agnp":
+    model = nps.construct_agnp(
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        likelihood="lowrank",
+    )
+    run_model = model
+elif args.model == "convcnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
         dim_x=args.dim_x,
@@ -281,13 +323,6 @@ if args.model == "convcnp":
         dws_channels=dws_channels,
         dws_receptive_field=dws_receptive_field,
         margin=args.margin,
-    )
-    run_model = model
-elif args.model == "cnp":
-    model = nps.construct_gnp(
-        dim_x=args.dim_x,
-        dim_y=args.dim_y,
-        likelihood="het",
     )
     run_model = model
 elif args.model == "convgnp-linear":
