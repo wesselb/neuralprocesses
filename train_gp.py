@@ -95,6 +95,7 @@ def plot_first_of_batch(gen, model):
             batch["xc"],
             batch["yc"],
             x,
+            dtype_enc_sample=torch.float32,
             dtype_lik=torch.float64,
             noiseless=True,
         )
