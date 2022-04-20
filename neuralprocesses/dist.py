@@ -25,21 +25,21 @@ class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def mean(self):
-        """tensor: Marginal means of shape `(b, c, n)`."""
+        """tensor: Marginal means of shape `(*b, c, n)`."""
 
     @abc.abstractmethod
     def var(self):
-        """tensor: Marginal variances of shape `(b, c, n)`."""
+        """tensor: Marginal variances of shape `(*b, c, n)`."""
 
     @abc.abstractmethod
     def logpdf(self, x):
         """Compute the log-pdf at inputs `x`.
 
         Args:
-            x (tensor): Inputs of shape `(b, c, n)`.
+            x (tensor): Inputs of shape `(*b, c, n)`.
 
         Returns:
-            tensor: Log-pdfs of shape `(b,)`.
+            tensor: Log-pdfs of shape `(*b,)`.
         """
 
     @abc.abstractmethod
@@ -51,7 +51,8 @@ class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
             num (int, optional): Number of samples. Defaults to one.
 
         Returns:
-            tensor: Samples of shape `(b, num, c, n)`.
+            tensor: Samples of shape `(num, *b, c, n)` if `num > 1` and of shape .
+                `(*b, c, n)` otherwise.
         """
 
     def kl(self, other):
@@ -61,7 +62,7 @@ class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
             other (:class:`.AbstractMultiOutputDistribution`): Other.
 
         Returns:
-            tensor: KL-divergences `kl(self, other)` of shape `(b,)`.
+            tensor: KL-divergences `kl(self, other)` of shape `(*b,)`.
         """
         raise NotImplementedError(
             f"Cannot compute the KL-divergence between {self} and {other}."
@@ -71,7 +72,7 @@ class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
         """Compute entropy.
 
         Returns:
-            tensor: Entropies of shape `(b,)`.
+            tensor: Entropies of shape `(*b,)`.
         """
         raise NotImplementedError(f"Cannot compute the entropy of {self}.")
 
@@ -80,7 +81,7 @@ class Dirac(AbstractMultiOutputDistribution):
     """A Dirac delta.
 
     Args:
-        x (tensor): Position of the Dirac delta of shape `(b, c, n)`.
+        x (tensor): Position of the Dirac delta of shape `(*b, c, n)`.
     """
 
     def __init__(self, x):
@@ -103,19 +104,22 @@ class Dirac(AbstractMultiOutputDistribution):
 
     def logpdf(self, x):
         with B.on_device(self.x):
-            return B.zeros(B.dtype(self.x), B.shape(x, 0))
+            return B.zeros(B.dtype(self.x), *batch(x, 2))
 
     @_dispatch
     def sample(self, state: B.RandomState, num=1):
-        return state, self.x
+        return state, self.sample(num=num)
 
     @_dispatch
     def sample(self, num=1):
-        return self.x
+        if num == 1:
+            return self.x
+        else:
+            return self.x[None, ...]
 
     def kl(self, other: "Dirac"):
         with B.on_device(self.x):
-            return B.zeros(B.dtype(self.x), B.shape(x, 0))
+            return B.zeros(B.dtype(self.x), *batch(x, 2))
 
 
 @_dispatch
@@ -154,8 +158,8 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
         """Construct a dense multi-output normal distribution.
 
         Args:
-            mean (tensor): Mean of shape `(b, c, n)`.
-            var (tensor): Variance of shape `(b, c, n, c, n)`.
+            mean (tensor): Mean of shape `(*b, c, n)`.
+            var (tensor): Variance of shape `(*b, c, n, c, n)`.
         """
         c, n = B.shape(mean, -2, -1)
         return cls(
@@ -171,8 +175,8 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
         """Construct a diagonal multi-output normal distribution.
 
         Args:
-            mean (tensor): Mean of shape `(b, c, n)`.
-            var (tensor): Marginal variances of shape `(b, c, n)`.
+            mean (tensor): Mean of shape `(*b, c, n)`.
+            var (tensor): Marginal variances of shape `(*b, c, n)`.
         """
         c, n = B.shape(mean, -2, -1)
         return cls(
@@ -194,13 +198,13 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
         """Construct a low-rank multi-output normal distribution.
 
         Args:
-            mean (tensor): Mean of shape `(b, c, n)`.
+            mean (tensor): Mean of shape `(*b, c, n)`.
             var_diag (tensor): Diagonal part of the low-rank variance of shape
-                `(b, c, n)`.
+                `(*b, c, n)`.
             var_factor (tensor): Factors of the low-rank variance of shape
-                `(b, c * num_factors, n)`.
+                `(*b, c * num_factors, n)`.
             var_middle (tensor, optional): Covariance of the factors of shape
-                `(b, num_factors, num_factors)`.
+                `(*b, num_factors, num_factors)`.
         """
         c, n = B.shape(mean, -2, -1)
         # Separate out factor channels.
@@ -244,10 +248,17 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
         return self.normal.logpdf(B.reshape(x, *batch(x, 2), -1, 1))
 
     def sample(self, *args, **kw_args):
-        def f(res):
-            # Reshape sample to have the right size.
-            res = B.transpose(res)  # Put the sample dimension second to last.
-            return self._unreshape(res)
+        def f(sample):
+            # Put the sample dimension first.
+            perm = list(range(B.rank(sample)))
+            perm = [perm[-1]] + perm[:-1]
+            sample = B.transpose(sample, perm=perm)
+            # Separate out outputs.
+            sample = self._unreshape(sample)
+            # If there was only one sample, squeeze the sample dimension.
+            if B.shape(sample, 0) == 1:
+                sample = sample[0, ...]
+            return sample
 
         return _map_sample_output(f, self.normal.sample(*args, **kw_args))
 

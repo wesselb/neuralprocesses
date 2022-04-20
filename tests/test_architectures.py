@@ -96,6 +96,11 @@ def test_architectures(nps, float64, construct_name, kw_args):
     # Check that the objective is finite and of the right data type.
     assert np.isfinite(B.to_numpy(objective))
     assert B.dtype(objective) == nps.dtype
+    # Check mean, variance, and samples.
+    assert B.shape(pred.mean) == B.shape(yt)
+    assert B.shape(pred.var) == B.shape(yt)
+    assert B.shape(pred.sample()) == B.shape(yt)
+    assert B.shape(pred.sample(2)) == (2,) + B.shape(yt)
 
     # Check that batching works correctly.
     pred2 = model(
@@ -121,6 +126,11 @@ def test_architectures(nps, float64, construct_name, kw_args):
     # Again check that the objective is finite and of the right data type.
     assert np.isfinite(B.to_numpy(objective))
     assert B.dtype(objective) == nps.dtype
+    # Check mean, variance, and samples.
+    assert B.shape(pred.mean) == B.shape(yt)
+    assert B.shape(pred.var) == B.shape(yt)
+    assert B.shape(pred.sample()) == B.shape(yt)
+    assert B.shape(pred.sample(2)) == (2,) + B.shape(yt)
 
 
 def test_transform_positive(nps):
@@ -142,7 +152,7 @@ def test_transform_positive(nps):
     assert np.isfinite(B.to_numpy(objective))
     # Check that predictions and samples satisfy the constraint.
     assert B.all(pred.mean > 0)
-    assert B.all(pred.sample() > 0)
+    assert B.all(pred.sample(2) > 0)
 
 
 def test_transform_bounded(nps):
@@ -227,6 +237,6 @@ def test_convgnp_masking(nps):
     mask = B.cast(B.dtype(yc), mask)
     pred_masked = model(xc, nps.Masked(yc, mask), xt)
 
-    # Check that they coincide.
+    # Check that the two ways of doing it coincide.
     approx(pred.mean, pred_masked.mean)
     approx(pred.var, pred_masked.var)

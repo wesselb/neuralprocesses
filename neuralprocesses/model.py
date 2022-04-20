@@ -5,10 +5,10 @@ from plum import List, Tuple, Union
 from . import _dispatch
 from .augment import AugmentedInput
 from .coding import code
+from .dist import AbstractMultiOutputDistribution
 from .mask import Masked
 from .parallel import Parallel
 from .util import register_module
-from .dist import AbstractMultiOutputDistribution
 
 __all__ = ["Model"]
 
@@ -91,10 +91,10 @@ class Model:
 
 
 @_dispatch
-def _sample(x: Parallel, num: B.Int = 1):
-    return Parallel(*[_sample(xi, num=num) for xi in x])
+def _sample(x: AbstractMultiOutputDistribution, num: B.Int = 1):
+    return x.sample(num=num)
 
 
 @_dispatch
-def _sample(x: AbstractMultiOutputDistribution, num: B.Int = 1):
-    return x.sample(num=num)
+def _sample(x: Parallel, num: B.Int = 1):
+    return Parallel(*[_sample(xi, num=num) for xi in x])

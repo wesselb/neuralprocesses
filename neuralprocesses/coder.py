@@ -46,14 +46,14 @@ class DeepSet:
     """Deep set.
 
     Args:
-        phi (function): Pre-aggregation function.
-        rho (function): Post-aggregation function.
-        agg (function, optional): Aggregation function. Defaults to summing.
+        phi (object): Pre-aggregation function.
+        rho (object): Post-aggregation function.
+        agg (object, optional): Aggregation function. Defaults to summing.
 
     Attributes:
-        phi (function): Pre-aggregation function.
-        rho (function): Post-aggregation function.
-        agg (function): Aggregation function.
+        phi (object): Pre-aggregation function.
+        rho (object): Post-aggregation function.
+        agg (object): Aggregation function.
     """
 
     def __init__(
