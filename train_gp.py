@@ -172,7 +172,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--subdir", type=str, nargs="*")
 parser.add_argument("--dim_x", type=int, default=1)
 parser.add_argument("--dim_y", type=int, default=1)
-parser.add_argument("--epochs", type=int, default=100)
+parser.add_argument("--epochs", type=int, default=200)
 parser.add_argument("--rate", type=float, default=1e-4)
 parser.add_argument("--batch_size", type=int, default=16)
 parser.add_argument(
@@ -193,7 +193,7 @@ parser.add_argument(
     default="convcnp",
 )
 parser.add_argument("--arch", type=str)
-parser.add_argument("--margin", type=float, default=2)
+parser.add_argument("--margin", type=float, default=0.1)
 parser.add_argument("--receptive_field", type=float, default=2)
 parser.add_argument(
     "--data",
@@ -408,15 +408,25 @@ out.kv("Number of parameters", nps.num_params(model))
 
 # Setup objective.
 if args.objective == "loglik":
-    objective = partial(nps.loglik, model, num_samples=args.num_samples, normalise=True)
+    objective = partial(
+        nps.loglik,
+        model,
+        num_samples=args.num_samples,
+        normalise=True,
+    )
 elif args.objective == "elbo":
-    objective = partial(nps.elbo, model, num_samples=args.num_samples, normalise=True)
+    objective = partial(
+        nps.elbo,
+        model,
+        num_samples=args.num_samples,
+        normalise=True,
+    )
 else:
     raise RuntimeError(f'Invalid objective "{args.objective}".')
 
 # Setup training loop.
 opt = torch.optim.Adam(model.parameters(), args.rate)
-best_eval_loss = np.inf
+best_eval_lik = np.inf
 
 for i in range(args.epochs):
     with out.Section(f"Epoch {i + 1}"):
@@ -430,9 +440,9 @@ for i in range(args.epochs):
         val = eval(gen_eval, objective)
 
         # Check if the model is the new best. If so, save it.
-        if val < best_eval_loss:
+        if val > best_eval_lik:
             out.out("New best model!")
-            best_eval_loss = val
+            best_eval_lik = val
             torch.save(model.state_dict(), wd.file(f"model-best.torch"))
 
         # Visualise a prediction by the model.
