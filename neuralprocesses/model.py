@@ -294,8 +294,8 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
 
     # Produce noiseless samples.
     pred_noiseless = model(
-        batch["xc"],
-        batch["yc"],
+        xc,
+        yc,
         x,
         dtype_enc_sample=torch.float32,
         dtype_lik=torch.float64,
