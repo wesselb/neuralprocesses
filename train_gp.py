@@ -72,14 +72,14 @@ def with_err(vals):
     return f"{mean:8.4f} +- {err:8.4f}"
 
 
-def first_np(x):
+def first_np(x, i=0):
     """Get the first batch and convert to NumPy."""
     if B.rank(x) == 2:
         return B.to_numpy(x[0, :])
     elif B.rank(x) == 3:
-        return B.to_numpy(x[0, 0, :])
+        return B.to_numpy(x[0, i, :])
     elif B.rank(x) == 4:
-        return B.transpose(B.to_numpy(x[:, 0, 0, :]))
+        return B.transpose(B.to_numpy(x[:, 0, i, :]))
     else:
         raise ValueError(f"Rank must be two, three, or four.")
 
@@ -91,82 +91,90 @@ def plot_first_of_batch(model, gen, *, name, epoch):
     # Define points to predict at.
     with B.on_device(batch["xt"]):
         x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
-        x = B.tile(x, B.shape(batch["xt"], 0), 1, 1)
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
-        mean, var, samples = nps.predict(model, batch["xc"], batch["yc"], x)
-
-    plt.figure(figsize=(6, 4))
-
-    # Plot context and target.
-    plt.scatter(
-        first_np(batch["xc"]),
-        first_np(batch["yc"]),
-        label="Context",
-        style="train",
-        s=20,
-    )
-    plt.scatter(
-        first_np(batch["xt"]),
-        first_np(batch["yt"]),
-        label="Target",
-        style="test",
-        s=20,
-    )
-
-    # Plot prediction.
-    err = 1.96 * B.sqrt(var)
-    plt.plot(
-        first_np(x),
-        first_np(mean),
-        label="Prediction",
-        style="pred",
-    )
-    plt.fill_between(
-        first_np(x),
-        first_np(mean - err),
-        first_np(mean + err),
-        style="pred",
-    )
-    plt.plot(
-        first_np(x),
-        first_np(samples),
-        style="pred",
-        ls="-",
-        lw=0.5,
-    )
-
-    # Plot prediction by ground truth.
-    if hasattr(gen, "kernel"):
-        f = stheno.GP(gen.kernel)
-        # Make sure that everything is of `float64`s and on the GPU.
-        noise = B.to_active_device(B.cast(torch.float64, gen.noise))
-        xc = B.transpose(B.cast(torch.float64, batch["xc"]))
-        yc = B.transpose(B.cast(torch.float64, batch["yc"]))
-        x = B.transpose(B.cast(torch.float64, x))
-        # Compute posterior GP.
-        f_post = f | (f(xc, noise), yc)
-        mean, lower, upper = f_post(x).marginal_credible_bounds()
-        plt.plot(
-            first_np(B.transpose(x)),
-            first_np(mean),
-            label="Truth",
-            style="pred2",
-        )
-        plt.plot(
-            first_np(B.transpose(x)),
-            first_np(lower),
-            style="pred2",
-        )
-        plt.plot(
-            first_np(B.transpose(x)),
-            first_np(upper),
-            style="pred2",
+        mean, var, samples = nps.predict(
+            model,
+            batch["xc"][:1, ...],
+            batch["yc"][:1, ...],
+            x,
         )
 
-    plt.xlim(B.min(x), B.max(x))
-    tweak()
+    plt.figure(figsize=(8, 6 * args.dim_y))
+
+    for i in range(args.dim_y):
+        plt.subplot(args.dim_y, 1, 1 + i)
+
+        # Plot context and target.
+        plt.scatter(
+            first_np(batch["xc"]),
+            first_np(batch["yc"], i),
+            label="Context",
+            style="train",
+            s=20,
+        )
+        plt.scatter(
+            first_np(batch["xt"]),
+            first_np(batch["yt"], i),
+            label="Target",
+            style="test",
+            s=20,
+        )
+
+        # Plot prediction.
+        err = 1.96 * B.sqrt(var)
+        plt.plot(
+            first_np(x),
+            first_np(mean, i),
+            label="Prediction",
+            style="pred",
+        )
+        plt.fill_between(
+            first_np(x),
+            first_np(mean - err, i),
+            first_np(mean + err, i),
+            style="pred",
+        )
+        plt.plot(
+            first_np(x),
+            first_np(samples, i),
+            style="pred",
+            ls="-",
+            lw=0.5,
+        )
+
+        # Plot prediction by ground truth.
+        if hasattr(gen, "kernel") and args.dim_y == 1:
+            f = stheno.GP(gen.kernel)
+            # Make sure that everything is of `float64`s and on the GPU.
+            noise = B.to_active_device(B.cast(torch.float64, gen.noise))
+            xc = B.transpose(B.cast(torch.float64, batch["xc"]))
+            yc = B.transpose(B.cast(torch.float64, batch["yc"]))
+            x = B.transpose(B.cast(torch.float64, x))
+            # Compute posterior GP.
+            f_post = f | (f(xc, noise), yc)
+            mean, lower, upper = f_post(x).marginal_credible_bounds()
+            plt.plot(
+                first_np(B.transpose(x)),
+                first_np(mean),
+                label="Truth",
+                style="pred2",
+            )
+            plt.plot(
+                first_np(B.transpose(x)),
+                first_np(lower),
+                style="pred2",
+            )
+            plt.plot(
+                first_np(B.transpose(x)),
+                first_np(upper),
+                style="pred2",
+            )
+
+        plt.xlim(B.min(x), B.max(x))
+        tweak()
+
     plt.savefig(wd.file(f"{name}-{epoch:03d}.pdf"))
     plt.close()
 
@@ -304,7 +312,7 @@ gens_eval = [
 
 # Setup architectures.
 width = 256
-dim_embedding = 128
+dim_embedding = 256
 num_heads = 8
 num_layers = 6
 unet_channels = (64,) * num_layers
@@ -488,7 +496,7 @@ if args.evaluate:
     model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
 
     # Visualise some predictions by the model.
-    if args.dim_x == 1 and args.dim_y == 1:
+    if args.dim_x == 1:
         for i in range(10):
             plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
 
