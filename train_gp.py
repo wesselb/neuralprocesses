@@ -293,7 +293,7 @@ gens_eval = [
     for name, x_range_context, x_range_target in [
         ("interpolation in training range", (-2, 2), (-2, 2)),
         ("interpolation beyond training range", (2, 6), (2, 6)),
-        ("extrapolation beyond training range", (0, 2), (2, 4)),
+        ("extrapolation beyond training range", (-2, 2), (2, 6)),
     ]
 ]
 
