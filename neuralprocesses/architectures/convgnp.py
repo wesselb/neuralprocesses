@@ -47,7 +47,7 @@ def _convgnp_construct_encoder_setconvs(
     if encoder_scales is not None:
         encoder_scales = factor * encoder_scales
     else:
-        encoder_scales = disc.points_per_unit
+        encoder_scales = 2 / disc.points_per_unit
     # Ensure that there is one for every context set.
     if not isinstance(encoder_scales, (tuple, list)):
         encoder_scales = (encoder_scales,) * len(dim_yc)
