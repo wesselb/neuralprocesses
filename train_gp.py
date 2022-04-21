@@ -191,7 +191,7 @@ parser.add_argument(
     ],
     default="convcnp",
 )
-parser.add_argument("--arch", type=str)
+parser.add_argument("--arch", choices=["unet", "dws"], default="unet")
 parser.add_argument("--margin", type=float, default=0.1)
 parser.add_argument("--receptive_field", type=float, default=2)
 parser.add_argument(
@@ -216,19 +216,15 @@ parser.add_argument(
 parser.add_argument("--evaluate_num_samples", type=int, default=4096)
 args = parser.parse_args()
 
-# Ensure that the `arch` is and only is specified when it is required.
-models_which_require_arch = {
+# Remove the architecture argument if a model doesn't use it.
+models_which_use_arch = {
     "convcnp",
     "convgnp",
     "convnp",
     "fullconvgnp",
 }
-if args.model in models_which_require_arch and not args.arch:
-    raise RuntimeError(f"Model requires a choice of architecture. Please set `--arch`.")
-elif args.model not in models_which_require_arch and args.arch:
-    raise RuntimeError(
-        f"Model does not allow choice of architecture. Please unset `--arch`."
-    )
+if args.model not in models_which_use_arch:
+    args.arch = None
 
 # Setup script.
 out.report_time = True
