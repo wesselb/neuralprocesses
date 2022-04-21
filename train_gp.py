@@ -72,29 +72,22 @@ def with_err(vals):
     return f"{mean:8.4f} +- {err:8.4f}"
 
 
-def first_np(x, i=0):
-    """Get the first batch and convert to NumPy."""
-    if B.rank(x) == 2:
-        return B.to_numpy(x[0, :])
-    elif B.rank(x) == 3:
-        return B.to_numpy(x[0, i, :])
-    elif B.rank(x) == 4:
-        return B.transpose(B.to_numpy(x[:, 0, i, :]))
-    else:
-        raise ValueError(f"Rank must be two, three, or four.")
-
-
 def plot_first_of_batch(model, gen, *, name, epoch):
     """Plot the prediction for the first element of a batch."""
-    if args.dim_x > 1:
-        # TODO: Implement this.
-        return
+    if args.dim_x == 1:
+        plot_first_of_batch_1d(model, gen, name=name, epoch=epoch)
+    elif args.dim_x == 2:
+        plot_first_of_batch_2d(model, gen, name=name, epoch=epoch)
+    else:
+        pass  # Not implemented. Just do nothing.
 
+
+def plot_first_of_batch_1d(model, gen, *, name, epoch):
     batch = gen.generate_batch()
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
-        x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)[None, None, :]
+        x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
@@ -102,7 +95,7 @@ def plot_first_of_batch(model, gen, *, name, epoch):
             model,
             batch["xc"][:1, ...],
             batch["yc"][:1, ...],
-            x,
+            x[None, None, :],
         )
 
     plt.figure(figsize=(8, 6 * args.dim_y))
@@ -112,15 +105,15 @@ def plot_first_of_batch(model, gen, *, name, epoch):
 
         # Plot context and target.
         plt.scatter(
-            first_np(batch["xc"]),
-            first_np(batch["yc"], i),
+            batch["xc"][0, 0],
+            batch["yc"][0, i],
             label="Context",
             style="train",
             s=20,
         )
         plt.scatter(
-            first_np(batch["xt"]),
-            first_np(batch["yt"], i),
+            batch["xt"][0, 0],
+            batch["yt"][0, i],
             label="Target",
             style="test",
             s=20,
@@ -129,20 +122,20 @@ def plot_first_of_batch(model, gen, *, name, epoch):
         # Plot prediction.
         err = 1.96 * B.sqrt(var)
         plt.plot(
-            first_np(x),
-            first_np(mean, i),
+            x,
+            mean[0, i],
             label="Prediction",
             style="pred",
         )
         plt.fill_between(
-            first_np(x),
-            first_np(mean - err, i),
-            first_np(mean + err, i),
+            x,
+            mean[0, i] - err[0, i],
+            mean[0, i] + err[0, i],
             style="pred",
         )
         plt.plot(
-            first_np(x),
-            first_np(samples, i),
+            x,
+            samples[:, 0, i].T,
             style="pred",
             ls="-",
             lw=0.5,
@@ -153,31 +146,105 @@ def plot_first_of_batch(model, gen, *, name, epoch):
             f = stheno.GP(gen.kernel)
             # Make sure that everything is of `float64`s and on the GPU.
             noise = B.to_active_device(B.cast(torch.float64, gen.noise))
-            xc = B.transpose(B.cast(torch.float64, batch["xc"]))
-            yc = B.transpose(B.cast(torch.float64, batch["yc"]))
-            x = B.transpose(B.cast(torch.float64, x))
+            xc = B.cast(torch.float64, batch["xc"][0, 0])
+            yc = B.cast(torch.float64, batch["yc"][0, 0])
+            x = B.cast(torch.float64, x)
             # Compute posterior GP.
             f_post = f | (f(xc, noise), yc)
             mean, lower, upper = f_post(x).marginal_credible_bounds()
-            plt.plot(
-                first_np(B.transpose(x)),
-                first_np(mean),
-                label="Truth",
-                style="pred2",
-            )
-            plt.plot(
-                first_np(B.transpose(x)),
-                first_np(lower),
-                style="pred2",
-            )
-            plt.plot(
-                first_np(B.transpose(x)),
-                first_np(upper),
-                style="pred2",
-            )
+            plt.plot(x, mean, label="Truth", style="pred2")
+            plt.plot(x, lower, style="pred2")
+            plt.plot(x, upper, style="pred2")
 
         plt.xlim(B.min(x), B.max(x))
         tweak()
+
+    plt.savefig(wd.file(f"{name}-{epoch:03d}.pdf"))
+    plt.close()
+
+
+def plot_first_of_batch_2d(model, gen, *, name, epoch):
+    batch = gen.generate_batch()
+
+    # Define points to predict at.
+    with B.on_device(batch["xt"]):
+        x = B.linspace(B.dtype(batch["xt"]), -2, 2, 200)[None, None, :]
+
+    # Predict with model and produce five noiseless samples.
+    with torch.no_grad():
+        mean, var, samples = nps.predict(
+            model,
+            batch["xc"][:1, ...],
+            batch["yc"][:1, ...],
+            (x, x),
+        )
+
+    vmin = max(B.max(mean), B.max(samples))
+    vmax = min(B.min(mean), B.min(samples))
+
+    def plot_imshow(image, i, label):
+        plt.imshow(
+            image.T,
+            cmap="viridis",
+            vmin=vmax,
+            vmax=vmin,
+            origin="lower",
+            extent=[-2, 2, -2, 2],
+            label=label,
+        )
+
+        plt.scatter(
+            batch["xc"][0, 0],
+            batch["xc"][0, 1],
+            c=batch["yc"][0, i],
+            cmap="viridis",
+            vmin=vmax,
+            vmax=vmin,
+            edgecolor="white",
+            linewidth=0.5,
+            s=80,
+            label="Context",
+        )
+        plt.scatter(
+            batch["xt"][0, 0],
+            batch["xt"][0, 1],
+            c=batch["yt"][0, i],
+            cmap="viridis",
+            vmin=vmax,
+            vmax=vmin,
+            edgecolor="black",
+            linewidth=0.5,
+            s=80,
+            marker="d",
+            label="Target",
+        )
+        # Remove ticks, because those are noisy.
+        plt.gca().set_xticks([])
+        plt.gca().set_yticks([])
+
+    plt.figure(figsize=(12, 4 * args.dim_y))
+
+    for i in range(args.dim_y):
+        # Plot mean.
+        plt.subplot(args.dim_y, 3, 1 + i * 3)
+        if i == 0:
+            plt.title("Mean")
+        plot_imshow(mean[0, i], i, label="Mean")
+        tweak(grid=False)
+
+        # Plot first sample.
+        plt.subplot(args.dim_y, 3, 2 + i * 3)
+        if i == 0:
+            plt.title("Sample")
+        plot_imshow(samples[0, 0, i], i, label="Sample 1")
+        tweak(grid=False)
+
+        # Plot second sample.
+        plt.subplot(args.dim_y, 3, 3 + i * 3)
+        if i == 0:
+            plt.title("Sample")
+        plot_imshow(samples[1, 0, i], i, label="Sample 2")
+        tweak(grid=False)
 
     plt.savefig(wd.file(f"{name}-{epoch:03d}.pdf"))
     plt.close()

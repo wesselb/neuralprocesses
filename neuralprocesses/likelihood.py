@@ -205,17 +205,7 @@ def code(
         with B.on_device(noise):
             noise = B.zeros(noise)
 
-    pred = MultiOutputNormal.lowrank(mean, noise, var_factor, shape)
-
-    # If the noise was removed, convert the variance to dense, because the matrix
-    # inversion lemma will otherwise fail.
-    if noiseless:
-        pred = MultiOutputNormal(
-            Normal(pred.normal.mean, B.dense(pred.normal.var)),
-            pred.shape,
-        )
-
-    return xz, pred
+    return xz, MultiOutputNormal.lowrank(mean, noise, var_factor, shape)
 
 
 @register_module
