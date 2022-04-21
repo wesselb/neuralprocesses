@@ -217,7 +217,7 @@ def loglik(
     **kw_args,
 ):
     state = B.global_random_state(B.dtype(xt))
-    state, logpdfs = loglik(state, model, xc, yc, xt, **kw_args)
+    state, logpdfs = loglik(state, model, xc, yc, xt, yt, **kw_args)
     B.set_global_random_state(state)
     return logpdfs
 
@@ -296,7 +296,7 @@ def elbo(
     **kw_args,
 ):
     state = B.global_random_state(B.dtype(xt))
-    state, elbos = elbo(state, model, xc, yc, xt, **kw_args)
+    state, elbos = elbo(state, model, xc, yc, xt, yt, **kw_args)
     B.set_global_random_state(state)
     return elbo
 
