@@ -1,12 +1,14 @@
-import numpy as np
 import lab as B
+import numpy as np
+import pytest
 
 from .test_architectures import generate_data
 from .util import nps  # noqa
 
 
-def test_loglik_batching(nps):
-    model = nps.construct_gnp()
+@pytest.mark.parametrize("dim_lv", [0, 4])
+def test_loglik_batching(nps, dim_lv):
+    model = nps.construct_gnp(dim_lv=dim_lv)
     xc, yc, xt, yt = generate_data(nps)
     # Test a high number of samples, a number which also isn't a multiple of the batch
     # size.

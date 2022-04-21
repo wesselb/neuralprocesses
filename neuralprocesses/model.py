@@ -204,6 +204,14 @@ def loglik(
             **kw_args,
         )
         this_logpdfs = pred.logpdf(B.cast(float64, yt))
+
+        # If the number of samples is equal to one but `num_samples > 1`, then the
+        # likelihood was a `Dirac`, so we can stop batching.
+        if num_samples > 1 and B.shape(this_logpdfs, 0) == 1:
+            logpdfs = this_logpdfs
+            break
+
+        # Record current samples.
         if logpdfs is None:
             logpdfs = this_logpdfs
         else:
