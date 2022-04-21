@@ -84,7 +84,7 @@ def first_np(x):
         raise ValueError(f"Rank must be two, three, or four.")
 
 
-def plot_first_of_batch(model, gen, *, epoch, name_prefix):
+def plot_first_of_batch(model, gen, *, name, epoch):
     """Plot the prediction for the first element of a batch."""
     batch = gen.generate_batch()
 
@@ -167,7 +167,7 @@ def plot_first_of_batch(model, gen, *, epoch, name_prefix):
 
     plt.xlim(B.min(x), B.max(x))
     tweak()
-    plt.savefig(wd.file(f"{name_prefix}-epoch-{epoch:03d}.pdf"))
+    plt.savefig(wd.file(f"{name}-{epoch:03d}.pdf"))
     plt.close()
 
 
@@ -445,6 +445,11 @@ if args.evaluate:
     # Perform evaluation. First, load the best model.
     model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
 
+    # Visualise some predictions by the model.
+    if args.dim_x == 1 and args.dim_y == 1:
+        for i in range(10):
+            plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i)
+
     for name, gen in gens_eval:
         with out.Section(name.capitalize()):
             eval(state, model, evaluate_objective, gen)
@@ -472,4 +477,4 @@ else:
 
             # Visualise a prediction by the model.
             if args.dim_x == 1 and args.dim_y == 1:
-                plot_first_of_batch(model, gen_cv, epoch=i, name_prefix="train")
+                plot_first_of_batch(model, gen_cv, name="train-epoch", epoch=i)
