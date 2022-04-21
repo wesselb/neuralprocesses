@@ -140,52 +140,42 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
     Args:
         normal (class:`stheno.Normal`): Underlying vectorised one-dimensional normal
             distribution.
-        num_outputs (int): Number of outputs.
+        shape (shape): Shape of the data before vectorising.
 
     Attributes:
         normal (class:`stheno.Normal`): Underlying vectorised one-dimensional normal
             distribution.
-        num_outputs (int): Number of outputs.
+        shape (shape): Shape of the data before vectorising.
     """
 
     @_dispatch
-    def __init__(self, normal: Normal, num_outputs: B.Int):
+    def __init__(self, normal: Normal, shape):
         self.normal = normal
-        self.num_outputs = num_outputs
+        self.shape = shape
 
     @classmethod
-    def dense(cls, mean: B.Numeric, var: B.Numeric):
+    def dense(cls, mean: B.Numeric, var_diag: B.Numeric, var: B.Numeric, shape):
+
         """Construct a dense multi-output normal distribution.
 
         Args:
-            mean (tensor): Mean of shape `(*b, c, n)`.
-            var (tensor): Variance of shape `(*b, c, n, c, n)`.
+            mean (tensor): Mean of shape `(*b, n)`.
+            var_diag (tensor): Marginal variances of shape `(*b, n)`.
+            var (tensor): Variance matrix of shape `(*b, n, n)`.
+            shape (shape): Shape of the data before vectorising.
         """
-        c, n = B.shape(mean, -2, -1)
-        return cls(
-            Normal(
-                B.reshape(mean, *batch(mean, 2), c * n, -1),
-                B.reshape(var, *batch(var, 4), c * n, c * n),
-            ),
-            c,
-        )
+        return cls(Normal(mean[..., None], B.add(Diagonal(var_diag), var)), shape)
 
     @classmethod
-    def diagonal(cls, mean: B.Numeric, var: B.Numeric):
+    def diagonal(cls, mean: B.Numeric, var: B.Numeric, shape):
         """Construct a diagonal multi-output normal distribution.
 
         Args:
-            mean (tensor): Mean of shape `(*b, c, n)`.
-            var (tensor): Marginal variances of shape `(*b, c, n)`.
+            mean (tensor): Mean of shape `(*b, n)`.
+            var (tensor): Marginal variances of shape `(*b, n)`.
+            shape (shape): Shape of the data before vectorising.
         """
-        c, n = B.shape(mean, -2, -1)
-        return cls(
-            Normal(
-                B.reshape(mean, *batch(mean, 2), c * n, -1),
-                Diagonal(B.reshape(var, *batch(var, 2), c * n)),
-            ),
-            c,
-        )
+        return cls(Normal(mean[..., None], Diagonal(var)), shape)
 
     @classmethod
     def lowrank(
@@ -193,59 +183,52 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
         mean: B.Numeric,
         var_diag: B.Numeric,
         var_factor: B.Numeric,
+        shape,
         var_middle: Union[B.Numeric, None] = None,
     ):
         """Construct a low-rank multi-output normal distribution.
 
         Args:
-            mean (tensor): Mean of shape `(*b, c, n)`.
-            var_diag (tensor): Diagonal part of the low-rank variance of shape
-                `(*b, c, n)`.
-            var_factor (tensor): Factors of the low-rank variance of shape
-                `(*b, c * num_factors, n)`.
+            mean (tensor): Mean of shape `(*b, n)`.
+            var_diag (tensor): Diagonal part of the low-rank variance of shape `(*b, n)`.
+            var_factor (tensor): Factors of the low-rank variance of shape `(*b, n, f)`.
+            shape (shape): Shape of the data before vectorising.
             var_middle (tensor, optional): Covariance of the factors of shape
-                `(*b, num_factors, num_factors)`.
+                `(*b, f, f)`.
         """
-        c, n = B.shape(mean, -2, -1)
-        # Separate out factor channels.
-        var_factor = B.reshape(var_factor, *batch(var_factor, 2), c, -1, n)
-        var_factor = B.transpose(var_factor)
         # Construct variance.
-        var = Diagonal(B.reshape(var_diag, *batch(var_diag, 2), c * n))
-        var += LowRank(
-            left=B.reshape(var_factor, *batch(var_factor, 3), c * n, -1),
-            middle=var_middle,
-        )
+        var = Diagonal(var_diag) + LowRank(left=var_factor, middle=var_middle)
         # Do not retain structure if it doesn't give computational savings.
         if var.lr.rank >= B.shape_matrix(var, 0):
             var = B.dense(var)
-        return cls(Normal(B.reshape(mean, *batch(mean, 2), c * n, -1), var), c)
+        return cls(Normal(mean[..., None], var), shape)
 
     def __repr__(self):
         return (  # Comment to preserve formatting.
-            f"<MultiOutputNormal: num_outputs={self.num_outputs}\n"
+            f"<MultiOutputNormal: shape={self.shape}\n"
             + indented_kv("normal", repr(self.normal), suffix=">")
         )
 
     def __str__(self):
         return (  # Comment to preserve formatting.
-            f"<MultiOutputNormal: num_outputs={self.num_outputs}\n"
+            f"<MultiOutputNormal: shape={self.shape}\n"
             + indented_kv("normal", str(self.normal), suffix=">")
         )
 
-    def _unreshape(self, x):
-        return B.reshape(x, *B.shape(x)[:-1], self.num_outputs, -1)
+    def _unvectorise(self, x):
+        # Separate out the outputs and data dimensions.
+        return B.reshape(x, *B.shape(x)[:-1], *self.shape)
 
     @property
     def mean(self):
-        return self._unreshape(self.normal.mean[..., 0])
+        return self._unvectorise(self.normal.mean[..., 0])
 
     @property
     def var(self):
-        return self._unreshape(B.diag(self.normal.var))
+        return self._unvectorise(B.diag(self.normal.var))
 
     def logpdf(self, x):
-        return self.normal.logpdf(B.reshape(x, *batch(x, 2), -1, 1))
+        return self.normal.logpdf(B.reshape(x, *batch(x, len(self.shape)), -1, 1))
 
     def sample(self, *args, **kw_args):
         def f(sample):
@@ -253,8 +236,8 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
             perm = list(range(B.rank(sample)))
             perm = [perm[-1]] + perm[:-1]
             sample = B.transpose(sample, perm=perm)
-            # Separate out outputs.
-            sample = self._unreshape(sample)
+            # Undo the vectorisation.
+            sample = self._unvectorise(sample)
             # If there was only one sample, squeeze the sample dimension.
             if B.shape(sample, 0) == 1:
                 sample = sample[0, ...]

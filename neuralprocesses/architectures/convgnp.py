@@ -2,7 +2,7 @@ import wbml.out as out
 from plum import convert
 
 import neuralprocesses as nps  # This fixes inspection below.
-from .lik import construct_likelihood
+from .util import construct_likelihood
 from ..util import register_model
 
 __all__ = ["construct_convgnp"]

@@ -1,5 +1,5 @@
 import neuralprocesses as nps  # This fixes inspection below.
-from .lik import construct_likelihood
+from .util import construct_likelihood
 from ..util import register_model
 
 __all__ = ["construct_agnp"]
@@ -9,7 +9,7 @@ __all__ = ["construct_agnp"]
 def construct_agnp(
     dim_x=1,
     dim_y=1,
-    dim_embedding=128,
+    dim_embedding=256,
     num_heads=8,
     num_enc_layers=6,
     num_dec_layers=6,
@@ -35,13 +35,13 @@ def construct_agnp(
             low-rank likelihood. Defaults to 512.
         dim_lv (bool, optional): Dimensionality of the latent variable.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
-            `"het"` or `"lowrank"`. Defaults to `"het"`.
+            `"het"` or `"dense"`. Defaults to `"het"`.
         dtype (dtype, optional): Data type.
 
     Returns:
         :class:`.model.Model`: GNP model.
     """
-    mlp_out_channels, likelihood = construct_likelihood(
+    likelihood_in_channels, likelihood = construct_likelihood(
         nps,
         spec=likelihood,
         dim_y=dim_y,
@@ -50,7 +50,7 @@ def construct_agnp(
     )
 
     if dim_lv > 0:
-        lv_mlp_out_channels, lv_likelihood = construct_likelihood(
+        lv_likelihood_in_channels, lv_likelihood = construct_likelihood(
             nps,
             spec=lv_likelihood,
             dim_y=dim_lv,
@@ -58,25 +58,17 @@ def construct_agnp(
             dtype=dtype,
         )
         lv_encoder = nps.Chain(
-            nps.SelfAttention(
-                dim_x=dim_x,
-                dim_y=dim_y,
-                dim_embedding=dim_embedding,
-                num_heads=num_heads,
-                num_enc_layers=num_enc_layers // 2,
-                dtype=dtype,
-            ),
             nps.DeepSet(
                 nps.MLP(
-                    in_dim=dim_x + dim_embedding,
-                    layers=(256,) * (num_enc_layers // 2),
+                    in_dim=dim_x + dim_y,
+                    layers=(512,) * (num_enc_layers // 2),
                     out_dim=dim_embedding,
                     dtype=dtype,
                 ),
                 nps.MLP(
                     in_dim=dim_embedding,
-                    layers=(256,) * (num_enc_layers - num_enc_layers // 2),
-                    out_dim=lv_mlp_out_channels,
+                    layers=(512,) * (num_enc_layers - num_enc_layers // 2),
+                    out_dim=lv_likelihood_in_channels,
                     dtype=dtype,
                 ),
             ),
@@ -90,20 +82,12 @@ def construct_agnp(
                 nps.DeterministicLikelihood(),
             ),
             nps.Chain(
-                nps.SelfAttention(
+                nps.Attention(
                     dim_x=dim_x,
                     dim_y=dim_y,
                     dim_embedding=dim_embedding,
                     num_heads=num_heads,
-                    num_enc_layers=num_enc_layers // 2,
-                    dtype=dtype,
-                ),
-                nps.Attention(
-                    dim_x=dim_x,
-                    dim_y=dim_embedding,
-                    dim_embedding=dim_embedding,
-                    num_heads=num_heads,
-                    num_enc_layers=num_enc_layers - num_enc_layers // 2,
+                    num_enc_layers=num_enc_layers,
                     dtype=dtype,
                 ),
                 nps.DeterministicLikelihood(),
@@ -115,8 +99,8 @@ def construct_agnp(
         nps.Materialise(),
         nps.MLP(
             in_dim=dim_x + dim_embedding + dim_lv,
-            layers=(256,) * num_dec_layers,
-            out_dim=mlp_out_channels,
+            layers=(512,) * num_dec_layers,
+            out_dim=likelihood_in_channels,
             dtype=dtype,
         ),
         likelihood,

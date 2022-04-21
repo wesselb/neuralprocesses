@@ -3,12 +3,35 @@ import pytest
 import tensorflow as tf
 import torch
 from numpy.testing import assert_allclose
+from plum import Dispatcher
+from typing import Union
+
+import neuralprocesses
 
 __all__ = ["approx", "nps", "generate_data"]
 
+_dispatch = Dispatcher()
 
+
+@_dispatch
 def approx(a, b, **kw_args):
     assert_allclose(B.to_numpy(a), B.to_numpy(b), **kw_args)
+
+
+@_dispatch
+def approx(a: None, b: None, **kw_args):
+    assert True
+
+
+@_dispatch
+def approx(
+    a: Union[neuralprocesses.Parallel, tuple],
+    b: Union[neuralprocesses.Parallel, tuple],
+    **kw_args
+):
+    assert len(a) == len(b)
+    for ai, bi in zip(a, b):
+        approx(ai, bi, **kw_args)
 
 
 import neuralprocesses.tensorflow as nps_tf
@@ -22,11 +45,9 @@ nps_tf.dtype32 = tf.float32
 nps_tf.dtype64 = tf.float64
 
 
-@pytest.fixture(params=[nps_torch, nps_tf])
+@pytest.fixture(params=[nps_torch, nps_tf], scope="module")
 def nps(request):
-    nps = request.param
-    nps.dtype = nps.dtype32  # Reset data type to `float32`s.
-    return nps
+    return request.param
 
 
 def generate_data(nps, batch_size=4, dim_x=1, dim_y=1, n_context=5, n_target=7):

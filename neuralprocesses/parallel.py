@@ -1,8 +1,8 @@
+import lab as B
 from matrix.util import indent
 
 from . import _dispatch
 from .util import register_module
-import lab as B
 
 __all__ = ["Parallel", "broadcast_coder_over_parallel"]
 
@@ -27,11 +27,14 @@ class Parallel:
     def __call__(self, x):
         return Parallel(*(e(x) for e in self.elements))
 
-    def __iter__(self):
-        return iter(self.elements)
-
     def __getitem__(self, item):
         return self.elements[item]
+
+    def __len__(self):
+        return len(self.elements)
+
+    def __iter__(self):
+        return iter(self.elements)
 
     def __str__(self):
         return repr(self)

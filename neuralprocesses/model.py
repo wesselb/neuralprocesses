@@ -34,6 +34,7 @@ class Model:
     @_dispatch
     def __call__(
         self,
+        state: B.RandomState,
         xc,
         yc,
         xt,
@@ -46,6 +47,7 @@ class Model:
         """Run the model.
 
         Args:
+            state (random state, optional): Random state.
             xc (input): Context inputs.
             yc (tensor): Context outputs.
             xt (input): Target inputs.
@@ -56,7 +58,9 @@ class Model:
                 encoding to.
 
         Returns:
-            tuple[input, tensor]: Target inputs and prediction for target outputs.
+            random state, optional: Random state.
+            input: Target inputs.
+            object: Prediction for target outputs.
         """
         # Perform augmentation of `xt` with auxiliary target information.
         if aux_t is not None:
@@ -70,13 +74,36 @@ class Model:
         xz, pz = code(self.encoder, xc, yc, xt, **enc_kw_args)
 
         # Sample and convert sample to the right data type.
-        z = _sample(pz, num=num_samples)
+        state, z = _sample(state, pz, num=num_samples)
         if dtype_enc_sample:
             z = B.cast(dtype_enc_sample, z)
 
         _, d = code(self.decoder, xz, z, xt, **kw_args)
 
+        return state, d
+
+    @_dispatch
+    def __call__(self, xc, yc, xt, **kw_args):
+        state = B.global_random_state(B.dtype(xt))
+        state, d = self(state, xc, yc, xt, **kw_args)
+        B.set_global_random_state(state)
         return d
+
+    @_dispatch
+    def __call__(
+        self,
+        state: B.RandomState,
+        contexts: List[Tuple[Union[B.Numeric, tuple], Union[B.Numeric, Masked]]],
+        xt,
+        **kw_args,
+    ):
+        return self(
+            state,
+            Parallel(*(c[0] for c in contexts)),
+            Parallel(*(c[1] for c in contexts)),
+            xt,
+            **kw_args,
+        )
 
     @_dispatch
     def __call__(
@@ -85,12 +112,10 @@ class Model:
         xt,
         **kw_args,
     ):
-        return self(
-            Parallel(*(c[0] for c in contexts)),
-            Parallel(*(c[1] for c in contexts)),
-            xt,
-            **kw_args,
-        )
+        state = B.global_random_state(B.dtype(xt))
+        state, d = self(state, xc, yc, xt, **kw_args)
+        B.set_global_random_state(state)
+        return d
 
     def __str__(self):
         return (
@@ -112,13 +137,17 @@ class Model:
 
 
 @_dispatch
-def _sample(x: AbstractMultiOutputDistribution, num: B.Int = 1):
-    return x.sample(num=num)
+def _sample(state: B.RandomState, x: AbstractMultiOutputDistribution, num: B.Int = 1):
+    return x.sample(state, num=num)
 
 
 @_dispatch
-def _sample(x: Parallel, num: B.Int = 1):
-    return Parallel(*[_sample(xi, num=num) for xi in x])
+def _sample(state: B.RandomState, x: Parallel, num: B.Int = 1):
+    samples = []
+    for xi in x:
+        state, sample = _sample(state, xi, num=num)
+        samples.append(sample)
+    return state, Parallel(*samples)
 
 
 def loglik(

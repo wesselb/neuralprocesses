@@ -30,11 +30,14 @@ class Chain:
             x = link(x)
         return x
 
-    def __iter__(self):
-        return iter(self.links)
-
     def __getitem__(self, item):
         return self.links[item]
+
+    def __len__(self):
+        return len(self.links)
+
+    def __iter__(self):
+        return iter(self.links)
 
     def __str__(self):
         return repr(self)

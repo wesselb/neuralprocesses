@@ -10,8 +10,8 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
 
     Args:
         nps (module): Appropriate backend-specific module.
-        spec (str, optional): Specification. Must be one of `"het"` or `"lowrank"`.
-            Defaults to `"lowrank"`. Must be given as a keyword argument.
+        spec (str, optional): Specification. Must be one of `"het"`, `"lowrank"`, or
+            `"dense"`. Defaults to `"lowrank"`. Must be given as a keyword argument.
         dim_y (int): Dimensionality of the outputs. Must be given as a keyword argument.
         num_basis_functions (int): Number of basis functions for the low-rank
             likelihood. Must be given as a keyword argument.
@@ -27,6 +27,21 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
     elif spec == "lowrank":
         num_channels = (2 + num_basis_functions) * dim_y
         lik = nps.LowRankGaussianLikelihood(num_basis_functions)
+    elif spec == "dense":
+        # This will only work for global variables!
+        num_channels = 2 * dim_y + dim_y * dim_y
+        lik = nps.Chain(
+            nps.Splitter(2 * dim_y, dim_y * dim_y),
+            nps.Parallel(
+                # The split for the mean is alright.
+                lambda x: x,
+                # The split for the variance needs to be of the right shape. This
+                # reshaping assumes `n = 1`.
+                lambda x: B.reshape(x, *B.shape(x)[:-2], dim_y, 1, dim_y, 1),
+            ),
+            nps.DenseGaussianLikelihood(),
+        )
+
     else:
         raise ValueError(f'Incorrect likelihood specification "{spec}".')
     return num_channels, lik

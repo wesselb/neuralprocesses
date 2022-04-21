@@ -7,6 +7,7 @@ __all__ = [
     "data_dims",
     "batch",
     "compress_batch_dimensions",
+    "split_channels",
     "modules",
     "register_module",
     "models",
@@ -71,6 +72,27 @@ def compress_batch_dimensions(x, other_dims):
             return B.reshape(x_after, *b, *B.shape(x_after)[1:])
 
         return B.reshape(x, int(np.prod(b)), *B.shape(x)[len(b) :]), uncompress
+
+
+def split_channels(z, sizes, d):
+    """Split a tensor at the channels dimension.
+
+    Args:
+        z (tensor): Tensor to split.
+        sizes (iterable[int]): Sizes of the components.
+        d (int): Dimensionality of the inputs.
+
+    Returns:
+        list[tensor]: Components of the split.
+    """
+    components = []
+    i = 0
+    for size in sizes:
+        components.append(
+            z[(Ellipsis, slice(i, i + size, None)) + (slice(None, None, None),) * d]
+        )
+        i += size
+    return components
 
 
 modules = []  #: Registered modules.

@@ -1,5 +1,5 @@
 import neuralprocesses as nps  # This fixes inspection below.
-from .lik import construct_likelihood
+from .util import construct_likelihood
 from ..util import register_model
 
 __all__ = ["construct_gnp"]
@@ -33,7 +33,7 @@ def construct_gnp(
             low-rank likelihood. Defaults to 512.
         dim_lv (bool, optional): Dimensionality of the latent variable.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
-            `"het"` or `"lowrank"`. Defaults to `"het"`.
+            `"het"` or `"dense"`. Defaults to `"het"`.
         dtype (dtype, optional): Data type.
 
     Returns:
@@ -59,13 +59,13 @@ def construct_gnp(
             nps.DeepSet(
                 nps.MLP(
                     in_dim=dim_x + dim_y,
-                    layers=(256,) * (num_enc_layers // 2),
+                    layers=(512,) * (num_enc_layers // 2),
                     out_dim=dim_embedding,
                     dtype=dtype,
                 ),
                 nps.MLP(
                     in_dim=dim_embedding,
-                    layers=(256,) * (num_enc_layers - num_enc_layers // 2),
+                    layers=(512,) * (num_enc_layers - num_enc_layers // 2),
                     out_dim=lv_mlp_out_channels,
                     dtype=dtype,
                 ),
@@ -83,13 +83,13 @@ def construct_gnp(
                 nps.DeepSet(
                     nps.MLP(
                         in_dim=dim_x + dim_y,
-                        layers=(256,) * (num_enc_layers // 2),
+                        layers=(512,) * (num_enc_layers // 2),
                         out_dim=dim_embedding,
                         dtype=dtype,
                     ),
                     nps.MLP(
                         in_dim=dim_embedding,
-                        layers=(256,) * (num_enc_layers - num_enc_layers // 2),
+                        layers=(512,) * (num_enc_layers - num_enc_layers // 2),
                         out_dim=dim_embedding,
                         dtype=dtype,
                     ),
@@ -103,7 +103,7 @@ def construct_gnp(
         nps.Materialise(),
         nps.MLP(
             in_dim=dim_x + dim_embedding + dim_lv,
-            layers=(256,) * num_dec_layers,
+            layers=(512,) * num_dec_layers,
             out_dim=mlp_out_channels,
             dtype=dtype,
         ),

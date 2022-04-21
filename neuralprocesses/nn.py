@@ -2,16 +2,12 @@ import math
 from typing import Tuple, Union
 
 import lab as B
-import numpy as np
-from plum import Dispatcher
 
+from . import _dispatch
 from .parallel import Parallel
-from .util import register_module, batch, compress_batch_dimensions
+from .util import register_module, compress_batch_dimensions, data_dims, split_channels
 
 __all__ = ["MLP", "UNet", "ConvNet", "Splitter"]
-
-
-_dispatch = Dispatcher()
 
 
 @register_module
@@ -351,14 +347,11 @@ class Splitter:
         sizes (tuple[int]): Size of every split
     """
 
-    def __init__(self, *sizes):
-        self.sizes = sizes
+    def __init__(self, size0, *sizes):
+        self.sizes = (size0,) + sizes
 
-    @_dispatch
-    def __call__(self, z: B.Numeric):
-        i = 0
-        splits = []
-        for size in self.sizes:
-            splits.append(z[..., i : i + size, :])
-            i += size
-        return Parallel(*splits)
+
+@_dispatch
+def code(coder: Splitter, xz, z: B.Numeric, x, **kw_args):
+    d = data_dims(xz)
+    return xz, Parallel(*split_channels(z, coder.sizes, d))

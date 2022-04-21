@@ -1,80 +1,177 @@
 import lab as B
 import numpy as np
 import pytest
+from itertools import product
 
-from .util import nps, approx, generate_data  # noqa
+from .util import nps as nps_fixed_dtype, approx, generate_data  # noqa
 
 
-def generate_arch_variations(name, **kw_args):
-    variations = [
+def generate_arch_variations(configs):
+    varied_configs = []
+    for config in configs:
+        for variation in [
+            {
+                "unet_channels": (4, 8),
+                "unet_kernels": (5,) * 2,
+                "unet_activations": (B.relu,) * 2,
+            },
+            {
+                "unet_channels": (8, 16),
+                "unet_kernels": (5,) * 2,
+                "unet_activations": (B.relu,) * 2,
+                "unet_resize_convs": False,
+            },
+            {
+                "unet_channels": (8, 16),
+                "unet_kernels": (5,) * 2,
+                "unet_activations": (B.relu,) * 2,
+                "unet_resize_convs": True,
+            },
+            {
+                "conv_arch": "dws",
+                "dws_channels": 8,
+                "dws_layers": 4,
+                "dws_receptive_field": 0.5,
+            },
+        ]:
+            varied_configs.append(dict(config, **variation))
+    return varied_configs
+
+
+def product_kw_args(config, **kw_args):
+    configs = []
+    keys, values = zip(*kw_args.items())
+    for variation in product(*values):
+        configs.append(dict(config, **{k: v for (k, v) in zip(keys, variation)}))
+    return configs
+
+
+@pytest.fixture(
+    params=[]
+    # CNP:
+    + product_kw_args(
         {
-            "unet_channels": (4, 8),
-            "unet_kernels": (5,) * 2,
-            "unet_activations": (B.relu,) * 2,
+            "constructor": "construct_gnp",
+            "num_basis_functions": 4,
+            "dim_lv": 0,
         },
+        dim_x=[1, 2],
+        dim_y=[1, 2],
+        likelihood=["het", "lowrank"],
+    )
+    # NP:
+    + product_kw_args(
         {
-            "unet_channels": (8, 16),
-            "unet_kernels": (5,) * 2,
-            "unet_activations": (B.relu,) * 2,
-            "unet_resize_convs": False,
+            "constructor": "construct_gnp",
+            "num_basis_functions": 4,
+            "dim_lv": 3,
         },
+        dim_x=[1, 2],
+        dim_y=[1, 2],
+        likelihood=["het", "lowrank"],
+        lv_likelihood=["het", "dense"],
+    )
+    # ACNP:
+    + product_kw_args(
         {
-            "unet_channels": (8, 16),
-            "unet_kernels": (5,) * 2,
-            "unet_activations": (B.relu,) * 2,
-            "unet_resize_convs": True,
+            "constructor": "construct_gnp",
+            "num_basis_functions": 4,
+            "dim_lv": 0,
         },
+        dim_x=[1, 2],
+        dim_y=[1, 2],
+        likelihood=["het", "lowrank"],
+    )
+    # ANP:
+    + product_kw_args(
         {
-            "conv_arch": "dws",
-            "dws_channels": 8,
-            "dws_layers": 4,
-            "dws_receptive_field": 0.5,
+            "constructor": "construct_gnp",
+            "num_basis_functions": 4,
+            "dim_lv": 3,
         },
-    ]
-    return [(name, dict(config, **kw_args)) for config in variations]
-
-
-@pytest.mark.parametrize("float64", [False, True])
-@pytest.mark.parametrize(
-    "construct_name, kw_args",
-    [
-        (model, dict(base_kw_args, dim_x=dim_x, dim_y=dim_y, likelihood=lik))
-        for model, base_kw_args in [
-            (
-                "construct_gnp",
-                {"num_basis_functions": 4},
-            ),
-            (
-                "construct_agnp",
-                {"num_basis_functions": 4},
-            ),
-        ]
-        + generate_arch_variations(
-            "construct_convgnp",
-            points_per_unit=16,
-            num_basis_functions=16,
-            epsilon=1e-4,
-        )
-        for dim_x in [1, 2]
-        for dim_y in [1, 2]
-        for lik in ["het", "lowrank"]
-    ]
+        dim_x=[1, 2],
+        dim_y=[1, 2],
+        likelihood=["het", "lowrank"],
+        lv_likelihood=["het", "dense"],
+    )
+    # ConvCNP:
     + generate_arch_variations(
-        "construct_fullconvgnp",
-        dim_x=1,
-        dim_y=1,
-        points_per_unit=16,
-        epsilon=1e-4,
+        product_kw_args(
+            {
+                "constructor": "construct_convgnp",
+                "num_basis_functions": 4,
+                "points_per_unit": 8,
+                "dim_lv": 0,
+            },
+            dim_x=[1, 2],
+            dim_y=[1, 2],
+            likelihood=["het", "lowrank"],
+        )
+    )
+    # ConvNP:
+    + generate_arch_variations(
+        product_kw_args(
+            {
+                "constructor": "construct_convgnp",
+                "num_basis_functions": 4,
+                "points_per_unit": 8,
+                "dim_lv": 3,
+            },
+            dim_x=[1, 2],
+            dim_y=[1, 2],
+            likelihood=["het", "lowrank"],
+            lv_likelihood=["het", "lowrank"],
+        )
+    )
+    # FullConvGNP:
+    + generate_arch_variations(
+        [
+            {
+                "constructor": "construct_fullconvgnp",
+                "points_per_unit": 8,
+                "dim_x": 1,
+                "dim_y": 1,
+            }
+        ]
     ),
+    scope="module",
 )
-@pytest.mark.flaky(reruns=3)
-def test_architectures(nps, float64, construct_name, kw_args):
-    if float64:
+def config(request):
+    return request.param
+
+
+@pytest.fixture(params=[False, True], scope="module")
+def nps(request, nps_fixed_dtype):
+    nps = nps_fixed_dtype
+
+    # Use `float64`s or not?
+    if request.param:
+        # Safely make a copy of `nps` so that we can modify the value of `dtype` without
+        # the changes having side effects.
+
+        class Namespace:
+            pass
+
+        nps_copy = Namespace()
+        for attr in nps.__dir__():
+            setattr(nps_copy, attr, getattr(nps, attr))
+        nps = nps_copy
         nps.dtype = nps.dtype64
-    model = getattr(nps, construct_name)(**kw_args, dtype=nps.dtype)
-    # Generate data.
-    xc, yc, xt, yt = generate_data(nps, dim_x=kw_args["dim_x"], dim_y=kw_args["dim_y"])
-    model(xc, yc, xt)  # Run the model once to make sure all parameters exist.
+
+    return nps
+
+
+@pytest.fixture(scope="module")
+def model_sample(request, nps, config):
+    # Construct model.
+    config = dict(config)
+    constructor = getattr(nps, config["constructor"])
+    del config["constructor"]
+    model = constructor(**config, dtype=nps.dtype)
+
+    # Run the model once to make sure all parameters exist.
+    xc, yc, xt, yt = generate_data(nps, dim_x=config["dim_x"], dim_y=config["dim_y"])
+    model(xc, yc, xt)
 
     # Perturb all parameters to make sure that the biases aren't initialised to zero. If
     # biases are initialised to zero, then this can give zeros in the output if the
@@ -90,20 +187,47 @@ def test_architectures(nps, float64, construct_name, kw_args):
     else:
         raise RuntimeError("I don't know how to perturb the parameters of the model.")
 
-    # Check passing in a non-empty context set.
-    pred = model(xc, yc, xt, batch_size=2, unused_arg=None)
+    def sample():
+        return generate_data(nps, dim_x=config["dim_x"], dim_y=config["dim_y"])
+
+    return model, sample
+
+
+def check_prediction(nps, pred, yt):
+    # Check that the log-pdf at the target data is finite and of the right data type.
     objective = B.sum(pred.logpdf(yt))
-    # Check that the objective is finite and of the right data type.
     assert np.isfinite(B.to_numpy(objective))
     assert B.dtype(objective) == nps.dtype
+
     # Check mean, variance, and samples.
     assert B.shape(pred.mean) == B.shape(yt)
     assert B.shape(pred.var) == B.shape(yt)
     assert B.shape(pred.sample()) == B.shape(yt)
     assert B.shape(pred.sample(2)) == (2,) + B.shape(yt)
 
+
+@pytest.mark.flaky(reruns=3)
+def test_forward(nps, model_sample):
+    model, sample = model_sample
+    xc, yc, xt, yt = sample()
+
+    # Check passing in a non-empty context set.
+    pred = model(xc, yc, xt, batch_size=2, unused_arg=None)
+    check_prediction(nps, pred, yt)
+
+
+@pytest.mark.flaky(reruns=3)
+def test_batching(nps, model_sample):
+    model, sample = model_sample
+    xc, yc, xt, yt = sample()
+
+    state = B.create_random_state(nps.dtype, seed=0)
+    state2 = B.create_random_state(nps.dtype, seed=0)
+
     # Check that batching works correctly.
-    pred2 = model(
+    _, pred = model(state, xc, yc, xt, batch_size=2, unused_arg=None)
+    _, pred2 = model(
+        state2,
         B.reshape(xc, 2, -1, *B.shape(xc, 1, 2)),
         B.reshape(yc, 2, -1, *B.shape(yc, 1, 2)),
         B.reshape(xt, 2, -1, *B.shape(xt, 1, 2)),
@@ -112,6 +236,12 @@ def test_architectures(nps, float64, construct_name, kw_args):
     )
     approx(pred.mean, B.reshape(pred2.mean, -1, *B.shape(pred2.mean, 2, 3)))
     approx(pred.var, B.reshape(pred2.var, -1, *B.shape(pred2.var, 2, 3)))
+
+
+@pytest.mark.flaky(reruns=3)
+def test_empty_context(nps, model_sample):
+    model, sample = model_sample
+    xc, yc, xt, yt = sample()
 
     # Check passing the edge case of an empty context set.
     if isinstance(xc, B.Numeric):
@@ -122,121 +252,25 @@ def test_architectures(nps, float64, construct_name, kw_args):
         raise RuntimeError("Failed to contruct empty context set.")
     yc = yc[:, :, :0]
     pred = model(xc, yc, xt, batch_size=2, unused_arg=None)
-    objective = B.sum(pred.logpdf(yt))
-    # Again check that the objective is finite and of the right data type.
-    assert np.isfinite(B.to_numpy(objective))
-    assert B.dtype(objective) == nps.dtype
-    # Check mean, variance, and samples.
-    assert B.shape(pred.mean) == B.shape(yt)
-    assert B.shape(pred.var) == B.shape(yt)
-    assert B.shape(pred.sample()) == B.shape(yt)
-    assert B.shape(pred.sample(2)) == (2,) + B.shape(yt)
-
-
-def test_transform_positive(nps):
-    model = nps.construct_convgnp(
-        dim_x=1,
-        dim_y=1,
-        points_per_unit=16,
-        unet_channels=(8, 16),
-        transform="positive",
-    )
-    xc, yc, xt, yt = generate_data(nps, dim_x=1, dim_y=1)
-    # Make data positive.
-    yc = B.exp(yc)
-    yt = B.exp(yt)
-
-    pred = model(xc, yc, xt)
-    objective = B.sum(pred.logpdf(yt))
-    # Again check that the objective is finite and of the right data type.
-    assert np.isfinite(B.to_numpy(objective))
-    # Check that predictions and samples satisfy the constraint.
-    assert B.all(pred.mean > 0)
-    assert B.all(pred.sample(2) > 0)
-
-
-def test_transform_bounded(nps):
-    model = nps.construct_convgnp(
-        dim_x=1,
-        dim_y=1,
-        points_per_unit=16,
-        unet_channels=(8, 16),
-        transform=(10, 11),
-    )
-    xc, yc, xt, yt = generate_data(nps, dim_x=1, dim_y=1)
-    # Force data in the range `(10, 11)`.
-    yc = 10 + 1 / (1 + B.exp(yc))
-    yt = 10 + 1 / (1 + B.exp(yt))
-
-    pred = model(xc, yc, xt)
-    objective = B.sum(pred.logpdf(yt))
-    # Again check that the objective is finite and of the right data type.
-    assert np.isfinite(B.to_numpy(objective))
-    # Check that predictions and samples satisfy the constraint.
-    assert B.all(pred.mean > 10) and B.all(pred.mean < 11)
-    assert B.all(pred.sample() > 10) and B.all(pred.sample() < 11)
-
-
-def test_convgnp_auxiliary_variable(nps):
-    model = nps.construct_convgnp(
-        dim_x=2,
-        dim_yc=(3, 1, 2),
-        dim_aux_t=4,
-        dim_yt=3,
-        num_basis_functions=16,
-        points_per_unit=16,
-        likelihood="lowrank",
-    )
-
-    observed_data = (
-        B.randn(nps.dtype, 16, 2, 10),
-        B.randn(nps.dtype, 16, 3, 10),
-    )
-    aux_var1 = (
-        B.randn(nps.dtype, 16, 2, 12),
-        B.randn(nps.dtype, 16, 1, 12),
-    )
-    aux_var2 = (
-        (B.randn(nps.dtype, 16, 1, 25), B.randn(nps.dtype, 16, 1, 35)),
-        B.randn(nps.dtype, 16, 2, 25, 35),
-    )
-    aux_var_t = B.randn(nps.dtype, 16, 4, 15)
-    pred = model(
-        [observed_data, aux_var1, aux_var2],
-        B.randn(nps.dtype, 16, 2, 15),
-        aux_t=aux_var_t,
-    )
-    mean, var = pred.mean, pred.var
-
-    # Check that the logpdf at the mean is finite and of the right data type.
-    objective = B.sum(pred.logpdf(pred.mean))
-    assert np.isfinite(B.to_numpy(objective))
-    assert B.dtype(objective) == nps.dtype
+    check_prediction(nps, pred, yt)
 
 
 @pytest.mark.flaky(reruns=3)
-def test_convgnp_masking(nps):
-    model = nps.construct_convgnp(
-        num_basis_functions=16,
-        points_per_unit=16,
-        conv_arch="dws",
-        dws_receptive_field=0.5,
-        dws_layers=1,
-        dws_channels=1,
-        # Dividing by the density channel makes the forward very sensitive to the
-        # numerics.
-        divide_by_density=False,
+def test_recode(nps, model_sample):
+    model, sample = model_sample
+    xc, yc, xt, yt = sample()
+
+    x_new = B.concat(
+        xc,
+        # Add new inputs which defy the extrema of the current context and target
+        # inputs.
+        B.max(xc, axis=-1, squeeze=False) + 1,
+        B.max(xt, axis=-1, squeeze=False) + 1,
+        axis=-1,
     )
-    xc, yc, xt, yt = generate_data(nps)
+    y_new = B.concat(yc, yc[:, :, -1:] + 1, yt[:, :, -1:] + 1, axis=-1)
 
-    # Predict without the final three points.
-    pred = model(xc[:, :, :-3], yc[:, :, :-3], xt)
-    # Predict using a mask instead.
-    mask = B.to_numpy(B.ones(yc))  # Perform assignment in NumPy.
-    mask[:, :, -3:] = 0
-    mask = B.cast(B.dtype(yc), mask)
-    pred_masked = model(xc, nps.Masked(yc, mask), xt)
+    z, pz, h = nps.code_track(model.encoder, xc, yc, xt)
+    z2, pz2, _ = nps.recode(model.encoder, x_new, y_new, h)
 
-    # Check that the two ways of doing it coincide.
-    approx(pred.mean, pred_masked.mean)
-    approx(pred.var, pred_masked.var)
+    approx(z, z2)

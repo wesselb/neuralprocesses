@@ -41,6 +41,17 @@ def code(coder: FunctionalCoder, xz, z, x, **kw_args):
     return code(coder.coder, xz, z, x, **kw_args)
 
 
+@_dispatch
+def code_track(coder: FunctionalCoder, xz, z, x, h, **kw_args):
+    x = coder.disc(xz, x, **kw_args)
+    return code_track(coder.coder, xz, z, x, h + [x], **kw_args)
+
+
+@_dispatch
+def recode(coder: FunctionalCoder, xz, z, h, **kw_args):
+    return recode(coder.coder, xz, z, h[1:], **kw_args)
+
+
 @register_module
 class DeepSet:
     """Deep set.
