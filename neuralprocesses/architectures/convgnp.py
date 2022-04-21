@@ -93,7 +93,7 @@ def construct_convgnp(
     unet_resize_convs=False,
     unet_resize_conv_interp_method="nearest",
     dws_receptive_field=None,
-    dws_layers=8,
+    dws_layers=6,
     dws_channels=64,
     num_basis_functions=512,
     dim_lv=0,

@@ -9,7 +9,7 @@ __all__ = ["construct_gnp"]
 def construct_gnp(
     dim_x=1,
     dim_y=1,
-    dim_embedding=128,
+    dim_embedding=256,
     num_enc_layers=6,
     num_dec_layers=6,
     width=512,

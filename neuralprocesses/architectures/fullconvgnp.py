@@ -30,7 +30,7 @@ def construct_fullconvgnp(
     unet_resize_convs=False,
     unet_resize_conv_interp_method="nearest",
     dws_receptive_field=None,
-    dws_layers=8,
+    dws_layers=6,
     dws_channels=64,
     encoder_scales=None,
     decoder_scale=None,
@@ -129,7 +129,8 @@ def construct_fullconvgnp(
             dim=2 * dim_x,
             in_channels=conv_in_channels + 1,  # Add identity channel.
             out_channels=1,  # Kernel matrix
-            channels=unet_channels,
+            # Keep the parameters in check.
+            channels=tuple(n // 2 for n in unet_channels),
             kernels=unet_kernels,
             activations=unet_activations,
             resize_convs=unet_resize_convs,
@@ -152,7 +153,7 @@ def construct_fullconvgnp(
             dim=2 * dim_x,
             in_channels=conv_in_channels + 1,  # Add identity channel.
             out_channels=1,  # Kernel matrix
-            channels=dws_channels,
+            channels=dws_channels // 2,  # Keep the parameters in check.
             num_layers=dws_layers,
             points_per_unit=points_per_unit // 2,  # Keep memory in control.
             receptive_field=dws_receptive_field,

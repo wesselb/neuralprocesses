@@ -219,6 +219,7 @@ parser.add_argument(
     default="loglik",
 )
 parser.add_argument("--evaluate-num-samples", type=int, default=4096)
+parser.add_argument("--no-action", action="store_true")
 args = parser.parse_args()
 
 # Remove the architecture argument if a model doesn't use it.
@@ -301,15 +302,20 @@ gens_eval = [
     ]
 ]
 
-# Setup architecture.
-unet_channels = (64,) * 6
+# Setup architectures.
+width = 256
+dim_embedding = 128
+num_heads = 8
+num_layers = 6
+unet_channels = (64,) * num_layers
 dws_channels = 64
 dws_receptive_field = args.receptive_field
+num_basis_functions = 512
 if args.dim_x == 1:
-    points_per_unit = 64
+    points_per_unit = 40
 elif args.dim_x == 2:
     # Reduce the PPU to reduce memory consumption.
-    points_per_unit = 64 / 2
+    points_per_unit = 20
 else:
     raise RuntimeError(f"Invalid input dimensionality {args.dim_x}.")
 
@@ -318,41 +324,68 @@ if args.model == "cnp":
     model = nps.construct_gnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
+        dim_embedding=dim_embedding,
+        num_enc_layers=num_layers,
+        num_dec_layers=num_layers,
+        width=width,
         likelihood="het",
     )
 elif args.model == "gnp":
     model = nps.construct_gnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
+        dim_embedding=dim_embedding,
+        num_enc_layers=num_layers,
+        num_dec_layers=num_layers,
+        width=width,
         likelihood="lowrank",
-        num_basis_functions=512,
+        num_basis_functions=num_basis_functions,
     )
 elif args.model == "np":
     model = nps.construct_gnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
+        dim_embedding=dim_embedding,
+        num_enc_layers=num_layers,
+        num_dec_layers=num_layers,
+        width=width,
         likelihood="het",
-        dim_lv=128,
+        dim_lv=dim_embedding,
     )
 elif args.model == "acnp":
     model = nps.construct_agnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
+        dim_embedding=dim_embedding,
+        num_heads=num_heads,
+        num_enc_layers=num_layers,
+        num_dec_layers=num_layers,
+        width=width,
         likelihood="het",
     )
 elif args.model == "agnp":
     model = nps.construct_agnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
+        dim_embedding=dim_embedding,
+        num_heads=num_heads,
+        num_enc_layers=num_layers,
+        num_dec_layers=num_layers,
+        width=width,
         likelihood="lowrank",
-        num_basis_functions=512,
+        num_basis_functions=num_basis_functions,
     )
 elif args.model == "anp":
     model = nps.construct_agnp(
         dim_x=args.dim_x,
         dim_y=args.dim_y,
+        dim_embedding=dim_embedding,
+        num_heads=num_heads,
+        num_enc_layers=num_layers,
+        num_dec_layers=num_layers,
+        width=width,
         likelihood="het",
-        dim_lv=128,
+        dim_lv=dim_embedding,
     )
 elif args.model == "convcnp":
     model = nps.construct_convgnp(
@@ -363,6 +396,7 @@ elif args.model == "convcnp":
         conv_arch=args.arch,
         unet_channels=unet_channels,
         dws_channels=dws_channels,
+        dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
         margin=args.margin,
     )
@@ -375,8 +409,9 @@ elif args.model == "convgnp":
         conv_arch=args.arch,
         unet_channels=unet_channels,
         dws_channels=dws_channels,
+        dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
-        num_basis_functions=512,
+        num_basis_functions=num_basis_functions,
         margin=args.margin,
     )
 elif args.model == "convnp":
@@ -388,6 +423,7 @@ elif args.model == "convnp":
         conv_arch=args.arch,
         unet_channels=unet_channels,
         dws_channels=dws_channels,
+        dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
         dim_lv=16,
         margin=args.margin,
@@ -400,6 +436,7 @@ elif args.model == "fullconvgnp":
         conv_arch=args.arch,
         unet_channels=unet_channels,
         dws_channels=dws_channels,
+        dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
         margin=args.margin,
     )
@@ -442,6 +479,10 @@ elif args.objective == "elbo":
 else:
     raise RuntimeError(f'Invalid objective "{args.objective}".')
 
+# The user can just want to see some statistics about the model.
+if args.no_action:
+    exit()
+
 if args.evaluate:
     # Perform evaluation. First, load the best model.
     model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
@@ -455,7 +496,7 @@ if args.evaluate:
         with out.Section(name.capitalize()):
             eval(state, model, evaluate_objective, gen)
 else:
-    # Perform training. First, check we want to resume training.
+    # Perform training. First, check if we want to resume training.
     start = 0
     if args.resume_at_epoch:
         start = args.resume_at_epoch - 1
