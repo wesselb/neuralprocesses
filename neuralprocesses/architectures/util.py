@@ -35,9 +35,15 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
             nps.Parallel(
                 # The split for the mean is alright.
                 lambda x: x,
-                # The split for the variance needs to be of the right shape. This
-                # reshaping assumes `n = 1`.
-                lambda x: B.reshape(x, *B.shape(x)[:-2], dim_y, 1, dim_y, 1),
+                nps.Chain(
+                    # For the variance, first make it positive definite. Assume that
+                    # `n = 1`, so we can ignore the data dimension.
+                    lambda x: B.reshape(x, *B.shape(x)[:-2], dim_y, dim_y),
+                    # Make PD and divide by 100 to stabilise initialisation.
+                    lambda x: B.matmul(x, x, tr_b=True) / 100,
+                    # Make it of the shape `(*b, c, n, c, n)` with `n = 1`.
+                    lambda x: x[..., :, None, :, None],
+                ),
             ),
             nps.DenseGaussianLikelihood(),
         )

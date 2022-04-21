@@ -224,19 +224,16 @@ class DenseGaussianLikelihood:
 
     Args:
         epsilon (float, optional): Smallest allowable variance. Defaults to `1e-6`.
-        ensure_pd (bool, optional): Ensure that the covariance matrix is positive
-            definite by multiplying with itself. Defaults to `True`.
 
     Args:
         epsilon (float): Smallest allowable variance.
-        ensure_pd (bool): Ensure that the covariance matrix is positive definite by
+        transform_var (bool): Ensure that the covariance matrix is positive definite by
             multiplying with itself.
     """
 
     @_dispatch
-    def __init__(self, epsilon: float = 1e-6, ensure_pd: bool = True):
+    def __init__(self, epsilon: float = 1e-6):
         self.epsilon = epsilon
-        self.ensure_pd = ensure_pd
 
     def __str__(self):
         return repr(self)
@@ -275,13 +272,6 @@ def code(
     mean = z_mean
     noise = coder.epsilon + B.softplus(z_noise)
     var = z_var
-    if coder.ensure_pd:
-        # Force `var` to be positive definite by multiplying by itself.
-        var = B.matmul(var, var, tr_b=True)
-        # To normalise the computation, we cannot divide by `n`, because that would
-        # yield a changing constant. Instead, we divide by 1000, a constant meant to
-        # stabilise initialisation.
-        var = var / 1000
 
     # Cast parameters to the right data type.
     if dtype_lik:

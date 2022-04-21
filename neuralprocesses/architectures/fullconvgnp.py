@@ -244,9 +244,12 @@ def construct_fullconvgnp(
                 nps.MapDiagonal(
                     nps.Chain(
                         conv_kernel,
+                        # Ensure that the kernel is PD before before applying the
+                        # smoothing. Divide by 1000 to stabilise initialisation.
+                        lambda x: B.matmul(x, x, tr_b=True) / 1000,
                         nps.SetConv(decoder_kernel_scale, dtype=dtype),
                         # Ensure that the encoding is of the form `(*b, c, n, c, n)`.
-                        # This assumes that `c = 1`.
+                        # The below operation assumes that `c = 1`.
                         lambda x: x[..., None, :],
                     ),
                     # The inputs of the encoding already are in the squared space, so
