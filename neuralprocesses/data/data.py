@@ -43,6 +43,12 @@ class DataGenerator(metaclass=abc.ABCMeta):
         return (lazy_gen_batch() for _ in range(self.num_batches))
 
 
+def _stack_bounds(dtype, ranges):
+    lower = B.stack(*(B.cast(dtype, l) for l, _ in ranges))
+    upper = B.stack(*(B.cast(dtype, u) for _, u in ranges))
+    return B.to_active_device(lower), B.to_active_device(upper)
+
+
 class SyntheticGenerator(DataGenerator):
     """Synthetic data generator.
 
@@ -53,10 +59,14 @@ class SyntheticGenerator(DataGenerator):
         batch_size (int, optional): Batch size. Defaults to 16.
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
-        x_ranges (tuple[tuple[float, float]...], optional): Ranges of the inputs. Every
-            range corresponds to a dimension of the input, which means that the number
-            of ranges determine the dimensionality of the input. Defaults to
-            `((-2, 2),)`.
+        x_ranges_context (tuple[tuple[float, float]...], optional): Ranges of the inputs
+            of the context points. Every range corresponds to a dimension of the input,
+            which means that the number of ranges determine the dimensionality of the
+            input. Defaults to `((-2, 2),)`.
+        x_ranges_target (tuple[tuple[float, float]...], optional): Ranges of the inputs
+            of the target points. Every range corresponds to a dimension of the input,
+            which means that the number of ranges determine the dimensionality of the
+            input. Defaults to `((-2, 2),)`.
         dim_y (int, optional): Dimensionality of the outputs. Defaults to `1`.
         dim_y_latent (int, optional): If `y_dim > 1`, this specifies the number of
             latent processes. Defaults to `y_dim`.
@@ -76,6 +86,10 @@ class SyntheticGenerator(DataGenerator):
             of `batch_size`.
         num_batches (int): Number batches in an epoch.
         dim_x (int): Dimensionality of the inputs.
+        x_ranges_context (tuple[tuple[float, float]...]): Ranges of the inputs of the
+            context points. Every range corresponds to a dimension of the input.
+        x_ranges_target (tuple[tuple[float, float]...]): Ranges of the inputs of the
+            target points. Every range corresponds to a dimension of the input.
         dim_y (int): Dimensionality of the outputs.
         dim_y_latent (int): If `dim_y > 1`, the number of latent processes.
         h (int): If `dim_y > 1`, the mixing points.
@@ -94,7 +108,8 @@ class SyntheticGenerator(DataGenerator):
         noise=0.05**2,
         batch_size=16,
         num_tasks=2**14,
-        x_ranges=((-2, 2),),
+        x_ranges_context=((-2, 2),),
+        x_ranges_target=((-2, 2),),
         dim_y=1,
         dim_y_latent=None,
         num_context_points=(1, 50),
@@ -123,14 +138,20 @@ class SyntheticGenerator(DataGenerator):
                 f"the batch size {batch_size}."
             )
 
-        self.dim_x = len(x_ranges)
-        # Construct tensors for the bounds on the input range. These must be `float64`s.
-        with B.on_device(self.device):
-            lower = B.stack(*(B.cast(self.float64, l) for l, _ in x_ranges))
-            upper = B.stack(*(B.cast(self.float64, u) for _, u in x_ranges))
-            self.x_ranges = B.to_active_device(lower), B.to_active_device(upper)
+        # Determine the dimensionality of the inputs and outputs..
+        if not len(x_ranges_context) == len(x_ranges_target):
+            raise ValueError(
+                f"The dimensionalities specified in `x_ranges_context` and "
+                f"`x_ranges_target` do not agree."
+            )
+        self.dim_x = len(x_ranges_context)
         self.dim_y = dim_y
         self.dim_y_latent = dim_y_latent or dim_y
+
+        # Construct tensors for the bounds on the input range. These must be `float64`s.
+        with B.on_device(self.device):
+            self.x_ranges_context = _stack_bounds(self.float64, x_ranges_context)
+            self.x_ranges_target = _stack_bounds(self.float64, x_ranges_target)
 
         if self.dim_y > 1:
             # Draw a random mixing matrix.
@@ -194,16 +215,10 @@ class MixtureGenerator(DataGenerator):
         return self.gens[i].generate_batch()
 
 
-def _sample_inputs(gen):
-    # Sample number of context and target points.
-    lower, upper = gen.num_context_points
-    gen.state, num_context_points = B.randint(
-        gen.state, gen.int64, lower=lower, upper=upper + 1
-    )
-    lower, upper = gen.num_target_points
-    gen.state, num_target_points = B.randint(
-        gen.state, gen.int64, lower=lower, upper=upper + 1
-    )
+def _sample_inputs(gen, num_range, x_ranges):
+    # Sample number of points.
+    lower, upper = num_range
+    gen.state, num = B.randint(gen.state, gen.int64, lower=lower, upper=upper + 1)
 
     # Sample inputs.
     gen.state, rand = B.rand(
@@ -211,11 +226,28 @@ def _sample_inputs(gen):
         gen.float64,
         gen.batch_size,
         gen.dim_x,
-        int(num_context_points + num_target_points),
+        int(num),
     )
-    lower, upper = gen.x_ranges
-    # Make sure the appropriately shape the lower and upper bounds.
+    lower, upper = x_ranges
+    # Make sure to appropriately shape the lower and upper bounds.
     x = lower[None, :, None] + rand * (upper[None, :, None] - lower[None, :, None])
+
+    # Return sampled inputs and sampled number of points.
+    return x, num
+
+
+def _sample_all_inputs_noise(gen):
+    xc, num_context_points = _sample_inputs(
+        gen,
+        gen.num_context_points,
+        gen.x_ranges_context,
+    )
+    xt, num_target_points = _sample_inputs(
+        gen,
+        gen.num_target_points,
+        gen.x_ranges_target,
+    )
+    x = B.concat(xc, xt, axis=-1)
 
     # Cast `noise` before moving it to the active device, because Python scalars will
     # not be interpreted as tensors and hence will not be moved to the GPU.
@@ -271,7 +303,7 @@ class GPGenerator(SyntheticGenerator):
             batch = {}
 
             # Sample inputs.
-            x, num_context_points, noise = _sample_inputs(self)
+            x, num_context_points, noise = _sample_all_inputs_noise(self)
 
             # If `self.y_dim > 1`, then we create a multi-output GP. Otherwise, we
             # use a simple regular GP.
@@ -349,7 +381,7 @@ class SawtoothGenerator(SyntheticGenerator):
             batch = {}
 
             # Sample inputs.
-            x, num_context_points, noise = _sample_inputs(self)
+            x, num_context_points, noise = _sample_all_inputs_noise(self)
 
             # Sample a frequency.
             self.state, rand = B.rand(

@@ -13,6 +13,8 @@ def construct_predefined_gens(
     num_tasks=2**14,
     dim_x=1,
     dim_y=1,
+    x_range_context=(-2, 2),
+    x_range_target=(-2, 2),
     pred_logpdf=True,
     pred_logpdf_diag=True,
     device="cpu",
@@ -27,6 +29,10 @@ def construct_predefined_gens(
             integer multiple of `batch_size`. Defaults to 2^14.
         dim_x (int, optional): Dimensionality of the input space. Defaults to `1`.
         dim_y (int, optional): Dimensionality of the output space. Defaults to `1`.
+        x_range_context (tuple[int, int], optional): Range of the inputs of the context
+            points. Defaults to `(-2, 2)`.
+        x_range_target (tuple[int, int], optional): Range of the inputs of the target
+            points. Defaults to `(-2, 2)`.
         pred_logpdf (bool, optional): Also compute the logpdf of the target set given
             the context set under the true GP. Defaults to `True`.
         pred_logpdf_diag (bool, optional): Also compute the logpdf of the target set
@@ -44,7 +50,8 @@ def construct_predefined_gens(
         "seed": seed,
         "num_tasks": num_tasks,
         "batch_size": batch_size,
-        "x_ranges": ((-2, 2),) * dim_x,
+        "x_ranges_context": (x_range_context,) * dim_x,
+        "x_ranges_target": (x_range_target,) * dim_x,
         "dim_y": dim_y,
         "device": device,
     }

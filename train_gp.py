@@ -186,7 +186,6 @@ parser.add_argument(
         "anp",
         "convcnp",
         "convgnp",
-        "convgnp-lc",
         "convnp",
         "fullconvgnp",
     ],
@@ -208,13 +207,19 @@ parser.add_argument(
 )
 parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
 parser.add_argument("--num_samples", type=int, default=1)
+parser.add_argument("--evaluate", action="store_true")
+parser.add_argument(
+    "--evaluate_objective",
+    choices=["loglik", "elbo"],
+    default="loglik",
+)
+parser.add_argument("--evaluate_num_samples", type=int, default=4096)
 args = parser.parse_args()
 
 # Ensure that the `arch` is and only is specified when it is required.
 models_which_require_arch = {
     "convcnp",
     "convgnp",
-    "convgnp-lc",
     "convnp",
     "fullconvgnp",
 }
@@ -245,8 +250,8 @@ else:
     device = "cpu"
 B.set_global_device(device)
 
-# Setup data.
-gen = nps.construct_predefined_gens(
+# Setup data generators for training and for evaluation.
+gen_train = nps.construct_predefined_gens(
     torch.float32,
     seed=10,
     batch_size=args.batch_size,
@@ -257,17 +262,40 @@ gen = nps.construct_predefined_gens(
     pred_logpdf_diag=False,
     device=device,
 )[args.data]
-gen_eval = nps.construct_predefined_gens(
+gen_cv = nps.construct_predefined_gens(
     torch.float32,
     seed=20,  # Use a different seed!
     batch_size=args.batch_size,
-    num_tasks=2**12,
+    num_tasks=2**12,  # Lower the number of tasks.
     dim_x=args.dim_x,
     dim_y=args.dim_y,
     pred_logpdf=True,
     pred_logpdf_diag=True,
     device=device,
 )[args.data]
+gens_eval = [
+    (
+        name,
+        nps.construct_predefined_gens(
+            torch.float32,
+            seed=20,  # Use yet another seed!
+            batch_size=args.batch_size,
+            num_tasks=2**14,  # Use a high number of tasks.
+            dim_x=args.dim_x,
+            dim_y=args.dim_y,
+            pred_logpdf=True,
+            pred_logpdf_diag=True,
+            device=device,
+            x_range_context=x_range_context,
+            x_range_target=x_range_target,
+        )[args.data],
+    )
+    for name, x_range_context, x_range_target in [
+        ("interpolation in training range", (-2, 2), (-2, -2)),
+        ("interpolation beyond training range", (2, 6), (2, 6)),
+        ("extrapolation beyond training range", (-2, 2), (2, 6)),
+    ]
+]
 
 # Setup architecture.
 unet_channels = (64,) * 6
@@ -347,34 +375,6 @@ elif args.model == "convgnp":
         num_basis_functions=512,
         margin=args.margin,
     )
-elif args.model == "convgnp-lc":
-    if args.dim_x != 1:
-        raise NotImplementedError(
-            "`convgnp-lc` currently only supports one-dimensional inputs."
-        )
-    model = nps.construct_convgnp(
-        points_per_unit=points_per_unit,
-        dim_x=args.dim_x,
-        dim_y=args.dim_y,
-        dim_yc=(args.dim_y, 128),
-        likelihood="lowrank",
-        conv_arch=args.arch,
-        unet_channels=unet_channels,
-        dws_channels=dws_channels,
-        dws_receptive_field=dws_receptive_field,
-        num_basis_functions=512,
-        margin=args.margin,
-    )
-
-    with B.on_device(device):
-        x_lc = B.linspace(torch.float32, -2, 2, 256 + 1)[None, None, :]
-        x_lc = B.tile(x_lc, args.batch_size, 1, 1)
-        y_lc_init = B.randn(torch.float32, args.batch_size, 128, 256 + 1)
-    model.y_lc = model.nn.Parameter(y_lc_init)
-
-    def run_model(xc, yc, xt, **kw_args):
-        return model([(xc, yc), (x_lc, model.y_lc)], xt, **kw_args)
-
 elif args.model == "convnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
@@ -406,7 +406,7 @@ else:
 model = model.to(device)
 out.kv("Number of parameters", nps.num_params(model))
 
-# Setup objective.
+# Setup training objective.
 if args.objective == "loglik":
     objective = partial(
         nps.loglik,
@@ -424,27 +424,53 @@ elif args.objective == "elbo":
 else:
     raise RuntimeError(f'Invalid objective "{args.objective}".')
 
-# Setup training loop.
-opt = torch.optim.Adam(model.parameters(), args.rate)
-best_eval_lik = np.inf
+# Setup evaluation objective.
+if args.evaluate_objective == "loglik":
+    evaluate_objective = partial(
+        nps.loglik,
+        model,
+        num_samples=args.evaluate_num_samples,
+        normalise=True,
+    )
+elif args.objective == "elbo":
+    evaluate_objective = partial(
+        nps.elbo,
+        model,
+        num_samples=args.evaluate_num_samples,
+        normalise=True,
+    )
+else:
+    raise RuntimeError(f'Invalid objective "{args.objective}".')
 
-for i in range(args.epochs):
-    with out.Section(f"Epoch {i + 1}"):
-        # Perform an epoch.
-        train(gen, objective)
+if args.evaluate:
+    # Perform evaluation. First, load the best model.
+    model.load_state_dict(torch.load(wd.file("model-batch.torch"), map_location=device))
 
-        # Save current model.
-        torch.save(model.state_dict(), wd.file(f"model-last.torch"))
+    for name, gen in gens_eval:
+        with out.Section(name.capitalize()):
+            eval(gen, evaluate_objective)
+else:
+    # Perform training. Setup training loop.
+    opt = torch.optim.Adam(model.parameters(), args.rate)
+    best_eval_lik = np.inf
 
-        # The epoch is done. Now evaluate.
-        val = eval(gen_eval, objective)
+    for i in range(args.epochs):
+        with out.Section(f"Epoch {i + 1}"):
+            # Perform an epoch.
+            train(gen_train, objective)
 
-        # Check if the model is the new best. If so, save it.
-        if val > best_eval_lik:
-            out.out("New best model!")
-            best_eval_lik = val
-            torch.save(model.state_dict(), wd.file(f"model-best.torch"))
+            # Save current model.
+            torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
-        # Visualise a prediction by the model.
-        if args.dim_x == 1 and args.dim_y == 1:
-            plot_first_of_batch(gen, model)
+            # The epoch is done. Now evaluate.
+            val = eval(gen_cv, objective)
+
+            # Check if the model is the new best. If so, save it.
+            if val > best_eval_lik:
+                out.out("New best model!")
+                best_eval_lik = val
+                torch.save(model.state_dict(), wd.file(f"model-best.torch"))
+
+            # Visualise a prediction by the model.
+            if args.dim_x == 1 and args.dim_y == 1:
+                plot_first_of_batch(gen_train, model)
