@@ -298,7 +298,7 @@ def elbo(
     state = B.global_random_state(B.dtype(xt))
     state, elbos = elbo(state, model, xc, yc, xt, yt, **kw_args)
     B.set_global_random_state(state)
-    return elbo
+    return elbos
 
 
 @_dispatch
