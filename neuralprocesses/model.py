@@ -296,7 +296,7 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
     pred_noiseless = model(
         xc,
         yc,
-        x,
+        xt,
         dtype_enc_sample=torch.float32,
         dtype_lik=torch.float64,
         noiseless=True,
