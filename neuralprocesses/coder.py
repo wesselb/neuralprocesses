@@ -111,7 +111,7 @@ class MapDiagonal:
 def code(coder: MapDiagonal, xz, z, x, **kw_args):
     if coder.map_encoding:
         xz = B.concat(xz, xz, axis=-2)
-    return code(coder.coder, xz, z, (x, x))
+    return code(coder.coder, xz, z, (x, x), **kw_args)
 
 
 def _map_encoding_to_diagonal(xz: B.Numeric):
