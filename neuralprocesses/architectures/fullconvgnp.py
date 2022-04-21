@@ -1,8 +1,15 @@
 import lab as B
 import wbml.out as out
-from plum import convert
 
 import neuralprocesses as nps  # This fixes inspection below.
+from .convgnp import (
+    _convgnp_init_dims,
+    _convgnp_resolve_architecture,
+    _convgnp_construct_encoder_setconvs,
+    _convgnp_optional_division_by_density,
+    _convgnp_construct_decoder_setconv,
+)
+from .util import parse_transform
 from ..util import register_model
 
 __all__ = ["construct_fullconvgnp"]
@@ -27,6 +34,7 @@ def construct_fullconvgnp(
     dws_channels=64,
     encoder_scales=None,
     decoder_scale=None,
+    divide_by_density=True,
     epsilon=1e-4,
     transform=None,
     dtype=None,
@@ -74,53 +82,37 @@ def construct_fullconvgnp(
             to `2 / points_per_unit`.
         decoder_scale (float, optional): Initial value for the length scale of the
             set convolution in the decoder. Defaults to `2 / points_per_unit`.
+        divide_by_density (bool, optional): Divide by the density channel. Defaults
+            to `True`.
         epsilon (float, optional): Epsilon added by the set convolutions before
             dividing by the density channel. Defaults to `1e-4`.
         transform (str or tuple[float, float], optional): Bijection applied to the
-            output of the ConvGNP. This can help deal with positive of bounded data.
-            Must be either "positive" for positive data or `(lower, upper)` for data
+            output of the model. This can help deal with positive of bounded data.
+            Must be either `"positive"` for positive data or `(lower, upper)` for data
             in this open interval.
         dtype (dtype, optional): Data type.
 
     Returns:
         :class:`.model.Model`: FullConvGNP model.
     """
-    # Make sure that `dim_yc` is initialised and a tuple.
-    dim_yc = convert(dim_yc or dim_y, tuple)
-    # Make sure that `dim_yt` is initialised.
-    dim_yt = dim_yt or dim_y
-    # `len(dim_yc)` is equal to the number of density channels. Also add one to account
-    # for the identity channel.
-    conv_in_channels = sum(dim_yc) + len(dim_yc)
+    dim_yc, dim_yt, conv_in_channels = _convgnp_init_dims(dim_yc, dim_yt, dim_y)
 
-    # This model does not yet support multi-dimensional targets.
+    # This model does not yet support multi-dimensional inputs or targets.
     if not (dim_x == 1 and dim_yt == 1):
         raise NotImplementedError(
             "The FullConvGNP for now only supports single-dimensional inputs and "
             "single-dimensional targets."
         )
 
-    # Resolve architecture.
-    if conv_arch == "unet":
-        pass  # No requirements
-    elif conv_arch == "dws":
-        if dws_receptive_field is None:
-            raise ValueError(f"Must specify `dws_receptive_field`.")
-    else:
-        raise ValueError(f'Architecture "{conv_arch}" invalid.')
+    # Resolve the architecture.
+    _convgnp_resolve_architecture(
+        conv_arch,
+        unet_channels,
+        dws_channels,
+        dws_receptive_field,
+    )
 
-    # If `transform` is set to a value, apply the transform.
-    if isinstance(transform, str) and transform.lower() == "positive":
-        transform = nps.Transform.positive()
-    elif isinstance(transform, tuple):
-        lower, upper = transform
-        transform = nps.Transform.bounded(lower, upper)
-    elif transform is not None:
-        raise ValueError(f'Cannot parse value "{transform}" for `transform`.')
-    else:
-        transform = lambda x: x
-
-    # Construct the core CNN architecture of the model.
+    # Construct the core CNN architectures of the model.
     if conv_arch == "unet":
         conv_mean = nps.UNet(
             dim=dim_x,
@@ -170,7 +162,7 @@ def construct_fullconvgnp(
     else:
         raise ValueError(f'Architecture "{conv_arch}" invalid.')
 
-    # Construct the discretisation, taking into account that the input to the UNet
+    # Construct the discretisations, taking into account that the input to the UNet
     # must play nice with the halving layers.
     disc_mean = nps.Discretisation(
         points_per_unit=points_per_unit,
@@ -185,27 +177,6 @@ def construct_fullconvgnp(
         dim=dim_x,  # Only 1D, because the input is later repeated to make it 2D.
     )
 
-    # Construct a separate set conv for every context set.
-    encoder_mean_scales = encoder_scales or 2 / disc_mean.points_per_unit
-    if not isinstance(encoder_mean_scales, (tuple, list)):
-        encoder_mean_scales = (encoder_mean_scales,) * len(dim_yc)
-    encoder_mean_set_conv = nps.Parallel(
-        *(nps.SetConv(s, dtype=dtype) for s in encoder_mean_scales)
-    )
-    encoder_kernel_scales = encoder_scales or 2 / disc_kernel.points_per_unit
-    if not isinstance(encoder_kernel_scales, (tuple, list)):
-        encoder_kernel_scales = (encoder_kernel_scales,) * len(dim_yc)
-    # Multiply by two since we halved the PPU.
-    encoder_kernel_set_conv = nps.Parallel(
-        *(nps.SetConv(2 * s, dtype=dtype) for s in encoder_kernel_scales)
-    )
-
-    # Resolve length scales for decoders.
-    decoder_mean_scale = decoder_scale or 2 / disc_mean.points_per_unit
-    decoder_kernel_scale = decoder_scale or 2 / disc_kernel.points_per_unit
-    # Multiply by two since we halved the PPU.
-    decoder_kernel_scale *= 2
-
     # Construct model.
     model = nps.Model(
         nps.Parallel(
@@ -213,8 +184,18 @@ def construct_fullconvgnp(
                 disc_mean,
                 nps.Chain(
                     nps.PrependDensityChannel(),
-                    encoder_mean_set_conv,
-                    nps.DivideByFirstChannel(epsilon=epsilon),
+                    _convgnp_construct_encoder_setconvs(
+                        nps,
+                        encoder_scales,
+                        dim_yc,
+                        disc_mean,
+                        dtype,
+                    ),
+                    _convgnp_optional_division_by_density(
+                        nps,
+                        divide_by_density,
+                        epsilon,
+                    ),
                     nps.Materialise(),
                     nps.DeterministicLikelihood(),
                 ),
@@ -224,8 +205,21 @@ def construct_fullconvgnp(
                 nps.MapDiagonal(  # Map to diagonal of squared space.
                     nps.Chain(
                         nps.PrependDensityChannel(),
-                        encoder_kernel_set_conv,
-                        nps.DivideByFirstChannel(epsilon=epsilon),
+                        _convgnp_construct_encoder_setconvs(
+                            nps,
+                            encoder_scales,
+                            dim_yc,
+                            disc_kernel,
+                            dtype,
+                            # Multiply the initialisation by two since we halved the
+                            # PPU.
+                            init_factor=2,
+                        ),
+                        _convgnp_optional_division_by_density(
+                            nps,
+                            divide_by_density,
+                            epsilon,
+                        ),
                         nps.Materialise(),
                         # We only need the identity channel once, so insert it after
                         # materialising.
@@ -239,7 +233,12 @@ def construct_fullconvgnp(
             nps.Parallel(
                 nps.Chain(
                     conv_mean,
-                    nps.SetConv(decoder_mean_scale, dtype=dtype),
+                    _convgnp_construct_decoder_setconv(
+                        nps,
+                        decoder_scale,
+                        disc_mean,
+                        dtype,
+                    ),
                 ),
                 nps.MapDiagonal(
                     nps.Chain(
@@ -247,7 +246,15 @@ def construct_fullconvgnp(
                         # Ensure that the kernel is PD before before applying the
                         # smoothing. Divide by 1000 to stabilise initialisation.
                         lambda x: B.matmul(x, x, tr_b=True) / 1000,
-                        nps.SetConv(decoder_kernel_scale, dtype=dtype),
+                        _convgnp_construct_decoder_setconv(
+                            nps,
+                            decoder_scale,
+                            disc_kernel,
+                            dtype,
+                            # Multiply the initialisation by two since we halved the
+                            # PPU.
+                            init_factor=2,
+                        ),
                         # Ensure that the encoding is of the form `(*b, c, n, c, n)`.
                         # The below operation assumes that `c = 1`.
                         lambda x: x[..., None, :],
@@ -258,7 +265,7 @@ def construct_fullconvgnp(
                 ),
             ),
             nps.DenseGaussianLikelihood(),
-            transform,
+            parse_transform(nps, transform=transform),
         ),
     )
 

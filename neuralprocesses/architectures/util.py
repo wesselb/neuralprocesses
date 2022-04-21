@@ -2,7 +2,10 @@ import lab as B
 
 import neuralprocesses as nps  # This fixes inspection below.
 
-__all__ = ["construct_likelihood"]
+__all__ = [
+    "construct_likelihood",
+    "parse_transform",
+]
 
 
 def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
@@ -18,8 +21,8 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
         dtype (dtype): Data type. Must be given as a keyword argument.
 
     Returns:
-        tuple[int, coder]: Number of channels that the likelihood requires and the
-            likelihood.
+        int: Number of channels that the likelihood requires.
+        coder: Coder.
     """
     if spec == "het":
         num_channels = 2 * dim_y
@@ -51,3 +54,28 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
     else:
         raise ValueError(f'Incorrect likelihood specification "{spec}".')
     return num_channels, lik
+
+
+def parse_transform(nps=nps, *, transform):
+    """Construct the likelihood.
+
+    Args:
+        nps (module): Appropriate backend-specific module.
+        transform (str or tuple[float, float]): Bijection applied to the
+            output of the model. This can help deal with positive of bounded data.
+            Must be either `"positive"` for positive data or `(lower, upper)` for data
+            in this open interval.
+
+    Returns:
+        coder: Transform.
+    """
+    if isinstance(transform, str) and transform.lower() == "positive":
+        transform = nps.Transform.positive()
+    elif isinstance(transform, tuple):
+        lower, upper = transform
+        transform = nps.Transform.bounded(lower, upper)
+    elif transform is not None:
+        raise ValueError(f'Cannot parse value "{transform}" for `transform`.')
+    else:
+        transform = lambda x: x
+    return transform

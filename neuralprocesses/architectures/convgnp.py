@@ -2,10 +2,78 @@ import wbml.out as out
 from plum import convert
 
 import neuralprocesses as nps  # This fixes inspection below.
-from .util import construct_likelihood
+from .util import construct_likelihood, parse_transform
 from ..util import register_model
 
 __all__ = ["construct_convgnp"]
+
+
+def _convgnp_init_dims(dim_yc, dim_yt, dim_y):
+    # Make sure that `dim_yc` is initialised and a tuple.
+    dim_yc = convert(dim_yc or dim_y, tuple)
+    # Make sure that `dim_yt` is initialised.
+    dim_yt = dim_yt or dim_y
+    # `len(dim_yc)` is equal to the number of density channels.
+    conv_in_channels = sum(dim_yc) + len(dim_yc)
+    return dim_yc, dim_yt, conv_in_channels
+
+
+def _convgnp_resolve_architecture(
+    conv_arch,
+    unet_channels,
+    dws_channels,
+    dws_receptive_field,
+):
+    if conv_arch == "unet":
+        conv_out_channels = unet_channels[0]
+    elif conv_arch == "dws":
+        conv_out_channels = dws_channels
+        if dws_receptive_field is None:
+            raise ValueError(f"Must specify `dws_receptive_field`.")
+    else:
+        raise ValueError(f'Architecture "{conv_arch}" invalid.')
+    return conv_out_channels
+
+
+def _convgnp_construct_encoder_setconvs(
+    nps,
+    encoder_scales,
+    dim_yc,
+    disc,
+    dtype,
+    init_factor=1,
+):
+    # Initialise scale.
+    if encoder_scales is not None:
+        encoder_scales = factor * encoder_scales
+    else:
+        encoder_scales = disc.points_per_unit
+    # Ensure that there is one for every context set.
+    if not isinstance(encoder_scales, (tuple, list)):
+        encoder_scales = (encoder_scales,) * len(dim_yc)
+    # Construct set convs.
+    return nps.Parallel(*(nps.SetConv(s, dtype=dtype) for s in encoder_scales))
+
+
+def _convgnp_construct_decoder_setconv(
+    nps,
+    decoder_scale,
+    disc,
+    dtype,
+    init_factor=1,
+):
+    if decoder_scale is not None:
+        decoder_scale = factor * decoder_scale
+    else:
+        decoder_scale = 2 / disc.points_per_unit
+    return nps.SetConv(decoder_scale, dtype=dtype)
+
+
+def _convgnp_optional_division_by_density(nps, divide_by_density, epsilon):
+    if divide_by_density:
+        return nps.DivideByFirstChannel(epsilon=epsilon)
+    else:
+        return lambda x: x
 
 
 @register_model
@@ -98,20 +166,15 @@ def construct_convgnp(
         epsilon (float, optional): Epsilon added by the set convolutions before
             dividing by the density channel. Defaults to `1e-4`.
         transform (str or tuple[float, float], optional): Bijection applied to the
-            output of the ConvGNP. This can help deal with positive of bounded data.
-            Must be either "positive" for positive data or `(lower, upper)` for data
+            output of the model. This can help deal with positive of bounded data.
+            Must be either `"positive"` for positive data or `(lower, upper)` for data
             in this open interval.
         dtype (dtype, optional): Data type.
 
     Returns:
         :class:`.model.Model`: ConvGNP model.
     """
-    # Make sure that `dim_yc` is initialised and a tuple.
-    dim_yc = convert(dim_yc or dim_y, tuple)
-    # Make sure that `dim_yt` is initialised.
-    dim_yt = dim_yt or dim_y
-    # `len(dim_yc)` is equal to the number of density channels.
-    conv_in_channels = sum(dim_yc) + len(dim_yc)
+    dim_yc, dim_yt, conv_in_channels = _convgnp_init_dims(dim_yc, dim_yt, dim_y)
 
     # Construct likelihood of the encoder, which depends on whether we're using a
     # latent variable or not.
@@ -136,16 +199,13 @@ def construct_convgnp(
         dtype=dtype,
     )
 
-    # Resolve architecture.
-    if conv_arch == "unet":
-        conv_out_channels = unet_channels[0]
-    elif conv_arch == "dws":
-        conv_out_channels = dws_channels
-
-        if dws_receptive_field is None:
-            raise ValueError(f"Must specify `dws_receptive_field`.")
-    else:
-        raise ValueError(f'Architecture "{conv_arch}" invalid.')
+    # Resolve the architecture.
+    conv_out_channels = _convgnp_resolve_architecture(
+        conv_arch,
+        unet_channels,
+        dws_channels,
+        dws_receptive_field,
+    )
 
     # If `dim_aux_t` is given, contruct an MLP which will use the auxiliary
     # information from the augmented inputs.
@@ -165,17 +225,6 @@ def construct_convgnp(
         # There is no auxiliary MLP available, so the CNN will have to produce the
         # right number of channels.
         conv_out_channels = likelihood_in_channels
-
-    # If `transform` is set to a value, apply the transform.
-    if isinstance(transform, str) and transform.lower() == "positive":
-        transform = nps.Transform.positive()
-    elif isinstance(transform, tuple):
-        lower, upper = transform
-        transform = nps.Transform.bounded(lower, upper)
-    elif transform is not None:
-        raise ValueError(f'Cannot parse value "{transform}" for `transform`.')
-    else:
-        transform = lambda x: x
 
     # Construct the core CNN architectures for the encoder, which is only necessary
     # if we're using a latent variable, and for the decoder. First, we determine
@@ -254,31 +303,20 @@ def construct_convgnp(
         dim=dim_x,
     )
 
-    # Construct a separate set conv for every context set.
-    encoder_scales = encoder_scales or 2 / disc.points_per_unit
-    if not isinstance(encoder_scales, (tuple, list)):
-        encoder_scales = (encoder_scales,) * len(dim_yc)
-    encoder_set_conv = nps.Parallel(
-        *(nps.SetConv(s, dtype=dtype) for s in encoder_scales)
-    )
-
-    # Check if we want to divide by the density channel.
-    if divide_by_density:
-        density_divisor = nps.DivideByFirstChannel(epsilon=epsilon)
-    else:
-        density_divisor = lambda x: x
-
-    # Resolve length scale for decoder.
-    decoder_scale = decoder_scale or 2 / disc.points_per_unit
-
     # Construct model.
     model = nps.Model(
         nps.FunctionalCoder(
             disc,
             nps.Chain(
                 nps.PrependDensityChannel(),
-                encoder_set_conv,
-                density_divisor,
+                _convgnp_construct_encoder_setconvs(
+                    nps,
+                    encoder_scales,
+                    dim_yc,
+                    disc,
+                    dtype,
+                ),
+                _convgnp_optional_division_by_density(nps, divide_by_density, epsilon),
                 nps.Materialise(),
                 lv_conv,
                 encoder_likelihood,
@@ -286,9 +324,9 @@ def construct_convgnp(
         ),
         nps.Chain(
             conv,
-            nps.SetConv(decoder_scale, dtype=dtype),
+            _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
             likelihood,
-            transform,
+            parse_transform(nps, transform=transform),
         ),
     )
 

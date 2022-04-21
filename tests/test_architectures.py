@@ -175,17 +175,17 @@ def model_sample(request, nps, config):
     xc, yc, xt, yt = generate_data(nps, dim_x=config["dim_x"], dim_y=config["dim_y"])
     model(xc, yc, xt)
 
-    # Perturb all parameters to make sure that the biases aren't initialised to zero. If
+    # Pertub zero parameters to make sure that the biases aren't initialised to zero. If
     # biases are initialised to zero, then this can give zeros in the output if the
     # input is zero.
     if isinstance(nps.dtype, B.TFDType):
         weights = []
         for p in model.get_weights():
-            weights.append(p + 1e-3 * B.randn(p))
+            weights.append(B.where(p == 0, B.randn(p), p))
         model.set_weights(weights)
     elif isinstance(nps.dtype, B.TorchDType):
         for p in model.parameters():
-            p.data = p.data + 1e-3 * B.randn(p.data)
+            p.data = B.where(p.data == 0, B.randn(p.data), p.data)
     else:
         raise RuntimeError("I don't know how to perturb the parameters of the model.")
 
