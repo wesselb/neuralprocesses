@@ -84,7 +84,7 @@ def first_np(x):
         raise ValueError(f"Rank must be two, three, or four.")
 
 
-def plot_first_of_batch(model, gen):
+def plot_first_of_batch(model, gen, *, epoch, name_prefix):
     """Plot the prediction for the first element of a batch."""
     batch = gen.generate_batch()
 
@@ -167,7 +167,7 @@ def plot_first_of_batch(model, gen):
 
     plt.xlim(B.min(x), B.max(x))
     tweak()
-    plt.savefig(wd.file(f"epoch-{i:03d}.pdf"))
+    plt.savefig(wd.file(f"{name_prefix}-epoch-{epoch:03d}.pdf"))
     plt.close()
 
 
@@ -472,4 +472,4 @@ else:
 
             # Visualise a prediction by the model.
             if args.dim_x == 1 and args.dim_y == 1:
-                plot_first_of_batch(model, gen_cv)
+                plot_first_of_batch(model, gen_cv, epoch=i, name_prefix="train")
