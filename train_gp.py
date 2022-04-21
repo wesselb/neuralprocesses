@@ -174,11 +174,11 @@ def plot_first_of_batch(model, gen, *, name, epoch):
 # Setup arguments.
 parser = argparse.ArgumentParser()
 parser.add_argument("--subdir", type=str, nargs="*")
-parser.add_argument("--dim_x", type=int, default=1)
-parser.add_argument("--dim_y", type=int, default=1)
+parser.add_argument("--dim-x", type=int, default=1)
+parser.add_argument("--dim-y", type=int, default=1)
 parser.add_argument("--epochs", type=int, default=200)
 parser.add_argument("--rate", type=float, default=1e-4)
-parser.add_argument("--batch_size", type=int, default=16)
+parser.add_argument("--batch-size", type=int, default=16)
 parser.add_argument(
     "--model",
     choices=[
@@ -197,7 +197,7 @@ parser.add_argument(
 )
 parser.add_argument("--arch", choices=["unet", "dws"], default="unet")
 parser.add_argument("--margin", type=float, default=0.1)
-parser.add_argument("--receptive_field", type=float, default=2)
+parser.add_argument("--receptive-field", type=float, default=2)
 parser.add_argument(
     "--data",
     choices=[
@@ -210,14 +210,15 @@ parser.add_argument(
     default="eq",
 )
 parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
-parser.add_argument("--num_samples", type=int, default=1)
+parser.add_argument("--num-samples", type=int, default=1)
+parser.add_argument("--resume-at-epoch", type=int)
 parser.add_argument("--evaluate", action="store_true")
 parser.add_argument(
-    "--evaluate_objective",
+    "--evaluate-objective",
     choices=["loglik", "elbo"],
     default="loglik",
 )
-parser.add_argument("--evaluate_num_samples", type=int, default=4096)
+parser.add_argument("--evaluate-num-samples", type=int, default=4096)
 args = parser.parse_args()
 
 # Remove the architecture argument if a model doesn't use it.
@@ -448,17 +449,25 @@ if args.evaluate:
     # Visualise some predictions by the model.
     if args.dim_x == 1 and args.dim_y == 1:
         for i in range(10):
-            plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i)
+            plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
 
     for name, gen in gens_eval:
         with out.Section(name.capitalize()):
             eval(state, model, evaluate_objective, gen)
 else:
-    # Perform training. Setup training loop.
+    # Perform training. First, check we want to resume training.
+    start = 0
+    if args.resume_at_epoch:
+        start = args.resume_at_epoch - 1
+        model.load_state_dict(
+            torch.load(wd.file("model-last.torch"), map_location=device)
+        )
+
+    # Setup training loop.
     opt = torch.optim.Adam(model.parameters(), args.rate)
     best_eval_lik = -np.inf
 
-    for i in range(args.epochs):
+    for i in range(start, args.epochs):
         with out.Section(f"Epoch {i + 1}"):
             # Perform an epoch.
             state = train(state, model, objective, gen_train)
@@ -477,4 +486,4 @@ else:
 
             # Visualise a prediction by the model.
             if args.dim_x == 1 and args.dim_y == 1:
-                plot_first_of_batch(model, gen_cv, name="train-epoch", epoch=i)
+                plot_first_of_batch(model, gen_cv, name="train-epoch", epoch=i + 1)
