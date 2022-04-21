@@ -286,6 +286,9 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
         tensor: Marginal variance.
         tensor: `num_samples` noiseless samples.
     """
+    float = B.dtype_float(xt)
+    float64 = B.promote_dtypes(float, np.float64)
+
     # Predict marginal statistics.
     pred = model(xc, yc, xt, num_samples=pred_num_samples)
     m1 = B.mean(pred.mean, axis=0)
@@ -297,8 +300,8 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
         xc,
         yc,
         xt,
-        dtype_enc_sample=torch.float32,
-        dtype_lik=torch.float64,
+        dtype_enc_sample=float,
+        dtype_lik=float64,
         noiseless=True,
         num_samples=num_samples,
     )
