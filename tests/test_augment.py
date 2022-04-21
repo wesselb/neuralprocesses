@@ -1,9 +1,11 @@
 import lab as B
+import pytest
 
 from .test_architectures import check_prediction
 from .util import nps  # noqa
 
 
+@pytest.mark.flaky(reruns=3)
 def test_convgnp_auxiliary_variable(nps):
     model = nps.construct_convgnp(
         dim_x=2,
