@@ -177,7 +177,7 @@ parser.add_argument("--subdir", type=str, nargs="*")
 parser.add_argument("--dim-x", type=int, default=1)
 parser.add_argument("--dim-y", type=int, default=1)
 parser.add_argument("--epochs", type=int, default=200)
-parser.add_argument("--rate", type=float, default=1e-4)
+parser.add_argument("--rate", type=float, default=3e-4)
 parser.add_argument("--batch-size", type=int, default=16)
 parser.add_argument(
     "--model",
