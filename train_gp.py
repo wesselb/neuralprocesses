@@ -447,7 +447,7 @@ if args.evaluate:
 
     for name, gen in gens_eval:
         with out.Section(name.capitalize()):
-            eval(gen, evaluate_objective)
+            eval(state, model, evaluate_objective, gen)
 else:
     # Perform training. Setup training loop.
     opt = torch.optim.Adam(model.parameters(), args.rate)
