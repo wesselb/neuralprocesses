@@ -81,11 +81,17 @@ class Dirac(AbstractMultiOutputDistribution):
     """A Dirac delta.
 
     Args:
-        x (tensor): Position of the Dirac delta of shape `(*b, c, n)`.
+        x (tensor): Position of the Dirac delta of shape `(*b, c, *n)`.
+        d (int): Dimensionality of the data, i.e. `len(n)`.
+
+    Attributes:
+        x (tensor): Position of the Dirac delta of shape `(*b, c, *n)`.
+        d (int): Dimensionality of the data, i.e. `len(n)`.
     """
 
-    def __init__(self, x):
+    def __init__(self, x, d):
         self.x = x
+        self.d = d
 
     def __repr__(self):
         return f"<Dirac:\n" + indented_kv("x", repr(self.x), suffix=">")
@@ -100,11 +106,11 @@ class Dirac(AbstractMultiOutputDistribution):
     @property
     def var(self):
         with B.on_device(self.x):
-            return B.zeros(x)
+            return B.zeros(self.x)
 
     def logpdf(self, x):
         with B.on_device(self.x):
-            return B.zeros(B.dtype(self.x), *batch(x, 2))
+            return B.zeros(B.dtype(self.x), *batch(self.x, self.d + 1))
 
     @_dispatch
     def sample(self, state: B.RandomState, num=1):
@@ -119,7 +125,7 @@ class Dirac(AbstractMultiOutputDistribution):
 
     def kl(self, other: "Dirac"):
         with B.on_device(self.x):
-            return B.zeros(B.dtype(self.x), *batch(self.x, 2))
+            return B.zeros(B.dtype(self.x), *batch(self.x, self.d + 1))
 
 
 @_dispatch

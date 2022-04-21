@@ -32,7 +32,7 @@ def code(
 ):
     if dtype_lik:
         z = B.cast(dtype_lik, z)
-    return xz, Dirac(z)
+    return xz, Dirac(z, data_dims(xz))
 
 
 @register_module

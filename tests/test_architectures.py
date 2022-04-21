@@ -144,18 +144,19 @@ def config(request):
 def nps(request, nps_fixed_dtype):
     nps = nps_fixed_dtype
 
+    # Safely make a copy of `nps` so that we can modify the value of `dtype` without
+    # the changes having side effects.
+
+    class Namespace:
+        pass
+
+    nps_copy = Namespace()
+    for attr in nps.__dir__():
+        setattr(nps_copy, attr, getattr(nps, attr))
+    nps = nps_copy
+
     # Use `float64`s or not?
     if request.param:
-        # Safely make a copy of `nps` so that we can modify the value of `dtype` without
-        # the changes having side effects.
-
-        class Namespace:
-            pass
-
-        nps_copy = Namespace()
-        for attr in nps.__dir__():
-            setattr(nps_copy, attr, getattr(nps, attr))
-        nps = nps_copy
         nps.dtype = nps.dtype64
 
     return nps
@@ -164,6 +165,7 @@ def nps(request, nps_fixed_dtype):
 @pytest.fixture(scope="module")
 def model_sample(request, nps, config):
     # Construct model.
+    nps.config = config  # Save the config for easier debugging.
     config = dict(config)
     constructor = getattr(nps, config["constructor"])
     del config["constructor"]
@@ -214,6 +216,39 @@ def test_forward(nps, model_sample):
     # Check passing in a non-empty context set.
     pred = model(xc, yc, xt, batch_size=2, unused_arg=None)
     check_prediction(nps, pred, yt)
+
+
+@pytest.mark.flaky(reruns=3)
+def test_elbo(nps, model_sample):
+    model, sample = model_sample
+    xc, yc, xt, yt = sample()
+    elbo = B.mean(nps.elbo(model, xc, yc, xt, yt, num_samples=2))
+    assert np.isfinite(B.to_numpy(elbo))
+
+
+@pytest.mark.flaky(reruns=3)
+def test_loglik(nps, model_sample):
+    model, sample = model_sample
+    xc, yc, xt, yt = sample()
+    logpdfs = B.mean(nps.loglik(model, xc, yc, xt, yt, num_samples=2))
+    assert np.isfinite(B.to_numpy(logpdfs))
+
+
+@pytest.mark.flaky(reruns=3)
+def test_predict(nps, model_sample):
+    model, sample = model_sample
+    xc, yc, xt, yt = sample()
+    mean, var, samples = nps.predict(
+        model,
+        xc,
+        yc,
+        xt,
+        num_samples=2,
+        pred_num_samples=2,
+    )
+    assert B.shape(mean) == B.shape(yt)
+    assert B.shape(var) == B.shape(yt)
+    assert B.shape(samples) == (2,) + B.shape(yt)
 
 
 @pytest.mark.flaky(reruns=3)

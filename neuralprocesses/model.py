@@ -352,7 +352,12 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
     epsilon_before = B.epsilon
     while True:
         try:
-            samples = pred_noiseless.sample()
+            if B.shape(pred_noiseless.mean, 0) == 1:
+                # Model didn't have any internal stochastic component. Sample the output
+                # multiple times.
+                samples = pred_noiseless.sample(num_samples)[:, 0, ...]
+            else:
+                samples = pred_noiseless.sample()
             break
         except Exception as e:
             B.epsilon *= 10
