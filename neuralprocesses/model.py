@@ -113,7 +113,7 @@ class Model:
         **kw_args,
     ):
         state = B.global_random_state(B.dtype(xt))
-        state, d = self(state, xc, yc, xt, **kw_args)
+        state, d = self(state, contexts, xt, **kw_args)
         B.set_global_random_state(state)
         return d
 
