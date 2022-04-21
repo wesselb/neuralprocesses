@@ -237,6 +237,7 @@ wd = WorkingDirectory(
     args.objective,
     *((args.arch,) if args.arch else ()),
     f"x{args.dim_x}_y{args.dim_y}",
+    log="log_evaluate.txt" if args.evaluate else "log.txt",
 )
 
 # Use a GPU if one is available.
