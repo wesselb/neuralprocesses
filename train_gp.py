@@ -444,7 +444,7 @@ else:
 
 if args.evaluate:
     # Perform evaluation. First, load the best model.
-    model.load_state_dict(torch.load(wd.file("model-batch.torch"), map_location=device))
+    model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
 
     for name, gen in gens_eval:
         with out.Section(name.capitalize()):
@@ -452,7 +452,7 @@ if args.evaluate:
 else:
     # Perform training. Setup training loop.
     opt = torch.optim.Adam(model.parameters(), args.rate)
-    best_eval_lik = np.inf
+    best_eval_lik = -np.inf
 
     for i in range(args.epochs):
         with out.Section(f"Epoch {i + 1}"):
