@@ -65,7 +65,7 @@ def with_err(vals):
     vals = B.to_numpy(vals)
     mean = B.mean(vals)
     err = 1.96 * B.std(vals) / B.sqrt(B.length(vals))
-    return f"{mean:7.3f} +- {err:7.3f}"
+    return f"{mean:8.4f} +- {err:8.4f}"
 
 
 def first_np(x):
