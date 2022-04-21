@@ -86,6 +86,10 @@ def first_np(x, i=0):
 
 def plot_first_of_batch(model, gen, *, name, epoch):
     """Plot the prediction for the first element of a batch."""
+    if args.dim_x > 1:
+        # TODO: Implement this.
+        return
+
     batch = gen.generate_batch()
 
     # Define points to predict at.
@@ -496,9 +500,8 @@ if args.evaluate:
     model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
 
     # Visualise some predictions by the model.
-    if args.dim_x == 1:
-        for i in range(10):
-            plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
+    for i in range(10):
+        plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
 
     for name, gen in gens_eval:
         with out.Section(name.capitalize()):
@@ -534,5 +537,4 @@ else:
                 torch.save(model.state_dict(), wd.file(f"model-best.torch"))
 
             # Visualise a prediction by the model.
-            if args.dim_x == 1 and args.dim_y == 1:
-                plot_first_of_batch(model, gen_cv, name="train-epoch", epoch=i + 1)
+            plot_first_of_batch(model, gen_cv, name="train-epoch", epoch=i + 1)
