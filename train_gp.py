@@ -13,29 +13,33 @@ from wbml.plot import tweak
 import neuralprocesses.torch as nps
 
 
-def train(gen, objective):
+def train(state, model, objective, gen):
     """Train for an epoch."""
     for batch in gen.epoch():
-        # Be sure to negate the output of `objective`.
-        val = -B.mean(
-            objective(
-                batch["xc"],
-                batch["yc"],
-                batch["xt"],
-                batch["yt"],
-            )
+        state, obj = objective(
+            state,
+            model,
+            batch["xc"],
+            batch["yc"],
+            batch["xt"],
+            batch["yt"],
         )
+        # Be sure to negate the output of `objective`.
+        val = -B.mean(obj)
         opt.zero_grad(set_to_none=True)
         val.backward()
         opt.step()
+    return state
 
 
-def eval(gen, objective):
+def eval(state, model, objective, gen):
     """Perform evaluation."""
     with torch.no_grad():
         vals, kls, kls_diag = [], [], []
         for batch in gen.epoch():
-            obj = objective(
+            state, obj = objective(
+                state,
+                model,
                 batch["xc"],
                 batch["yc"],
                 batch["xt"],
@@ -57,7 +61,7 @@ def eval(gen, objective):
         if kls_diag:
             out.kv("KL (diag)", with_err(B.concat(*kls_diag)))
 
-        return B.mean(B.concat(*vals))
+        return state, B.mean(B.concat(*vals))
 
 
 def with_err(vals):
@@ -80,7 +84,7 @@ def first_np(x):
         raise ValueError(f"Rank must be two, three, or four.")
 
 
-def plot_first_of_batch(gen, model):
+def plot_first_of_batch(model, gen):
     """Plot the prediction for the first element of a batch."""
     batch = gen.generate_batch()
 
@@ -246,6 +250,8 @@ if torch.cuda.is_available():
 else:
     device = "cpu"
 B.set_global_device(device)
+# Maintain an explicit random state through the execution.
+state = B.create_random_state(torch.float32, seed=0)
 
 # Setup data generators for training and for evaluation.
 gen_train = nps.construct_predefined_gens(
@@ -296,7 +302,7 @@ gens_eval = [
 
 # Setup architecture.
 unet_channels = (64,) * 6
-dws_channels = 128
+dws_channels = 64
 dws_receptive_field = args.receptive_field
 if args.dim_x == 1:
     points_per_unit = 64
@@ -407,14 +413,12 @@ out.kv("Number of parameters", nps.num_params(model))
 if args.objective == "loglik":
     objective = partial(
         nps.loglik,
-        model,
         num_samples=args.num_samples,
         normalise=True,
     )
 elif args.objective == "elbo":
     objective = partial(
         nps.elbo,
-        model,
         num_samples=args.num_samples,
         normalise=True,
     )
@@ -425,14 +429,12 @@ else:
 if args.evaluate_objective == "loglik":
     evaluate_objective = partial(
         nps.loglik,
-        model,
         num_samples=args.evaluate_num_samples,
         normalise=True,
     )
 elif args.objective == "elbo":
     evaluate_objective = partial(
         nps.elbo,
-        model,
         num_samples=args.evaluate_num_samples,
         normalise=True,
     )
@@ -454,13 +456,13 @@ else:
     for i in range(args.epochs):
         with out.Section(f"Epoch {i + 1}"):
             # Perform an epoch.
-            train(gen_train, objective)
+            state = train(state, model, objective, gen_train)
 
             # Save current model.
             torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
             # The epoch is done. Now evaluate.
-            val = eval(gen_cv, objective)
+            state, val = eval(state, model, objective, gen_cv)
 
             # Check if the model is the new best. If so, save it.
             if val > best_eval_lik:
@@ -470,4 +472,4 @@ else:
 
             # Visualise a prediction by the model.
             if args.dim_x == 1 and args.dim_y == 1:
-                plot_first_of_batch(gen_train, model)
+                plot_first_of_batch(model, gen_cv)
