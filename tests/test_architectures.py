@@ -181,11 +181,11 @@ def model_sample(request, nps, config):
     if isinstance(nps.dtype, B.TFDType):
         weights = []
         for p in model.get_weights():
-            weights.append(p + 0.01 * B.randn(p))
+            weights.append(p + 1e-3 * B.randn(p))
         model.set_weights(weights)
     elif isinstance(nps.dtype, B.TorchDType):
         for p in model.parameters():
-            p.data = p.data + 0.01 * B.randn(p.data)
+            p.data = p.data + 1e-3 * B.randn(p.data)
     else:
         raise RuntimeError("I don't know how to perturb the parameters of the model.")
 

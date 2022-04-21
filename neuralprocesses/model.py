@@ -160,6 +160,7 @@ def loglik(
     yt,
     *,
     num_samples=1,
+    batch_size=256,
     normalise=True,
     **kw_args,
 ):
@@ -173,6 +174,7 @@ def loglik(
         xt (tensor): Inputs of the target set.
         yt (tensor): Outputs of the target set.
         num_samples (int, optional): Number of samples. Defaults to 1.
+        batch_size (int, optional): Batch size to use for sampling. Defaults to 256.
         normalise (bool, optional): Normalise the objective by the number of targets.
             Defaults to `True`.
 
@@ -183,17 +185,33 @@ def loglik(
     float = B.dtype_float(yt)
     float64 = B.promote_dtypes(float, np.float64)
 
-    state, pred = model(
-        state,
-        xc,
-        yc,
-        xt,
-        num_samples=num_samples,
-        dtype_enc_sample=float,
-        dtype_lik=float64,
-        **kw_args,
-    )
-    logpdfs = pred.logpdf(B.cast(float64, yt))
+    # Sample in batches to alleviate memory requirements.
+    logpdfs = None
+    done_num_samples = 0
+    while done_num_samples < num_samples:
+        # Limit the number of samples at the batch size.
+        this_num_samples = min(num_samples - done_num_samples, batch_size)
+
+        # Perform batch.
+        state, pred = model(
+            state,
+            xc,
+            yc,
+            xt,
+            num_samples=this_num_samples,
+            dtype_enc_sample=float,
+            dtype_lik=float64,
+            **kw_args,
+        )
+        this_logpdfs = pred.logpdf(B.cast(float64, yt))
+        if logpdfs is None:
+            logpdfs = this_logpdfs
+        else:
+            # Concatenate at the sample dimension.
+            logpdfs = B.concat(logpdfs, this_logpdfs, axis=0)
+
+        # Increase the counter.
+        done_num_samples += this_num_samples
 
     # Average over samples.
     if num_samples > 1:
