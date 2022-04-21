@@ -150,12 +150,15 @@ def _sample(state: B.RandomState, x: Parallel, num: B.Int = 1):
     return state, Parallel(*samples)
 
 
+@_dispatch
 def loglik(
-    model,
+    state: B.RandomState,
+    model: Model,
     xc,
     yc,
     xt,
     yt,
+    *,
     num_samples=1,
     normalise=True,
     **kw_args,
@@ -163,6 +166,7 @@ def loglik(
     """Log-likelihood objective.
 
     Args:
+        state (random state, optional): Random state.
         model (:class:`.Model`): Model.
         xc (tensor): Inputs of the context set.
         yc (tensor): Output of the context set.
@@ -173,12 +177,14 @@ def loglik(
             Defaults to `True`.
 
     Returns:
+        random state, optional: Random state.
         tensor: Log-likelihoods.
     """
     float = B.dtype_float(yt)
     float64 = B.promote_dtypes(float, np.float64)
 
-    pred = model(
+    state, pred = model(
+        state,
         xc,
         yc,
         xt,
@@ -189,6 +195,7 @@ def loglik(
     )
     logpdfs = pred.logpdf(B.cast(float64, yt))
 
+    # Average over samples.
     if num_samples > 1:
         # Sample dimension should always be the first.
         logpdfs = B.logsumexp(logpdfs, axis=0) - B.log(num_samples)
@@ -197,15 +204,33 @@ def loglik(
         # Normalise by the number of targets.
         logpdfs = logpdfs / B.shape(xt, -1)
 
-    return logpdfs
+    return state, logpdfs
 
 
-def elbo(
-    model,
+@_dispatch
+def loglik(
+    model: Model,
     xc,
     yc,
     xt,
     yt,
+    **kw_args,
+):
+    state = B.global_random_state(B.dtype(xt))
+    state, logpdfs = loglik(state, model, xc, yc, xt, **kw_args)
+    B.set_global_random_state(state)
+    return logpdfs
+
+
+@_dispatch
+def elbo(
+    state: B.RandomState,
+    model: Model,
+    xc,
+    yc,
+    xt,
+    yt,
+    *,
     num_samples=1,
     normalise=True,
     subsume_context=True,
@@ -214,6 +239,7 @@ def elbo(
     """ELBO objective.
 
     Args:
+        state (random state, optional): Random state.
         model (:class:`.Model`): Model.
         xc (tensor): Inputs of the context set.
         yc (tensor): Output of the context set.
@@ -226,6 +252,7 @@ def elbo(
             Defaults to `True`.
 
     Returns:
+        random state, optional: Random state.
         tensor: ELBOs.
     """
     float = B.dtype_float(yt)
@@ -243,7 +270,8 @@ def elbo(
     qz = recode_stochastic(model.encoder, pz, xt, yt, h, dtype_lik=float64, **kw_args)
 
     # Sample from poster.
-    z = B.cast(float, _sample(qz, num=num_samples))
+    state, z = _sample(state, qz, num=num_samples)
+    z = B.cast(float, z)
 
     # Run sample through decoder.
     _, d = code(model.decoder, xz, z, xt, dtype_lik=float64, **kw_args)
@@ -255,7 +283,22 @@ def elbo(
         # Normalise by the number of targets.
         elbos = elbos / B.shape(xt, -1)
 
-    return elbos
+    return state, elbos
+
+
+@_dispatch
+def elbo(
+    model: Model,
+    xc,
+    yc,
+    xt,
+    yt,
+    **kw_args,
+):
+    state = B.global_random_state(B.dtype(xt))
+    state, elbos = elbo(state, model, xc, yc, xt, **kw_args)
+    B.set_global_random_state(state)
+    return elbo
 
 
 @_dispatch
