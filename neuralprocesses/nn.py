@@ -250,7 +250,7 @@ class UNet:
 
 @register_module
 class ConvNet:
-    """A depthwise-separable convolutional neural network.
+    """A regular convolutional neural network.
 
     Args:
         dim (int): Dimensionality.
@@ -261,6 +261,8 @@ class ConvNet:
         points_per_unit (float): Density of the discretisation corresponding to the
             inputs.
         receptive_field (float): Desired receptive field.
+        separable (bool, optional): Use depthwise separable convolutions. Defaults
+            to `True`.
         dtype (dtype, optional): Data type.
 
     Attributes:
@@ -278,6 +280,7 @@ class ConvNet:
         num_layers: int,
         points_per_unit: float,
         receptive_field: float,
+        separable: bool = True,
         dtype=None,
     ):
         self.dim = dim
@@ -303,24 +306,41 @@ class ConvNet:
             activation,
         ]
         for _ in range(num_layers):
-            layers.extend(
-                [
-                    Conv(
-                        in_channels=channels,
-                        out_channels=channels,
-                        kernel=kernel,
-                        groups=channels,
-                        dtype=dtype,
-                    ),
-                    Conv(
-                        in_channels=channels,
-                        out_channels=channels,
-                        kernel=1,
-                        dtype=dtype,
-                    ),
-                    activation,
-                ]
-            )
+            if separable:
+                layers.extend(
+                    [
+                        # Construct depthwise separable convolution by setting
+                        # `groups=channels`.
+                        Conv(
+                            in_channels=channels,
+                            out_channels=channels,
+                            kernel=kernel,
+                            groups=channels,
+                            dtype=dtype,
+                        ),
+                        # Construct a pointwise MLP with `kernel=1`.
+                        Conv(
+                            in_channels=channels,
+                            out_channels=channels,
+                            kernel=1,
+                            dtype=dtype,
+                        ),
+                        activation,
+                    ]
+                )
+            else:
+                layers.extend(
+                    [
+                        Conv(
+                            in_channels=channels,
+                            out_channels=channels,
+                            kernel=kernel,
+                            groups=1,
+                            dtype=dtype,
+                        ),
+                        activation,
+                    ]
+                )
         layers.append(
             Conv(
                 in_channels=channels,
