@@ -15,6 +15,7 @@ import neuralprocesses.torch as nps
 
 def train(state, model, objective, gen):
     """Train for an epoch."""
+    vals = []
     for batch in gen.epoch():
         state, obj = objective(
             state,
@@ -24,11 +25,13 @@ def train(state, model, objective, gen):
             batch["xt"],
             batch["yt"],
         )
+        vals.append(B.to_numpy(obj))
         # Be sure to negate the output of `objective`.
         val = -B.mean(obj)
         opt.zero_grad(set_to_none=True)
         val.backward()
         opt.step()
+    out.kv("Loglik", with_err(B.concat(*vals)))
     return state
 
 
@@ -289,7 +292,7 @@ parser.add_argument(
     default="eq",
 )
 parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
-parser.add_argument("--num-samples", type=int, default=1)
+parser.add_argument("--num-samples", type=int, default=20)
 parser.add_argument("--resume-at-epoch", type=int)
 parser.add_argument("--evaluate", action="store_true")
 parser.add_argument(
@@ -298,7 +301,9 @@ parser.add_argument(
     default="loglik",
 )
 parser.add_argument("--evaluate-num-samples", type=int, default=4096)
+parser.add_argument("--evaluate-batch-size", type=int, default=512)
 parser.add_argument("--no-action", action="store_true")
+parser.add_argument("--ar", action="store_true")
 args = parser.parse_args()
 
 # Remove the architecture argument if a model doesn't use it.
@@ -547,12 +552,14 @@ if args.evaluate_objective == "loglik":
     evaluate_objective = partial(
         nps.loglik,
         num_samples=args.evaluate_num_samples,
+        batch_size=args.evaluate_batch_size,
         normalise=True,
     )
 elif args.objective == "elbo":
     evaluate_objective = partial(
         nps.elbo,
         num_samples=args.evaluate_num_samples,
+        batch_size=args.evaluate_batch_size,
         normalise=True,
     )
 else:
@@ -566,13 +573,18 @@ if args.evaluate:
     # Perform evaluation. First, load the best model.
     model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
 
-    # Visualise some predictions by the model.
-    for i in range(10):
-        plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
+    if args.ar:
+        # Do AR testing.
+        pass
 
-    for name, gen in gens_eval:
-        with out.Section(name.capitalize()):
-            eval(state, model, evaluate_objective, gen)
+    else:
+        # Do regular evaluation. First, visualise some predictions by the model.
+        for i in range(10):
+            plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
+
+        for name, gen in gens_eval:
+            with out.Section(name.capitalize()):
+                eval(state, model, evaluate_objective, gen)
 else:
     # Perform training. First, check if we want to resume training.
     start = 0
@@ -589,13 +601,15 @@ else:
     for i in range(start, args.epochs):
         with out.Section(f"Epoch {i + 1}"):
             # Perform an epoch.
-            state = train(state, model, objective, gen_train)
+            with out.Section("Training:"):
+                state = train(state, model, objective, gen_train)
 
             # Save current model.
             torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
             # The epoch is done. Now evaluate.
-            state, val = eval(state, model, objective, gen_cv)
+            with out.Section("Cross-validation:"):
+                state, val = eval(state, model, objective, gen_cv)
 
             # Check if the model is the new best. If so, save it.
             if val > best_eval_lik:
