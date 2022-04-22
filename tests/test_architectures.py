@@ -6,32 +6,27 @@ from itertools import product
 from .util import nps as nps_fixed_dtype, approx, generate_data  # noqa
 
 
-def generate_arch_variations(configs):
+def generate_conv_arch_variations(configs):
     varied_configs = []
     for config in configs:
         for variation in [
             {
                 "unet_channels": (4, 8),
-                "unet_kernels": (5,) * 2,
-                "unet_activations": (B.relu,) * 2,
-            },
-            {
-                "unet_channels": (8, 16),
-                "unet_kernels": (5,) * 2,
-                "unet_activations": (B.relu,) * 2,
+                "unet_kernels": (3, 5),
+                "unet_activations": (B.relu, B.tanh),
                 "unet_resize_convs": False,
             },
             {
-                "unet_channels": (8, 16),
-                "unet_kernels": (5,) * 2,
-                "unet_activations": (B.relu,) * 2,
+                "unet_channels": (4, 8),
+                "unet_kernels": (3, 5),
+                "unet_activations": (B.relu, B.tanh),
                 "unet_resize_convs": True,
             },
             {
                 "conv_arch": "dws",
-                "dws_channels": 8,
-                "dws_layers": 4,
-                "dws_receptive_field": 0.5,
+                "dws_channels": 4,
+                "dws_layers": 2,
+                "dws_receptive_field": 2,
             },
         ]:
             varied_configs.append(dict(config, **variation))
@@ -52,6 +47,8 @@ def product_kw_args(config, **kw_args):
     + product_kw_args(
         {
             "constructor": "construct_gnp",
+            "dim_embedding": 4,
+            "width": 4,
             "num_basis_functions": 4,
             "dim_lv": 0,
         },
@@ -63,6 +60,8 @@ def product_kw_args(config, **kw_args):
     + product_kw_args(
         {
             "constructor": "construct_gnp",
+            "dim_embedding": 4,
+            "width": 4,
             "num_basis_functions": 4,
             "dim_lv": 3,
         },
@@ -74,7 +73,10 @@ def product_kw_args(config, **kw_args):
     # ACNP:
     + product_kw_args(
         {
-            "constructor": "construct_gnp",
+            "constructor": "construct_agnp",
+            "dim_embedding": 4,
+            "num_heads": 2,
+            "width": 4,
             "num_basis_functions": 4,
             "dim_lv": 0,
         },
@@ -85,7 +87,10 @@ def product_kw_args(config, **kw_args):
     # ANP:
     + product_kw_args(
         {
-            "constructor": "construct_gnp",
+            "constructor": "construct_agnp",
+            "dim_embedding": 4,
+            "num_heads": 2,
+            "width": 4,
             "num_basis_functions": 4,
             "dim_lv": 3,
         },
@@ -95,7 +100,7 @@ def product_kw_args(config, **kw_args):
         lv_likelihood=["het", "dense"],
     )
     # ConvCNP:
-    + generate_arch_variations(
+    + generate_conv_arch_variations(
         product_kw_args(
             {
                 "constructor": "construct_convgnp",
@@ -109,7 +114,7 @@ def product_kw_args(config, **kw_args):
         )
     )
     # ConvNP:
-    + generate_arch_variations(
+    + generate_conv_arch_variations(
         product_kw_args(
             {
                 "constructor": "construct_convgnp",
@@ -124,7 +129,7 @@ def product_kw_args(config, **kw_args):
         )
     )
     # FullConvGNP:
-    + generate_arch_variations(
+    + generate_conv_arch_variations(
         [
             {
                 "constructor": "construct_fullconvgnp",
