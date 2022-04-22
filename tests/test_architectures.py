@@ -1,7 +1,10 @@
+from itertools import product
+
 import lab as B
 import numpy as np
 import pytest
-from itertools import product
+from matrix import Woodbury, Diagonal
+from stheno import Normal
 
 from .util import nps as nps_fixed_dtype, approx, generate_data  # noqa
 
@@ -24,7 +27,7 @@ def generate_conv_arch_variations(configs):
             },
             {
                 "conv_arch": "dws",
-                "dws_channels": 4,
+                "dws_channels": 8,
                 "dws_layers": 2,
                 "dws_receptive_field": 2,
             },
@@ -212,6 +215,19 @@ def model_sample(request, nps, config):
 
 
 def check_prediction(nps, pred, yt):
+    # Stabilise the matrix inversion lemma by ensuring that the model didn't output
+    # too small noise variances.
+    if isinstance(pred, nps.MultiOutputNormal) and isinstance(
+        pred.normal.var, Woodbury
+    ):
+        pred = nps.MultiOutputNormal(
+            Normal(
+                pred.normal.mean,
+                Diagonal(1e-2 + B.diag(pred.normal.var.diag)) + pred.normal.var.lr,
+            ),
+            pred.shape,
+        )
+
     # Check that the log-pdf at the target data is finite and of the right data type.
     objective = B.sum(pred.logpdf(yt))
     assert np.isfinite(B.to_numpy(objective))
