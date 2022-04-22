@@ -56,6 +56,7 @@ class SyntheticGenerator(DataGenerator):
         dtype (dtype): Data type to generate.
         noise (float, optional): Observation noise. Defaults to `5e-2`.
         seed (int, optional): Seed. Defaults to 0.
+        seed_params (int, optional): Seed for the model parameters. Defaults to 19.
         batch_size (int, optional): Batch size. Defaults to 16.
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
@@ -98,6 +99,7 @@ class SyntheticGenerator(DataGenerator):
         num_target_points (tuple[int, int]): Lower and upper bound of the number of
             target points.
         state (random state): Random state.
+        state_params (random state): Random state for the model parameters.
         device (str): Device.
     """
 
@@ -105,6 +107,7 @@ class SyntheticGenerator(DataGenerator):
         self,
         dtype,
         seed=0,
+        seed_params=19,
         noise=0.05**2,
         batch_size=16,
         num_tasks=2**14,
@@ -124,9 +127,10 @@ class SyntheticGenerator(DataGenerator):
 
         self.device = device
 
-        # The random state must be created on the right device.
+        # The random states must be created on the right device.
         with B.on_device(self.device):
             self.state = B.create_random_state(dtype, seed)
+            self.state_params = B.create_random_state(dtype, seed_params)
 
         self.noise = noise
 
@@ -153,14 +157,16 @@ class SyntheticGenerator(DataGenerator):
             self.x_ranges_context = _stack_bounds(self.float64, x_ranges_context)
             self.x_ranges_target = _stack_bounds(self.float64, x_ranges_target)
 
-        if self.dim_y > 1:
+        if self.dim_y > 1 or self.dim_y_latent > 1:
             # Draw a random mixing matrix.
-            self.state, self.h = B.randn(
-                self.state,
+            self.state_params, self.h = B.randn(
+                self.state_params,
                 self.float64,
                 self.dim_y,
                 self.dim_y_latent,
             )
+        else:
+            self.h = None
 
         # Ensure that `num_context_points` and `num_target_points` are tuples of lower
         # bounds and upper bounds.
@@ -305,9 +311,9 @@ class GPGenerator(SyntheticGenerator):
             # Sample inputs.
             x, num_context_points, noise = _sample_all_inputs_noise(self)
 
-            # If `self.y_dim > 1`, then we create a multi-output GP. Otherwise, we
+            # If `self.h` is specified, then we create a multi-output GP. Otherwise, we
             # use a simple regular GP.
-            if self.dim_y == 1:
+            if self.h is None:
                 f = stheno.GP(self.kernel)
             else:
                 with stheno.Measure():
@@ -417,8 +423,7 @@ class SawtoothGenerator(SyntheticGenerator):
 
             # Construct the sawtooth and add noise.
             f = (freq * (B.matmul(direction, x) - offset)) % 1
-            # Only mix the latent processes if we should generate more than one output.
-            if self.dim_y > 1:
+            if self.h is not None:
                 f = B.matmul(self.h, f)
             y = f + B.sqrt(noise) * B.randn(f)
 
