@@ -396,10 +396,10 @@ dws_channels = 64
 dws_receptive_field = args.receptive_field
 num_basis_functions = 512
 if args.dim_x == 1:
-    points_per_unit = 40
+    points_per_unit = 64
 elif args.dim_x == 2:
     # Reduce the PPU to reduce memory consumption.
-    points_per_unit = 20
+    points_per_unit = 32
 else:
     raise RuntimeError(f"Invalid input dimensionality {args.dim_x}.")
 
