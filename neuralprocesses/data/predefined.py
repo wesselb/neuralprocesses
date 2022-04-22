@@ -64,7 +64,7 @@ def construct_predefined_gens(
         name: GPGenerator(
             dtype,
             kernel=kernel,
-            num_context_points=(0, 20),
+            num_context_points=(0, 50),
             num_target_points=50,
             pred_logpdf=pred_logpdf,
             pred_logpdf_diag=pred_logpdf_diag,
@@ -74,8 +74,9 @@ def construct_predefined_gens(
     }
     gens["sawtooth"] = SawtoothGenerator(
         dtype,
-        freqs=(factor * 2, factor * 4),
-        num_context_points=(0, 40),
+        noise=0,
+        freqs=(2 / factor, 4 / factor),
+        num_context_points=(0, 100),
         num_target_points=100,
         **config,
     )
