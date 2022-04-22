@@ -118,9 +118,12 @@ class Dirac(AbstractMultiOutputDistribution):
 
     @_dispatch
     def sample(self, num=1):
+        # If there is only one sample, squeeze the sample dimension, which happens
+        # here by not adding it.
         if num == 1:
             return self.x
         else:
+            # Don't tile. This way is more efficient.
             return self.x[None, ...]
 
     def kl(self, other: "Dirac"):
