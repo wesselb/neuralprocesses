@@ -601,14 +601,14 @@ else:
     for i in range(start, args.epochs):
         with out.Section(f"Epoch {i + 1}"):
             # Perform an epoch.
-            with out.Section("Training:"):
+            with out.Section("Training"):
                 state = train(state, model, objective, gen_train)
 
             # Save current model.
             torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
             # The epoch is done. Now evaluate.
-            with out.Section("Cross-validation:"):
+            with out.Section("Cross-validation"):
                 state, val = eval(state, model, objective, gen_cv)
 
             # Check if the model is the new best. If so, save it.
