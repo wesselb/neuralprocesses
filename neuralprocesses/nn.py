@@ -1,5 +1,5 @@
 import math
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional
 
 import lab as B
 
@@ -16,8 +16,10 @@ class MLP:
 
     Args:
         in_dim (int): Input dimensionality.
-        layers (tuple[int, ...]): Width of every hidden layer.
         out_dim (int): Output dimensionality.
+        layers (tuple[int, ...], optional): Width of every hidden layer.
+        num_layers (int, optional): Number of hidden layers.
+        width (int, optional): Width of the hidden layers
         nonlinearity (function, optional): Nonlinearity.
         dtype (dtype, optional): Data type.
 
@@ -28,11 +30,27 @@ class MLP:
     def __init__(
         self,
         in_dim: int,
-        layers: Tuple[int, ...],
         out_dim: int,
+        layers: Optional[Tuple[int, ...]] = None,
+        num_layers: Optional[int] = None,
+        width: Optional[int] = None,
         nonlinearity=None,
         dtype=None,
     ):
+        # Check that one of the two specifications is given.
+        layers_given = layers is not None
+        num_layers_given = num_layers is not None and width is not None
+        if (
+            layers_given
+            and num_layers_given
+            or (not layers_given and not num_layers_given)
+        ):
+            raise ValueError(
+                f"Must specify either `layers` or `num_layers` and `width`."
+            )
+        # Make sure that `layers` is specified.
+        if not layers_given and num_layers_given:
+            layers = (width,) * num_layers
 
         # Default to ReLUs.
         if nonlinearity is None:

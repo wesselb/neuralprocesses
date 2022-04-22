@@ -66,14 +66,16 @@ def construct_gnp(
             nps.DeepSet(
                 nps.MLP(
                     in_dim=dim_x + dim_y,
-                    layers=(width,) * (num_enc_layers // 2),
                     out_dim=dim_embedding,
+                    num_layers=num_enc_layers // 2,
+                    width=width,
                     dtype=dtype,
                 ),
                 nps.MLP(
                     in_dim=dim_embedding,
-                    layers=(width,) * (num_enc_layers - num_enc_layers // 2),
                     out_dim=lv_mlp_out_channels,
+                    num_layers=num_enc_layers - num_enc_layers // 2,
+                    width=width,
                     dtype=dtype,
                 ),
             ),
@@ -90,14 +92,16 @@ def construct_gnp(
                 nps.DeepSet(
                     nps.MLP(
                         in_dim=dim_x + dim_y,
-                        layers=(width,) * (num_enc_layers // 2),
                         out_dim=dim_embedding,
+                        num_layers=num_enc_layers // 2,
+                        width=width,
                         dtype=dtype,
                     ),
                     nps.MLP(
                         in_dim=dim_embedding,
-                        layers=(width,) * (num_enc_layers - num_enc_layers // 2),
                         out_dim=dim_embedding,
+                        num_layers=num_enc_layers - num_enc_layers // 2,
+                        width=width,
                         dtype=dtype,
                     ),
                 ),
@@ -110,8 +114,9 @@ def construct_gnp(
         nps.Materialise(),
         nps.MLP(
             in_dim=dim_x + dim_embedding + dim_lv,
-            layers=(width,) * num_dec_layers,
             out_dim=mlp_out_channels,
+            num_layers=num_dec_layers,
+            width=width,
             dtype=dtype,
         ),
         likelihood,
