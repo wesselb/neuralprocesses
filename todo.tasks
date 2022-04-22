@@ -1,26 +1,82 @@
 TODOs:
-    UNet:
-        ☐ Multiple conv blocks: `unet_skip_connections=(True, True, False, False)`, `unet_striding=(True, True, False, False)` @high
-        ☐ Even kernel size
+    ☐ Stabilise tests
 
-    Port:
-        ☐ GNP @high
-            https://github.com/wesselb/neuralprocesses/tree/f4de0a3f9c0d4971d29813a6ff9acf763f73f05c/neuralprocesses/gnp
-        ☐ Port Julia repo @high
+UNet:
+    ☐ Multiple conv blocks: @high
+        ☐ `unet_skip_connections=(True, True, False, False)`
+        ☐ `unet_striding=(True, True, False, False)`
+        ☐ `unet_repeat_block=(1, 2, 1, 1)`
+    ☐ Even kernel size
 
-    ☐ kvv covariance
+Short Term:
+    ☐ Copy README from NeuralProcesses.jl and finish first version @high
+    ☐ Speed up `dim-y >= 2 generation? Necessary? Cache Stheno model?
+    ☐ IW for `loglik`
+    ☐ Ability to fix the noise to be small for early epochs?
 
-Test:
-    ☐ Transforms. Integrate with `probmods`?
-
-Short term:
-    ☐ Change to channels last format
-
+Refactor:
+    ☐ Integrate transforms with `probmods`.
 
 Features:
+    ☐ kvv covariance
     ☐ Learnable channel
         ☐ Gibbs kernel (MLKernels)
             ☐ `pairwise_from_dist2`
             ☐ `elwise_from_dist2`
         ☐ Given initialisation, like PCA
+
+
+
+＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
+Archive:
+ ✓ BatchedMLP allow option `num_layers` and simplify code. @done (22-04-22 16:26) @project(TODOs)
+ x AR more during eval @cancelled (22-04-22 16:26) @project(TODOs)
+ ✓ Allow dim_y_latent > 1 but dim_y = 1 @done (22-04-22 16:20) @project(TODOs)
+ ✓ seed_parameters @done (22-04-22 16:19) @project(TODOs)
+ ✓ FIX SEED FOR MIXING MATRIX!!!!!! @critical @done (22-04-22 16:19) @project(TODOs)
+ ✓ Plotting intensity? @done (22-04-22 16:17) @project(TODOs)
+ ✓ Show both train and test loss @done (22-04-22 13:01) @project(TODOs)
+ ✓ Add `--evaluate-batch-size` @done (22-04-22 13:01) @project(TODOs)
+ ✓ Remove noise from sawtooth @done (22-04-22 13:00) @project(TODOs)
+ ✓ Context to (0, 50) and (0, 100) @done (22-04-22 13:00) @project(TODOs)
+ ✓ rand for weights @done (22-04-22 11:21) @project(TODOs)
+ ✓ more observations generally? @done (22-04-22 11:21) @project(TODOs)
+ ✓ divide by factor in sawtooth length scale! @done (22-04-22 11:21) @project(TODOs)
+  64 channels, 32 ppu, 1e-4 fits, UNet!
+ ✓ Get ConvCNP to fit x1_y2 sawtooth: @done (22-04-22 11:21) @project(TODOs)
+  Only positive weights? Yes, that seems to work.
+  LR important? No, eventually loss goes crazy again. Well, need 1e-5.
+  Correlations important? Yes, that seems to stabilise training.
+  Or is number of observations important? No, but affects loss.
+  Need many UNet channels? Need at least (128,) * 6 channels.
+  Need at least PPU 64?
+  ppu 128, 512 channels, 1e-6
+ ✓ ConvNP x2_y2 eval batch size tuning --evaluate-batch-size @done (22-04-22 11:21) @project(TODOs)
+ ✓ ConvCNP fit x2_y1 sawtooth! @done (22-04-22 11:21) @project(TODOs)
+ ✓ 10 works for eval; 5 works for training @done (22-04-22 11:21) @project(TODOs)
+ ✓ Plotting: @done (22-04-22 09:12) @project(TODOs)
+ ✓ Get ANP to fit! @done (22-04-22 09:12) @project(Sanity Checks)
+ ✓ Does increasing `evaluate_num_samples` indeed help for the LV models? @done (22-04-22 09:12) @project(Sanity Checks)
+ ✓ 2D outputs @done (22-04-22 09:12) @project(TODOs)
+ ✓ 2D inputs @done (22-04-22 09:12) @project(TODOs)
+ ✓ Performance FullConvGNP on `weakly-periodic`? @done (22-04-21 16:51) @project(Sanity Checks)
+ x `points_per_unit` appropriate or too low? @cancelled (22-04-21 16:51) @project(Sanity Checks)
+ ✓ Performance ConvNP on `sawtooth`? @done (22-04-21 16:35) @project(Sanity Checks)
+ x `rate` 5e-4 too high? @cancelled (22-04-21 16:35) @project(Sanity Checks)
+ ✓ Carefully configure all settings of all models @done (22-04-21 16:28) @project(TODOs)
+ ✓ Resume training at epoch @done (22-04-21 16:08) @project(TODOs)
+ ✓ Plot a few before running eval @done (22-04-21 15:50) @project(TODOs)
+ ✓ Fix convcnp @done (22-04-21 15:50) @project(TODOs)
+ ✓ Random state in objective @done (22-04-21 15:41) @project(TODOs)
+ ✓ Check number of samples @done (22-04-21 15:29) @project(TODOs)
+ ✓ Check ANP arch with paper @done (22-04-21 15:24) @project(TODOs)
+ ✓ Carefully configure all models: ANP and NP `width` kw? @done (22-04-21 15:24) @project(TODOs)
+ ✓ Fix duplicate code between models @done (22-04-21 15:22) @project(TODOs)
+ ✓ Transforms for all models @done (22-04-21 14:49) @project(Short Term)
+ ✓ Log of eval elsewhere @high @done (22-04-21 14:45) @project(TODOs)
+ ✓ Eval mode for script @high @done (22-04-21 14:29) @project(TODOs)
+ ✓ `loglik` batching for high-number of samples @done (22-04-21 13:18) @project(TODOs)
+ ✓ Port Julia repo @high @done (22-04-21 12:41) @project(TODOs / Port)
+ ✓ GNP @high @done (22-04-21 12:41) @project(TODOs / Port)
+  https://github.com/wesselb/neuralprocesses/tree/f4de0a3f9c0d4971d29813a6ff9acf763f73f05c/neuralprocesses/gnp
 
