@@ -46,7 +46,6 @@ def construct_predefined_gens(
     # We achieve this by blowing up all length scales by `sqrt(dim_x)`.
     factor = B.sqrt(dim_x)
     config = {
-        "noise": 0.05,
         "seed": seed,
         "num_tasks": num_tasks,
         "batch_size": batch_size,
@@ -63,6 +62,7 @@ def construct_predefined_gens(
     gens = {
         name: GPGenerator(
             dtype,
+            noise=0.05,
             kernel=kernel,
             num_context_points=(0, 50),
             num_target_points=50,
@@ -74,6 +74,7 @@ def construct_predefined_gens(
     }
     gens["sawtooth"] = SawtoothGenerator(
         dtype,
+        # The sawtooth is hard already as it is. Do not add noise.
         noise=0,
         freqs=(2 / factor, 4 / factor),
         num_context_points=(0, 100),
