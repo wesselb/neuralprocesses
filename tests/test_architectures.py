@@ -174,11 +174,36 @@ def model_sample(request, nps, config):
     # Run the model once to make sure all parameters exist.
     xc, yc, xt, yt = generate_data(nps, dim_x=config["dim_x"], dim_y=config["dim_y"])
     model(xc, yc, xt)
-    
+
+    # Create a constructor which resamples the parameters of the model. This will ensure
+    # that flaky tests which are rerun don't get stuck at particularly bad model
+    # initialisations.
+
+    if isinstance(nps.dtype, B.TFDType):
+        magnitudes = [B.abs(p) for p in model.get_weights()]
+
+        def construct_model():
+            new_weights = []
+            for p, magnitude in zip(model.get_weights(), magnitudes):
+                new_weights.append(magnitude * B.randn(p))
+            model.set_weights(new_weights)
+            return model
+
+    elif isinstance(nps.dtype, B.TorchDType):
+        magnitudes = [B.abs(x.data) for x in model.parameters()]
+
+        def construct_model():
+            for p, magnitude in zip(model.parameters(), magnitudes):
+                p.data = magnitude * B.randn(p)
+            return model
+
+    else:
+        raise RuntimeError("I don't know how to resample the parameters of the model.")
+
     def sample():
         return generate_data(nps, dim_x=config["dim_x"], dim_y=config["dim_y"])
 
-    return model, sample
+    return construct_model, sample
 
 
 def check_prediction(nps, pred, yt):
@@ -197,6 +222,7 @@ def check_prediction(nps, pred, yt):
 @pytest.mark.flaky(reruns=3)
 def test_forward(nps, model_sample):
     model, sample = model_sample
+    model = model()
     xc, yc, xt, yt = sample()
 
     # Check passing in a non-empty context set.
@@ -207,6 +233,7 @@ def test_forward(nps, model_sample):
 @pytest.mark.flaky(reruns=3)
 def test_elbo(nps, model_sample):
     model, sample = model_sample
+    model = model()
     xc, yc, xt, yt = sample()
     elbo = B.mean(nps.elbo(model, xc, yc, xt, yt, num_samples=2))
     assert np.isfinite(B.to_numpy(elbo))
@@ -215,6 +242,7 @@ def test_elbo(nps, model_sample):
 @pytest.mark.flaky(reruns=3)
 def test_loglik(nps, model_sample):
     model, sample = model_sample
+    model = model()
     xc, yc, xt, yt = sample()
     logpdfs = B.mean(nps.loglik(model, xc, yc, xt, yt, num_samples=2))
     assert np.isfinite(B.to_numpy(logpdfs))
@@ -223,6 +251,7 @@ def test_loglik(nps, model_sample):
 @pytest.mark.flaky(reruns=3)
 def test_predict(nps, model_sample):
     model, sample = model_sample
+    model = model()
     xc, yc, xt, yt = sample()
     mean, var, samples = nps.predict(
         model,
@@ -240,6 +269,7 @@ def test_predict(nps, model_sample):
 @pytest.mark.flaky(reruns=3)
 def test_batching(nps, model_sample):
     model, sample = model_sample
+    model = model()
     xc, yc, xt, yt = sample()
 
     state = B.create_random_state(nps.dtype, seed=0)
@@ -262,6 +292,7 @@ def test_batching(nps, model_sample):
 @pytest.mark.flaky(reruns=3)
 def test_empty_context(nps, model_sample):
     model, sample = model_sample
+    model = model()
     xc, yc, xt, yt = sample()
 
     # Check passing the edge case of an empty context set.
@@ -279,6 +310,7 @@ def test_empty_context(nps, model_sample):
 @pytest.mark.flaky(reruns=3)
 def test_recode(nps, model_sample):
     model, sample = model_sample
+    model = model()
     xc, yc, xt, yt = sample()
 
     x_new = B.concat(
