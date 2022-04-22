@@ -230,7 +230,7 @@ def loglik(
     # Average over samples.
     if do_logsumexp:
         # Sample dimension should always be the first.
-        logpdf = B.logsumexp(logpdfs, axis=0) - B.log(num_samples)
+        logpdfs = B.logsumexp(logpdfs, axis=0) - B.log(num_samples)
 
     if normalise:
         # Normalise by the number of targets.
