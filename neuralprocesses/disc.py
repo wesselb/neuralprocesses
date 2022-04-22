@@ -117,7 +117,7 @@ def _split_coordinates(
 ) -> List[List[B.Numeric]]:
     # Cast with `int` so we can safely pass it to `range` below!
     dim = dim or int(B.shape(x, -2))
-    return [[x[..., i, :]] for i in range(dim)]
+    return [[x[..., i : i + 1, :]] for i in range(dim)]
 
 
 @_dispatch

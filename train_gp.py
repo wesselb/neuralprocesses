@@ -31,7 +31,7 @@ def train(state, model, objective, gen):
         opt.zero_grad(set_to_none=True)
         val.backward()
         opt.step()
-    out.kv("Loglik", with_err(B.concat(*vals)))
+    out.kv("Loglik (T)", with_err(B.concat(*vals)))
     return state
 
 
@@ -58,7 +58,7 @@ def eval(state, model, objective, gen):
                 kls_diag.append(B.to_numpy(batch["pred_logpdf_diag"] / n - obj))
 
         # Report numbers.
-        out.kv("Loglik", with_err(B.concat(*vals)))
+        out.kv("Loglik (V)", with_err(B.concat(*vals)))
         if kls:
             out.kv("KL (full)", with_err(B.concat(*kls)))
         if kls_diag:
@@ -255,6 +255,7 @@ def plot_first_of_batch_2d(model, gen, *, name, epoch):
 
 # Setup arguments.
 parser = argparse.ArgumentParser()
+parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
 parser.add_argument("--subdir", type=str, nargs="*")
 parser.add_argument("--dim-x", type=int, default=1)
 parser.add_argument("--dim-y", type=int, default=1)
@@ -295,6 +296,7 @@ parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
 parser.add_argument("--num-samples", type=int, default=20)
 parser.add_argument("--resume-at-epoch", type=int)
 parser.add_argument("--evaluate", action="store_true")
+parser.add_argument("--evaluate-fast", action="store_true")
 parser.add_argument(
     "--evaluate-objective",
     choices=["loglik", "elbo"],
@@ -320,7 +322,7 @@ if args.model not in models_which_use_arch:
 out.report_time = True
 B.epsilon = 1e-8
 wd = WorkingDirectory(
-    "_experiments",
+    *args.root,
     *(args.subdir or ()),
     args.data,
     args.model,
@@ -369,7 +371,8 @@ gens_eval = [
             torch.float32,
             seed=20,  # Use yet another seed!
             batch_size=args.batch_size,
-            num_tasks=2**14,  # Use a high number of tasks.
+            # Use a high number of tasks.
+            num_tasks=2**8 if args.evaluate_fast else 2**14,
             dim_x=args.dim_x,
             dim_y=args.dim_y,
             pred_logpdf=True,
@@ -574,8 +577,20 @@ if args.evaluate:
     model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
 
     if args.ar:
+        # Test prediction.
+        batch = gen_train.generate_batch()
+        print(nps.ar_predict(model, batch["xc"], batch["yc"], batch["xt"]))
+        exit()
+
         # Do AR testing.
-        pass
+        for name, gen in gens_eval:
+            with out.Section(name.capitalize()):
+                state, _ = eval(
+                    state,
+                    model,
+                    partial(nps.ar_loglik, normalise=True),
+                    gen,
+                )
 
     else:
         # Do regular evaluation. First, visualise some predictions by the model.
@@ -584,7 +599,7 @@ if args.evaluate:
 
         for name, gen in gens_eval:
             with out.Section(name.capitalize()):
-                eval(state, model, evaluate_objective, gen)
+                state, _ = eval(state, model, evaluate_objective, gen)
 else:
     # Perform training. First, check if we want to resume training.
     start = 0
@@ -601,15 +616,13 @@ else:
     for i in range(start, args.epochs):
         with out.Section(f"Epoch {i + 1}"):
             # Perform an epoch.
-            with out.Section("Training"):
-                state = train(state, model, objective, gen_train)
+            state = train(state, model, objective, gen_train)
 
             # Save current model.
             torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
             # The epoch is done. Now evaluate.
-            with out.Section("Cross-validation"):
-                state, val = eval(state, model, objective, gen_cv)
+            state, val = eval(state, model, objective, gen_cv)
 
             # Check if the model is the new best. If so, save it.
             if val > best_eval_lik:

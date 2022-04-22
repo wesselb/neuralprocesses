@@ -15,6 +15,7 @@ from .setconv import *
 from .disc import *
 from .augment import *
 from .mask import *
+from .ar import *
 
 from .architectures import *
 
