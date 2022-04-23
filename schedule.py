@@ -111,7 +111,7 @@ async def main():
         f" --epochs 100"
         for dim_x in [1, 2]
         for dim_y in [1, 2]
-        for model in ["cnp", "acnp", "convcnp", "gnp", "gnp", "convgnp"]
+        for model in ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
     ] + [
         f"python train_gp.py"
         f" --model fullconvgnp"
