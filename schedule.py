@@ -113,7 +113,14 @@ async def main():
         f" --epochs 100"
         for dim_x in [1, 2]
         for dim_y in [1, 2]
-        for model in ["cnp", "acnp", "convcnp", "fullconvgnp", "gnp", "gnp", "convgnp"]
+        for model in ["cnp", "acnp", "convcnp", "gnp", "gnp", "convgnp"]
+    ] + [
+        f"python train_gp.py"
+        f" --model fullconvgnp"
+        f" --data {args.data}"
+        f" --dim-x 1"
+        f" --dim-y 1"
+        f" --epochs 100"
     ]
 
     # Load the existing benchmarks, if they exist.
