@@ -43,7 +43,7 @@ def dict_max(*ds):
     return {k: max([d[k] for d in ds]) for k in ds[0].keys()}
 
 
-async def benchmark(gpu_id, command):
+async def benchmark_command(gpu_id, command):
     with out.Section("Determining GPU usage"):
         out.kv("Command", command)
 
@@ -57,7 +57,7 @@ async def benchmark(gpu_id, command):
         )
 
         sleep_total = 10
-        out.out(f"Monitoring usage over {sleep_total} seconds.")
+        out.out(f"Monitoring usage.")
         sleep_current = 0
         stats_collected = []
         while sleep_current < sleep_total:
@@ -74,13 +74,16 @@ async def benchmark(gpu_id, command):
         stats_diff = dict_max(*(dict_diff(d, stats_before) for d in stats_collected))
         out.kv("Collected statistics", stats_diff)
 
+        # Wait five seconds for the process to shut down.
+        await asyncio.sleep(5)
+
         return stats_diff
 
 
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpu", type=int, required=True)
-    parser.add_argument("--benchmark", action="action_store")
+    parser.add_argument("--benchmark", action="store_true")
     args = parser.parse_args()
 
     wd = WorkingDirectory("_scheduling")
@@ -93,7 +96,7 @@ async def main():
     if args.benchmark:
         benchmark = {}
         for command in commands:
-            benchmark[command] = await benchmark(args.gpu, command)
+            benchmark[command] = await benchmark_command(args.gpu, command)
         wd.save(benchmark, "benchmark.pickle")
 
     benchmark = wd.load("benchmark.pickle")
