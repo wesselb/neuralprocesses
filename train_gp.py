@@ -175,12 +175,35 @@ def plot_first_of_batch_2d(model, gen, *, name, epoch):
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
-        mean, var, samples = nps.predict(
-            model,
-            batch["xc"][:1, ...],
-            batch["yc"][:1, ...],
-            (x, x),
-        )
+        try:
+            mean, _, samples = nps.predict(
+                model,
+                batch["xc"][:1, ...],
+                batch["yc"][:1, ...],
+                (x, x),
+            )
+        except:
+            # The model probably doesn't suppose the tuple shorthand for grids. Do it
+            # in a different way.
+            with B.on_device(x):
+                x0 = x[..., :, None]
+                x1 = x[..., None, :]
+                # Perform broadcasting.
+                x0 = x0 * B.ones(x1)
+                x1 = x1 * B.ones(x0)
+                # Reshape into lists.
+                x0 = B.reshape(x0, *B.shape(x0)[:-2], -1)
+                x1 = B.reshape(x1, *B.shape(x1)[:-2], -1)
+                # Run model on whole list.
+                mean, _, samples = nps.predict(
+                    model,
+                    batch["xc"][:1, ...],
+                    batch["yc"][:1, ...],
+                    B.concat(x0, x1, axis=-2),
+                )
+                # Reshape the results back to images.
+                mean = B.reshape(mean, *B.shape(mean)[:-1], 200, 200)
+                samples = B.reshape(samples, *B.shape(samples)[:-1], 200, 200)
 
     vmin = max(B.max(mean), B.max(samples))
     vmax = min(B.min(mean), B.min(samples))
@@ -577,10 +600,10 @@ if args.evaluate:
     model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
 
     if args.ar:
-        # Test prediction.
-        batch = gen_train.generate_batch()
-        print(nps.ar_predict(model, batch["xc"], batch["yc"], batch["xt"]))
-        exit()
+        # # Test prediction.
+        # batch = gen_train.generate_batch()
+        # print(nps.ar_predict(model, batch["xc"], batch["yc"], batch["xt"]))
+        # exit()
 
         # Do AR testing.
         for name, gen in gens_eval:
