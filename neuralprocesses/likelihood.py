@@ -194,8 +194,8 @@ def code(
     noise = coder.epsilon + B.softplus(z_noise)
     # Intuitively, roughly `var_factor ** 2` summed along the columns will determine the
     # output variances. We divide by the square root of the number of columns to
-    # stabilise this, and we divide by an extra factor of 100 to account for the square.
-    var_factor = z_var_factor / B.shape(z_var_factor, -1) / 100
+    # stabilise this.
+    var_factor = z_var_factor / B.shape(z_var_factor, -1)
 
     # Cast the parameters before constructing the distribution.
     if dtype_lik:
