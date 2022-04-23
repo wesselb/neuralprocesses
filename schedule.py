@@ -60,14 +60,7 @@ async def benchmark_command(gpu_id, command):
         )
         spawned.append(p)
 
-        # Monitor usage over ten seconds.
-        sleep_total = 10
-        sleep_current = 0
-        stats_collected = []
-        while sleep_current < sleep_total:
-            await asyncio.sleep(1)
-            stats_collected.append(nvidia_smi(gpu_id))
-            sleep_current += 1
+        stats_diff = dict_diff(await determine_current_stats(gpu_id), stats_before)
 
         # Kill the process.
         if p.returncode is None:
@@ -75,15 +68,20 @@ async def benchmark_command(gpu_id, command):
             out.out(f"Killed PID {p.pid}.")
         else:
             raise RuntimeError("Process already terminated. Something went wrong!")
-
-        # Determine the final statistics.
-        stats_diff = dict_max(*(dict_diff(d, stats_before) for d in stats_collected))
-        out.kv("Collected statistics", stats_diff)
-
         # Wait five seconds for the process to shut down.
         await asyncio.sleep(5)
 
         return stats_diff
+
+
+async def determine_current_stats(gpu_id):
+    stats = []
+    current = 0
+    while current < 20:
+        await asyncio.sleep(1)
+        stats.append(nvidia_smi(gpu_id))
+        current += 1
+    return dict_max(*stats)
 
 
 async def main():
@@ -145,16 +143,16 @@ async def main():
             out.out(c)
 
     while commands:
-        # Check which commands we can run without putting too much strain on the
-        # GPU.
-        stats = nvidia_smi(args.gpu)
+        # Check which commands we can run without putting too much strain on the GPU.
+        stats = await determine_current_stats(args.gpu)
+
         eligible_commands = []
         for c in commands:
             if stats["memory"] + benchmark[c]["memory"] > 0.9 * args.memory:
                 # Takes too much memory.
                 continue
-            if stats["utilisation"] + benchmark[c]["utilisation"] >= 100:
-                # Takes too much of a toll on the GPU.
+            if stats["utilisation"] + benchmark[c]["utilisation"] > 100:
+                # Don't max out the GPU. That will just slow things down.
                 continue
             eligible_commands.append(c)
 
@@ -172,8 +170,6 @@ async def main():
             commands.remove(c)
             spawned.append(p)
             out.kv("Remaining", len(commands))
-
-        await asyncio.sleep(10)
 
 
 if __name__ == "__main__":
