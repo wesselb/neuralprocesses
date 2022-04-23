@@ -393,7 +393,7 @@ gens_eval = [
         name,
         nps.construct_predefined_gens(
             torch.float32,
-            seed=20,  # Use yet another seed!
+            seed=30,  # Use yet another seed!
             batch_size=args.batch_size,
             # Use a high number of tasks.
             num_tasks=2**8 if args.evaluate_fast else 2**14,
