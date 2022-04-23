@@ -44,10 +44,10 @@ def dict_max(*ds):
 
 
 async def benchmark_command(gpu_id, command):
-    with out.Section("Determining GPU usage"):
+    with out.Section("Benchmarking command"):
         out.kv("Command", command)
 
-        out.out("Starting process.")
+        # Start process.
         stats_before = nvidia_smi(gpu_id)
         p = await asyncio.create_subprocess_shell(
             command,
@@ -56,8 +56,8 @@ async def benchmark_command(gpu_id, command):
             stderr=asyncio.subprocess.PIPE,
         )
 
+        # Monitor usage over ten seconds.
         sleep_total = 10
-        out.out(f"Monitoring usage.")
         sleep_current = 0
         stats_collected = []
         while sleep_current < sleep_total:
@@ -65,12 +65,14 @@ async def benchmark_command(gpu_id, command):
             stats_collected.append(nvidia_smi(gpu_id))
             sleep_current += 1
 
+        # Kill the process.
         if p.returncode is None:
             os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-            out.out("Process killed.")
+            out.out(f"Killed PID {p.pid}.")
         else:
             raise RuntimeError("Process already terminated. Something went wrong!")
 
+        # Determine the final statistics.
         stats_diff = dict_max(*(dict_diff(d, stats_before) for d in stats_collected))
         out.kv("Collected statistics", stats_diff)
 
@@ -81,26 +83,94 @@ async def benchmark_command(gpu_id, command):
 
 
 async def main():
+    # Parse arguments.
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpu", type=int, required=True)
+    parser.add_argument("--memory", type=int, default=11_019)
     parser.add_argument("--benchmark", action="store_true")
     args = parser.parse_args()
 
+    # Setup script.
+    out.report_time = True
     wd = WorkingDirectory("_scheduling")
 
+    # Determine the suite of experiments to run.
     commands = [
-        f"CUDA_VISIBLE_DEVICES={args.gpu} python train_gp.py --model convcnp --data eq",
-        f"CUDA_VISIBLE_DEVICES={args.gpu} python train_gp.py --model convcnp --data matern",
+        f"CUDA_VISIBLE_DEVICES={args.gpu} python train_gp.py"
+        f" --model {model}"
+        f" --data {data}"
+        f" --dim-x {dim_x}"
+        f" --dim-y {dim_y}"
+        for data in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]
+        for model in ["convcnp"]
+        for dim_x in [1]
+        for dim_y in [1]
     ]
 
-    if args.benchmark:
+    # Load the existing benchmarks, if they exist.
+    if os.path.exists(wd.file("benchmark.pickle")):
+        benchmark = wd.load("benchmark.pickle")
+    else:
         benchmark = {}
-        for command in commands:
-            benchmark[command] = await benchmark_command(args.gpu, command)
+
+    # Loop over the current commands to update the benchmarks with the current commands.
+    if args.benchmark:
+        for c in commands:
+            benchmark[c] = await benchmark_command(args.gpu, c)
         wd.save(benchmark, "benchmark.pickle")
 
-    benchmark = wd.load("benchmark.pickle")
-    print(benchmark)
+    # Sort the commands by memory then utilisation.
+    commands = sorted(
+        commands,
+        key=lambda c: (benchmark[c]["memory"], benchmark[c]["utilisation"]),
+    )
+    with out.Section("Commands"):
+        for c in commands:
+            out.out(c)
+
+    spawned = []
+
+    try:
+        while commands:
+            out.kv("Remaining:", len(commands))
+
+            # Check which commands we can run without putting too much strain on the
+            # GPU.
+            stats = nvidia_smi(args.gpu)
+            eligible_commands = []
+            for c in commands:
+                if stats["memory"] + benchmark[c]["memory"] > 0.9 * args.memory:
+                    # Takes too much memory.
+                    continue
+                if stats["utilisation"] + benchmark[c]["utilisation"] >= 100:
+                    # Takes too much of a toll on the GPU.
+                    continue
+                eligible_commands.append(c)
+
+            if not eligible_commands:
+                out.out("No eligible commands currently.")
+            else:
+                # Decide on the first eligible command.
+                c = eligible_commands[0]
+                with out.Section("Running command"):
+                    out.kv("Command", c)
+                p = await asyncio.create_subprocess_shell(
+                    c,
+                    preexec_fn=os.setsid,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                commands.remove(c)
+                spawned.append(p)
+
+            await asyncio.sleep(10)
+
+    except KeyboardInterrupt:
+        out.out("Killing all spawned processes.")
+        for p in spawned:
+            if p.returncode is None:
+                os.killpg(os.getpgid(p.pid), signal.SIGKILL)
+                out.out(f"Killed PID {p.pid}.")
 
 
 if __name__ == "__main__":
