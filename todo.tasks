@@ -1,5 +1,11 @@
 TODOs:
+    ☐ ConvNP + x2_y* + loglik? Too memory intensive. @high
+        Only ELBO or batch/4 rate/4?
+        Batch size 4 takes 25 min/epoch
+        ELBO@5 takes 9 min/epoch
+
     ☐ Stabilise tests
+        ☐ Masking?
 
 UNet:
     ☐ Multiple conv blocks: @high
@@ -29,6 +35,10 @@ Features:
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
+ ✓ Reduce num contexts for 1D again! @done (22-04-23 14:00) @project(TODOs)
+ ✓ Add LVs option to script @done (22-04-23 14:00) @project(TODOs)
+ ✓ Check ConvGNP on eq and weakly-periodic from epoch 38 @high @done (22-04-23 13:53) @project(TODOs)
+ x Check ConvGNP on weakly-periodic @high @cancelled (22-04-23 13:42) @project(TODOs)
  ✓ BatchedMLP allow option `num_layers` and simplify code. @done (22-04-22 16:26) @project(TODOs)
  x AR more during eval @cancelled (22-04-22 16:26) @project(TODOs)
  ✓ Allow dim_y_latent > 1 but dim_y = 1 @done (22-04-22 16:20) @project(TODOs)
