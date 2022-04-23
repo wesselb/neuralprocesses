@@ -9,6 +9,9 @@ import wbml.out as out
 from wbml.experiment import WorkingDirectory
 
 
+spawned = []
+
+
 def read_values(xs, sep, *values):
     xs = [x.strip() for x in xs.split(sep)]
     if len(xs) != len(values):
@@ -55,6 +58,7 @@ async def benchmark_command(gpu_id, command):
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        spawned.append(p)
 
         # Monitor usage over ten seconds.
         sleep_total = 10
@@ -128,42 +132,45 @@ async def main():
         for c in commands:
             out.out(c)
 
-    spawned = []
+    while commands:
+        out.kv("Remaining:", len(commands))
 
+        # Check which commands we can run without putting too much strain on the
+        # GPU.
+        stats = nvidia_smi(args.gpu)
+        eligible_commands = []
+        for c in commands:
+            if stats["memory"] + benchmark[c]["memory"] > 0.9 * args.memory:
+                # Takes too much memory.
+                continue
+            if stats["utilisation"] + benchmark[c]["utilisation"] >= 100:
+                # Takes too much of a toll on the GPU.
+                continue
+            eligible_commands.append(c)
+
+        if not eligible_commands:
+            out.out("No eligible commands currently.")
+        else:
+            # Decide on the first eligible command.
+            c = eligible_commands[0]
+            with out.Section("Running command"):
+                out.kv("Command", c)
+            p = await asyncio.create_subprocess_shell(
+                c,
+                preexec_fn=os.setsid,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            commands.remove(c)
+            spawned.append(p)
+
+        await asyncio.sleep(10)
+
+
+if __name__ == "__main__":
     try:
-        while commands:
-            out.kv("Remaining:", len(commands))
-
-            # Check which commands we can run without putting too much strain on the
-            # GPU.
-            stats = nvidia_smi(args.gpu)
-            eligible_commands = []
-            for c in commands:
-                if stats["memory"] + benchmark[c]["memory"] > 0.9 * args.memory:
-                    # Takes too much memory.
-                    continue
-                if stats["utilisation"] + benchmark[c]["utilisation"] >= 100:
-                    # Takes too much of a toll on the GPU.
-                    continue
-                eligible_commands.append(c)
-
-            if not eligible_commands:
-                out.out("No eligible commands currently.")
-            else:
-                # Decide on the first eligible command.
-                c = eligible_commands[0]
-                with out.Section("Running command"):
-                    out.kv("Command", c)
-                p = await asyncio.create_subprocess_shell(
-                    c,
-                    preexec_fn=os.setsid,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                commands.remove(c)
-                spawned.append(p)
-
-            await asyncio.sleep(10)
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
 
     except KeyboardInterrupt:
         out.out("Killing all spawned processes.")
@@ -171,8 +178,3 @@ async def main():
             if p.returncode is None:
                 os.killpg(os.getpgid(p.pid), signal.SIGKILL)
                 out.out(f"Killed PID {p.pid}.")
-
-
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
