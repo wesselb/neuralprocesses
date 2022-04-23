@@ -75,17 +75,17 @@ def with_err(vals):
     return f"{mean:8.4f} +- {err:8.4f}"
 
 
-def plot_first_of_batch(model, gen, *, name, epoch):
+def plot_first_of_batch(model, gen, *, name, epoch, predict=nps.predict):
     """Plot the prediction for the first element of a batch."""
     if args.dim_x == 1:
-        plot_first_of_batch_1d(model, gen, name=name, epoch=epoch)
+        plot_first_of_batch_1d(model, gen, name=name, epoch=epoch, predict=predict)
     elif args.dim_x == 2:
-        plot_first_of_batch_2d(model, gen, name=name, epoch=epoch)
+        plot_first_of_batch_2d(model, gen, name=name, epoch=epoch, predict=predict)
     else:
         pass  # Not implemented. Just do nothing.
 
 
-def plot_first_of_batch_1d(model, gen, *, name, epoch):
+def plot_first_of_batch_1d(model, gen, *, name, epoch, predict):
     batch = gen.generate_batch()
 
     # Define points to predict at.
@@ -94,7 +94,7 @@ def plot_first_of_batch_1d(model, gen, *, name, epoch):
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
-        mean, var, samples = nps.predict(
+        mean, var, samples = predict(
             model,
             batch["xc"][:1, ...],
             batch["yc"][:1, ...],
@@ -166,7 +166,7 @@ def plot_first_of_batch_1d(model, gen, *, name, epoch):
     plt.close()
 
 
-def plot_first_of_batch_2d(model, gen, *, name, epoch):
+def plot_first_of_batch_2d(model, gen, *, name, epoch, predict):
     batch = gen.generate_batch()
 
     # Define points to predict at.
@@ -176,7 +176,7 @@ def plot_first_of_batch_2d(model, gen, *, name, epoch):
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
         try:
-            mean, _, samples = nps.predict(
+            mean, _, samples = predict(
                 model,
                 batch["xc"][:1, ...],
                 batch["yc"][:1, ...],
@@ -320,6 +320,7 @@ parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
 parser.add_argument("--num-samples", type=int, default=20)
 parser.add_argument("--resume-at-epoch", type=int)
 parser.add_argument("--evaluate", action="store_true")
+parser.add_argument("--evaluate-last", action="store_true")
 parser.add_argument("--evaluate-fast", action="store_true")
 parser.add_argument(
     "--evaluate-objective",
@@ -346,7 +347,7 @@ if args.model not in models_which_use_arch:
 # reduce the batch size.
 if args.dim_x == 2 and args.model == "convnp" and args.objective == "loglik":
     args.batch_size //= 4
-    # With reducing the batch size, we will have more gradient updated per epoch, so
+    # With reducing the batch size, we will have more gradient updates per epoch, so
     # correspondingly decrease the learning rate.
     args.rate /= 4
 
@@ -425,7 +426,6 @@ gens_eval = [
         ("extrapolation beyond training range", (-2, 2), (2, 6)),
     ]
 ]
-
 
 # Setup architectures.
 width = 256
@@ -611,14 +611,23 @@ if args.no_action:
     exit()
 
 if args.evaluate:
-    # Perform evaluation. First, load the best model.
-    model.load_state_dict(torch.load(wd.file("model-best.torch"), map_location=device))
+    # Perform evaluation.
+    if args.evaluate_last:
+        name = "model-last.torch"
+    else:
+        name = "model-best.torch"
+    model.load_state_dict(torch.load(wd.file(name), map_location=device))
 
     if args.ar:
-        # # Test prediction.
-        # batch = gen_train.generate_batch()
-        # print(nps.ar_predict(model, batch["xc"], batch["yc"], batch["xt"]))
-        # exit()
+        # Do AR evaluation. First, load the model.
+        for i in range(10):
+            plot_first_of_batch(
+                model,
+                gen_cv,
+                name="evaluate-ar",
+                epoch=i + 1,
+                predict=nps.ar_predict,
+            )
 
         # Do AR testing.
         for name, gen in gens_eval:
@@ -631,7 +640,7 @@ if args.evaluate:
                 )
 
     else:
-        # Do regular evaluation. First, visualise some predictions by the model.
+        # Do regular evaluation.
         for i in range(10):
             plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
 

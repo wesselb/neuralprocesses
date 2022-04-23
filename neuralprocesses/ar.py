@@ -1,5 +1,6 @@
 import lab as B
 import numpy as np
+from wbml.util import inv_perm
 
 __all__ = ["ar_predict", "ar_loglik"]
 
@@ -11,19 +12,28 @@ def _sort_targets(xt, yt=None):
         yt = B.identity(yt)
 
     # Sort the targets.
+    inv_inds = []
     for i in range(B.shape(xt, 0)):
         inds = np.lexsort(B.to_numpy(xt)[i, ::-1, :])
-        xt[i] = xt[i, :, inds]
+        inv_inds.append(inv_perm(inds))
+        xt[..., i, :, :] = xt[..., i, :, inds]
         if yt is not None:
-            yt[i] = yt[i, :, inds]
+            yt[..., i, :, :] = yt[..., i, :, inds]
+
+    # Define function which undoes the sorting.
+
+    def unsort(z):
+        for i, inds in enumerate(inv_inds):
+            z[..., i, :, :] = z[..., i, :, inds]
+        return z
 
     if yt is None:
-        return xt
+        return xt, unsort
     else:
-        return xt, yt
+        return xt, yt, unsort
 
 
-def ar_predict(model, xc, yc, xt, pred_num_samples=50, num_samples=1):
+def ar_predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
     """Autoregressive sampling.
 
     Args:
@@ -41,7 +51,7 @@ def ar_predict(model, xc, yc, xt, pred_num_samples=50, num_samples=1):
         tensor: Marginal variance.
         tensor: `num_samples` noiseless samples.
     """
-    xt = _sort_targets(xt)
+    xt, unsort = _sort_targets(xt)
 
     # Tile to produce multiple samples through batching.
     xc = B.tile(xc[None, ...], pred_num_samples, *((1,) * B.rank(xc)))
@@ -51,9 +61,7 @@ def ar_predict(model, xc, yc, xt, pred_num_samples=50, num_samples=1):
     # Now evaluate the log-likelihood autoregressively.
     samples = []
     for i in range(B.shape(xt, -1)):
-        print(xc.shape, yc.shape, xt[..., i : i + 1].shape)
         sample = model(xc, yc, xt[..., i : i + 1]).sample()
-        print(sample.shape)
         samples.append(sample)
         xc = B.concat(xc, xt[..., i : i + 1], axis=-1)
         yc = B.concat(yc, sample, axis=-1)
@@ -69,6 +77,11 @@ def ar_predict(model, xc, yc, xt, pred_num_samples=50, num_samples=1):
 
     mean = B.mean(samples, axis=0)
     var = B.std(samples, axis=0) ** 2
+
+    # Undo the sorting from the beginning.
+    mean = unsort(mean)
+    var = unsort(var)
+    noiseless_samples = unsort(noiseless_samples)
 
     return mean, var, noiseless_samples
 
@@ -90,7 +103,7 @@ def ar_loglik(state, model, xc, yc, xt, yt, normalise=True):
         random state, optional: Random state.
         tensor: Log-likelihoods.
     """
-    xt, yt = _sort_targets(xt, yt)
+    xt, yt, _ = _sort_targets(xt, yt)
 
     # Now evaluate the log-likelihood autoregressively.
     logpdfs = []
