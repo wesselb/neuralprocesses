@@ -105,6 +105,7 @@ async def main():
         f" --data {data}"
         f" --dim-x {dim_x}"
         f" --dim-y {dim_y}"
+        f" --epochs 3"
         for data in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]
         for model in ["convcnp"]
         for dim_x in [1]
@@ -118,10 +119,10 @@ async def main():
         benchmark = {}
 
     # Loop over the current commands to update the benchmarks with the current commands.
-    if args.benchmark:
-        for c in commands:
+    for c in commands:
+        if c not in benchmark or args.benchmark:
             benchmark[c] = await benchmark_command(args.gpu, c)
-        wd.save(benchmark, "benchmark.pickle")
+            wd.save(benchmark, "benchmark.pickle")
 
     # Sort the commands by memory then utilisation.
     commands = sorted(
@@ -133,8 +134,6 @@ async def main():
             out.out(c)
 
     while commands:
-        out.kv("Remaining:", len(commands))
-
         # Check which commands we can run without putting too much strain on the
         # GPU.
         stats = nvidia_smi(args.gpu)
@@ -148,9 +147,7 @@ async def main():
                 continue
             eligible_commands.append(c)
 
-        if not eligible_commands:
-            out.out("No eligible commands currently.")
-        else:
+        if eligible_commands:
             # Decide on the first eligible command.
             c = eligible_commands[0]
             with out.Section("Running command"):
@@ -163,6 +160,7 @@ async def main():
             )
             commands.remove(c)
             spawned.append(p)
+            out.kv("Remaining", len(commands))
 
         await asyncio.sleep(10)
 
