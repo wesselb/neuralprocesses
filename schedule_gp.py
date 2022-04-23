@@ -1,13 +1,11 @@
+import argparse
 import asyncio
 import asyncio.subprocess
 import os
 import signal
 import subprocess
-import argparse
 
 import wbml.out as out
-from wbml.experiment import WorkingDirectory
-
 
 spawned = []
 
@@ -93,25 +91,14 @@ async def main():
         choices=["eq", "matern", "weakly-periodic", "sawtooth", "mixture"],
         required=True,
     )
-    parser.add_argument("--lv", action="store_true")
     parser.add_argument("--memory", type=int, default=11_019)
-    parser.add_argument("--benchmark", action="store_true")
     args = parser.parse_args()
 
     # Setup script.
     out.report_time = True
-    wd = WorkingDirectory("_scheduling")
 
     # Determine the suite of experiments to run.
-    if args.lv:
-        models = [
-            f"{model} --objective {objective}"
-            for model in ["np", "anp", "convnp"]
-            for objective in ["loglik --num-samples 20", "elbo --num-samples 5"]
-        ]
-    else:
-        models = ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
-    commands = [
+    conditional_commands = [
         f"python train_gp.py"
         f" --model {model}"
         f" --data {args.data}"
@@ -120,7 +107,7 @@ async def main():
         f" --epochs 100"
         for dim_x in [1, 2]
         for dim_y in [1, 2]
-        for model in models
+        for model in ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
     ] + [
         f"python train_gp.py"
         f" --model fullconvgnp"
@@ -129,24 +116,37 @@ async def main():
         f" --dim-y 1"
         f" --epochs 100"
     ]
+    lv_commands = [
+        f"python train_gp.py"
+        f" --model {model}"
+        f" --objective {objective}"
+        f" --data {args.data}"
+        f" --dim-x {dim_x}"
+        f" --dim-y {dim_y}"
+        f" --epochs 100"
+        for dim_x in [1, 2]
+        for dim_y in [1, 2]
+        for model in ["np", "anp", "convnp"]
+        for objective in ["loglik --num-samples 20", "elbo --num-samples 5"]
+    ]
 
-    # Load the existing benchmarks, if they exist.
-    if os.path.exists(wd.file("benchmark.pickle")):
-        benchmark = wd.load("benchmark.pickle")
-    else:
-        benchmark = {}
+    # Benchmark every command before commit to the long run.
+    benchmark = {
+        c: await benchmark_command(args.gpu, c)
+        for c in conditional_commands + lv_commands
+    }
 
-    # Loop over the current commands to update the benchmarks with the current commands.
-    for c in commands:
-        if c not in benchmark or args.benchmark:
-            benchmark[c] = await benchmark_command(args.gpu, c)
-            wd.save(benchmark, "benchmark.pickle")
-
-    # Sort the commands by memory then utilisation.
-    commands = sorted(
-        commands,
+    # Sort the commands by memory then utilisation. Run the conditional models before
+    # running the latent-variable models.
+    conditional_commands = sorted(
+        conditional_commands,
         key=lambda c: (benchmark[c]["memory"], benchmark[c]["utilisation"]),
     )
+    lv_commands = sorted(
+        lv_commands,
+        key=lambda c: (benchmark[c]["memory"], benchmark[c]["utilisation"]),
+    )
+    commands = conditional_commands + lv_commands
     with out.Section("Commands"):
         for c in commands:
             out.out(c)
