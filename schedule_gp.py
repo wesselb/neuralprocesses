@@ -103,11 +103,14 @@ async def main():
     wd = WorkingDirectory("_scheduling")
 
     # Determine the suite of experiments to run.
-    models = ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
     if args.lv:
-        for lv_model in ["np", "anp", "convnp"]:
-            for objective in ["loglik --num-samples 20", "elbo --num-samples 5"]:
-                models += [f"{lv_model} --objective {objective}"]
+        models = [
+            f"{model} --objective {objective}"
+            for model in ["np", "anp", "convnp"]
+            for objective in ["loglik --num-samples 20", "elbo --num-samples 5"]
+        ]
+    else:
+        models = ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
     commands = [
         f"python train_gp.py"
         f" --model {model}"
