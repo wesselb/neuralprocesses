@@ -53,7 +53,7 @@ async def benchmark_command(gpu_id, command):
         # Start process.
         stats_before = nvidia_smi(gpu_id)
         p = await asyncio.create_subprocess_shell(
-            command,
+            f"CUDA_VISIBLE_DEVICES={gpu_id} " + command,
             preexec_fn=os.setsid,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -90,6 +90,11 @@ async def main():
     # Parse arguments.
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpu", type=int, required=True)
+    parser.add_argument(
+        "--data",
+        choices=["eq", "matern", "weakly-periodic", "sawtooth", "mixture"],
+        required=True,
+    )
     parser.add_argument("--memory", type=int, default=11_019)
     parser.add_argument("--benchmark", action="store_true")
     args = parser.parse_args()
@@ -100,16 +105,15 @@ async def main():
 
     # Determine the suite of experiments to run.
     commands = [
-        f"CUDA_VISIBLE_DEVICES={args.gpu} python train_gp.py"
+        f"python train_gp.py"
         f" --model {model}"
-        f" --data {data}"
+        f" --data {args.data}"
         f" --dim-x {dim_x}"
         f" --dim-y {dim_y}"
-        f" --epochs 3"
-        for data in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]
-        for model in ["convcnp"]
-        for dim_x in [1]
-        for dim_y in [1]
+        f" --epochs 100"
+        for dim_x in [1, 2]
+        for dim_y in [1, 2]
+        for model in ["cnp", "acnp", "convcnp", "fullconvgnp", "gnp", "gnp", "convgnp"]
     ]
 
     # Load the existing benchmarks, if they exist.
@@ -153,7 +157,7 @@ async def main():
             with out.Section("Running command"):
                 out.kv("Command", c)
             p = await asyncio.create_subprocess_shell(
-                c,
+                f"CUDA_VISIBLE_DEVICES={args.gpu} " + c,
                 preexec_fn=os.setsid,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
