@@ -93,6 +93,7 @@ async def main():
         choices=["eq", "matern", "weakly-periodic", "sawtooth", "mixture"],
         required=True,
     )
+    parser.add_argument("--lv", action="store_true")
     parser.add_argument("--memory", type=int, default=11_019)
     parser.add_argument("--benchmark", action="store_true")
     args = parser.parse_args()
@@ -102,6 +103,11 @@ async def main():
     wd = WorkingDirectory("_scheduling")
 
     # Determine the suite of experiments to run.
+    models = ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
+    if args.lv:
+        for lv_model in ["np", "anp", "convnp"]:
+            for objective in ["loglik --num-samples 20", "elbo --num-samples 5"]:
+                models += [f"{lv_model} --objective {objective}"]
     commands = [
         f"python train_gp.py"
         f" --model {model}"
@@ -111,7 +117,7 @@ async def main():
         f" --epochs 100"
         for dim_x in [1, 2]
         for dim_y in [1, 2]
-        for model in ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
+        for model in models
     ] + [
         f"python train_gp.py"
         f" --model fullconvgnp"
