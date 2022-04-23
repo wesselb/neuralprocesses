@@ -345,7 +345,7 @@ if args.model not in models_which_use_arch:
 # The ConvNP with 2D inputs and the ML is particularly memory intensive. In that case,
 # reduce the batch size.
 if args.dim_x == 2 and args.model == "convnp" and args.objective == "loglik":
-    args.batch_size /= 4
+    args.batch_size //= 4
     # With reducing the batch size, we will have more gradient updated per epoch, so
     # correspondingly decrease the learning rate.
     args.rate /= 4
