@@ -350,6 +350,11 @@ if args.dim_x == 2 and args.model == "convnp" and args.objective == "loglik":
     # correspondingly decrease the learning rate.
     args.rate /= 4
 
+# Make a similar exception for the ConvGNP with 2D inputs and 2D outputs.
+if args.dim_x == args.dim_y == 2 and args.model == "convgnp":
+    args.batch_size //= 2
+    args.rate /= 2
+
 # Setup script.
 out.report_time = True
 B.epsilon = 1e-8
