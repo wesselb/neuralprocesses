@@ -209,6 +209,8 @@ def plot_first_of_batch_2d(model, gen, *, name, epoch):
     vmax = min(B.min(mean), B.min(samples))
 
     def plot_imshow(image, i, label):
+        # `plt.imshow` isn't patched, so ensure that `image` is a NumPy array.
+        image = B.to_numpy(image)
         plt.imshow(
             image.T,
             cmap="viridis",
@@ -218,7 +220,6 @@ def plot_first_of_batch_2d(model, gen, *, name, epoch):
             extent=[-2, 2, -2, 2],
             label=label,
         )
-
         plt.scatter(
             batch["xc"][0, 0],
             batch["xc"][0, 1],
