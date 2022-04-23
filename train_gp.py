@@ -342,6 +342,14 @@ models_which_use_arch = {
 if args.model not in models_which_use_arch:
     args.arch = None
 
+# The ConvNP with 2D inputs and the ML is particularly memory intensive. In that case,
+# reduce the batch size.
+if args.dim_x == 2 and args.model == "convnp" and args.objective == "loglik":
+    args.batch_size /= 4
+    # With reducing the batch size, we will have more gradient updated per epoch, so
+    # correspondingly decrease the learning rate.
+    args.rate /= 4
+
 # Setup script.
 out.report_time = True
 B.epsilon = 1e-8
@@ -349,10 +357,10 @@ wd = WorkingDirectory(
     *args.root,
     *(args.subdir or ()),
     args.data,
-    args.model,
-    args.objective,
-    *((args.arch,) if args.arch else ()),
     f"x{args.dim_x}_y{args.dim_y}",
+    args.model,
+    *((args.arch,) if args.arch else ()),
+    args.objective,
     log="log_evaluate.txt" if args.evaluate else "log.txt",
 )
 
@@ -412,6 +420,7 @@ gens_eval = [
         ("extrapolation beyond training range", (-2, 2), (2, 6)),
     ]
 ]
+
 
 # Setup architectures.
 width = 256
