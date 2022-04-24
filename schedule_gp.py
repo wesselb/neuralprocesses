@@ -157,11 +157,12 @@ async def main():
 
         eligible_commands = []
         for c in commands:
-            if stats["memory"] + benchmark[c]["memory"] > 0.9 * args.memory:
+            # Predict 15% more memory usage than the benchmark.
+            if stats["memory"] + 1.15 * benchmark[c]["memory"] > args.memory:
                 # Takes too much memory.
                 continue
-            if stats["utilisation"] + benchmark[c]["utilisation"] > 100:
-                # Don't max out the GPU. That will just slow things down.
+            if stats["utilisation"] + benchmark[c]["utilisation"] > 120:
+                # Fine to max out the GPU, but not much more than that.
                 continue
             eligible_commands.append(c)
 
