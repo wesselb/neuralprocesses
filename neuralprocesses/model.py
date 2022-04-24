@@ -365,38 +365,38 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
     float64 = B.promote_dtypes(float, np.float64)
 
     # Predict marginal statistics.
-    pred = model(xc, yc, xt, num_samples=pred_num_samples)
-    m1 = B.mean(pred.mean, axis=0)
-    m2 = B.mean(pred.var + pred.mean**2, axis=0)
+    m1s, m2s = [], []
+    for _ in range(pred_num_samples):
+        pred = model(xc, yc, xt, num_samples)
+        m1s.append(pred.mean)
+        m2s.append(pred.var + pred.mean**2)
+    m1 = B.mean(B.stack(m1s, axis=0), axis=0)
+    m2 = B.mean(B.stack(m2s, axis=0), axis=0)
     mean, var = m1, m2 - m1**2
 
     # Produce noiseless samples.
-    pred_noiseless = model(
-        xc,
-        yc,
-        xt,
-        dtype_enc_sample=float,
-        dtype_lik=float64,
-        noiseless=True,
-        num_samples=num_samples,
-    )
-    # Try sampling with increasingly higher regularisation.
-    epsilon_before = B.epsilon
-    while True:
-        try:
-            if B.shape(pred_noiseless.mean, 0) == 1:
-                # Model didn't have any internal stochastic component. Sample the output
-                # multiple times.
-                samples = pred_noiseless.sample(num_samples)[:, 0, ...]
-            else:
-                samples = pred_noiseless.sample()
-            break
-        except Exception as e:
-            B.epsilon *= 10
-            if B.epsilon > 1e-3:
-                # Reset regularisation before failing.
-                B.epsilon = epsilon_before
-                raise e
-    B.epsilon = epsilon_before  # Reset regularisation after success.
+    samples = []
+    for _ in range(num_samples):
+        pred_noiseless = model(
+            xc,
+            yc,
+            xt,
+            dtype_enc_sample=float,
+            dtype_lik=float64,
+            noiseless=True,
+        )
+        # Try sampling with increasingly higher regularisation.
+        epsilon_before = B.epsilon
+        while True:
+            try:
+                samples.append(pred_noiseless.sample())
+            except Exception as e:
+                B.epsilon *= 10
+                if B.epsilon > 1e-3:
+                    # Reset regularisation before failing.
+                    B.epsilon = epsilon_before
+                    raise e
+        B.epsilon = epsilon_before  # Reset regularisation after success.
+    samples = B.stack(*samples, axis=0)
 
     return mean, var, samples
