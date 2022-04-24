@@ -171,7 +171,7 @@ def plot_first_of_batch_2d(model, gen, *, name, epoch, predict):
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
-        x = B.linspace(B.dtype(batch["xt"]), -2, 2, 200)[None, None, :]
+        x = B.linspace(B.dtype(batch["xt"]), -2, 2, 100)[None, None, :]
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
@@ -181,6 +181,7 @@ def plot_first_of_batch_2d(model, gen, *, name, epoch, predict):
                 batch["xc"][:1, ...],
                 batch["yc"][:1, ...],
                 (x, x),
+                num_samples=2,
             )
         except:
             # The model probably doesn't suppose the tuple shorthand for grids. Do it
@@ -200,17 +201,16 @@ def plot_first_of_batch_2d(model, gen, *, name, epoch, predict):
                     batch["xc"][:1, ...],
                     batch["yc"][:1, ...],
                     B.concat(x0, x1, axis=-2),
+                    num_samples=2,
                 )
                 # Reshape the results back to images.
-                mean = B.reshape(mean, *B.shape(mean)[:-1], 200, 200)
-                samples = B.reshape(samples, *B.shape(samples)[:-1], 200, 200)
+                mean = B.reshape(mean, *B.shape(mean)[:-1], 100, 100)
+                samples = B.reshape(samples, *B.shape(samples)[:-1], 100, 100)
 
     vmin = max(B.max(mean), B.max(samples))
     vmax = min(B.min(mean), B.min(samples))
 
     def plot_imshow(image, i, label):
-        # `plt.imshow` isn't patched, so ensure that `image` is a NumPy array.
-        image = B.to_numpy(image)
         plt.imshow(
             image.T,
             cmap="viridis",

@@ -390,6 +390,7 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
         while True:
             try:
                 samples.append(pred_noiseless.sample())
+                break
             except Exception as e:
                 B.epsilon *= 10
                 if B.epsilon > 1e-3:
