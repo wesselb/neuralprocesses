@@ -367,7 +367,7 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
     # Predict marginal statistics.
     m1s, m2s = [], []
     for _ in range(pred_num_samples):
-        pred = model(xc, yc, xt, num_samples)
+        pred = model(xc, yc, xt)
         m1s.append(pred.mean)
         m2s.append(pred.var + pred.mean**2)
     m1 = B.mean(B.stack(m1s, axis=0), axis=0)
