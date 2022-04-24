@@ -370,8 +370,8 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
         pred = model(xc, yc, xt)
         m1s.append(pred.mean)
         m2s.append(pred.var + pred.mean**2)
-    m1 = B.mean(B.stack(m1s, axis=0), axis=0)
-    m2 = B.mean(B.stack(m2s, axis=0), axis=0)
+    m1 = B.mean(B.stack(*m1s, axis=0), axis=0)
+    m2 = B.mean(B.stack(*m2s, axis=0), axis=0)
     mean, var = m1, m2 - m1**2
 
     # Produce noiseless samples.
