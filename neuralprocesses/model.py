@@ -364,10 +364,20 @@ def _kl(q: Parallel, p: Parallel):
     return sum([_kl(qi, pi) for qi, pi in zip(q, p)], 0)
 
 
-def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
+@_dispatch
+def predict(
+    state: B.RandomState,
+    model: Model,
+    xc,
+    yc,
+    xt,
+    pred_num_samples=50,
+    num_samples=5,
+):
     """Use a model to predict.
 
     Args:
+        state (random state, optional): Random state.
         model (:class:`.Model`): Model.
         xc (tensor): Inputs of the context set.
         yc (tensor): Output of the context set.
@@ -378,6 +388,7 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
             to 5.
 
     Returns:
+        random state, optional: Random state.
         tensor: Marignal mean.
         tensor: Marginal variance.
         tensor: `num_samples` noiseless samples.
@@ -421,4 +432,18 @@ def predict(model, xc, yc, xt, pred_num_samples=50, num_samples=5):
         B.epsilon = epsilon_before  # Reset regularisation after success.
     samples = B.stack(*samples, axis=0)
 
+    return mean, var, samples
+
+
+@_dispatch
+def predict(
+    model: Model,
+    xc,
+    yc,
+    xt,
+    **kw_args,
+):
+    state = B.global_random_state(B.dtype(xt))
+    state, mean, var, samples = predict(state, model, xc, yc, xt, **kw_args)
+    B.set_global_random_state(state)
     return mean, var, samples
