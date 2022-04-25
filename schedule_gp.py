@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import asyncio.subprocess
+import subprocess
 import os
 import signal
 import subprocess
@@ -53,8 +54,8 @@ async def benchmark_command(gpu_id, command):
         p = await asyncio.create_subprocess_shell(
             f"CUDA_VISIBLE_DEVICES={gpu_id} " + command,
             preexec_fn=os.setsid,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
         spawned.append(p)
 
@@ -82,6 +83,14 @@ async def determine_current_stats(gpu_id):
     return dict_max(*stats)
 
 
+def test_success(command):
+    try:
+        subprocess.check_output(command, stderr=asyncio.subprocess.DEVNULL)
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
 async def main():
     # Parse arguments.
     parser = argparse.ArgumentParser()
@@ -93,6 +102,9 @@ async def main():
     )
     parser.add_argument("--memory", type=int, default=11_019)
     args = parser.parse_args()
+
+    def with_gpu(c):
+        return f"CUDA_VISIBLE_DEVICES={args.gpu} {c}"
 
     # Setup script.
     out.report_time = True
@@ -129,6 +141,18 @@ async def main():
         for model in ["np", "anp", "convnp"]
         for objective in ["loglik --num-samples 20", "elbo --num-samples 5"]
     ]
+
+    # First, run through the commands and eject the ones that have already completed.
+    for c in conditional_commands:
+        if test_success(with_gpu(c + " --has-completed")):
+            with out.Section("Command already completed"):
+                out.kv("Command", c)
+            conditional_commands.remove(c)
+    for c in lv_commands:
+        if test_success(with_gpu(c + " --has-completed")):
+            with out.Section("Command already completed"):
+                out.kv("Command", c)
+            lv_commands.remove(c)
 
     # Benchmark every command before commit to the long run.
     benchmark = {
@@ -176,10 +200,10 @@ async def main():
             with out.Section("Running command"):
                 out.kv("Command", c)
             p = await asyncio.create_subprocess_shell(
-                f"CUDA_VISIBLE_DEVICES={args.gpu} " + c,
+                with_gpu(c),
                 preexec_fn=os.setsid,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
             )
             commands.remove(c)
             spawned.append(p)
