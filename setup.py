@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 requirements = [
     "numpy>=1.16",
-    "backends>=1.4.19",
+    "backends>=1.4.21",
     "backends-matrix>=1.2.10",
     "plum-dispatch>=1",
     "stheno>=1.3.10",
