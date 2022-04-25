@@ -399,7 +399,7 @@ def predict(
     # Predict marginal statistics.
     m1s, m2s = [], []
     for _ in range(pred_num_samples):
-        pred = model(xc, yc, xt)
+        state, pred = model(state, xc, yc, xt)
         m1s.append(pred.mean)
         m2s.append(pred.var + pred.mean**2)
     m1 = B.mean(B.stack(*m1s, axis=0), axis=0)
@@ -409,7 +409,8 @@ def predict(
     # Produce noiseless samples.
     samples = []
     for _ in range(num_samples):
-        pred_noiseless = model(
+        state, pred_noiseless = model(
+            state,
             xc,
             yc,
             xt,
@@ -421,7 +422,8 @@ def predict(
         epsilon_before = B.epsilon
         while True:
             try:
-                samples.append(pred_noiseless.sample())
+                state, sample = pred_noiseless.sample(state)
+                samples.append(sample)
                 break
             except Exception as e:
                 B.epsilon *= 10
@@ -432,7 +434,7 @@ def predict(
         B.epsilon = epsilon_before  # Reset regularisation after success.
     samples = B.stack(*samples, axis=0)
 
-    return mean, var, samples
+    return state, mean, var, samples
 
 
 @_dispatch
