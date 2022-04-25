@@ -85,7 +85,7 @@ async def determine_current_stats(gpu_id):
 
 def test_success(command):
     try:
-        subprocess.check_output(command, stderr=asyncio.subprocess.DEVNULL)
+        subprocess.check_output(command, shell=True, stderr=asyncio.subprocess.DEVNULL)
         return True
     except subprocess.CalledProcessError:
         return False
@@ -144,12 +144,12 @@ async def main():
 
     # First, run through the commands and eject the ones that have already completed.
     for c in conditional_commands:
-        if test_success(with_gpu(c + " --has-completed")):
+        if test_success(with_gpu(c + " --check-completed")):
             with out.Section("Command already completed"):
                 out.kv("Command", c)
             conditional_commands.remove(c)
     for c in lv_commands:
-        if test_success(with_gpu(c + " --has-completed")):
+        if test_success(with_gpu(c + " --check-completed")):
             with out.Section("Command already completed"):
                 out.kv("Command", c)
             lv_commands.remove(c)
