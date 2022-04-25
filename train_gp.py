@@ -1,4 +1,6 @@
 import argparse
+import os
+import sys
 from functools import partial
 
 import lab as B
@@ -319,6 +321,7 @@ parser.add_argument(
 parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
 parser.add_argument("--num-samples", type=int, default=20)
 parser.add_argument("--resume-at-epoch", type=int)
+parser.add_argument("--check-completed", action="store_true")
 parser.add_argument("--evaluate", action="store_true")
 parser.add_argument("--evaluate-last", action="store_true")
 parser.add_argument("--evaluate-fast", action="store_true")
@@ -356,6 +359,18 @@ if args.dim_x == args.dim_y == 2 and args.model == "convgnp":
     args.batch_size //= 2
     args.rate /= 2
 
+# Determine the mode of the script.
+if args.check_completed or args.no_action:
+    # Don't add any mode suffix.
+    mode = ""
+elif args.evaluate:
+    mode = "_evaluate"
+    if args.ar:
+        mode += "_ar"
+else:
+    # The default is training.
+    mode = "_train"
+
 # Setup script.
 out.report_time = True
 B.epsilon = 1e-8
@@ -367,8 +382,18 @@ wd = WorkingDirectory(
     args.model,
     *((args.arch,) if args.arch else ()),
     args.objective,
-    log="log_evaluate.txt" if args.evaluate else "log.txt",
+    log=f"log{mode}.txt",
+    diff=f"diff{mode}.txt",
 )
+
+# Check if a run has completed.
+if args.check_completed:
+    # Simply check if the final plot exists.
+    # TODO: Do this in a better way.
+    if os.path.exists(wd.file(f"train-epoch-{args.epochs}.pdf")):
+        sys.exit(0)
+    else:
+        sys.exit(1)
 
 # Use a GPU if one is available.
 if torch.cuda.is_available():
