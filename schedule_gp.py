@@ -230,25 +230,25 @@ async def main():
             for dim_x in [1, 2]
             for dim_y in [1, 2]
             for model in ["np", "anp", "convnp"]
-            if not (model == "convnp" and dim_x == dim_y == 2)
+            if not (model == "convnp" and dim_x == 2)
             for objective in [
                 f"loglik --num-samples 20",
                 f"elbo --num-samples 5",
             ]
         ]
-        # The ConvNP for 2D inputs and 2D outputs is too expensive and doesn't fit in
-        # memory. We reduce the numbers of samples to keep the memory and runtime in
-        # check.
+        # The ConvNP for 2D inputs is too expensive and doesn't fit in memory. We reduce
+        # the numbers of samples to keep the memory and runtime in check.
         + [
             f"python train_gp.py"
             f" --model convnp"
             f" --objective {objective}"
             f" --data {args.data}"
             f" --dim-x 2"
-            f" --dim-y 2"
+            f" --dim-y {dim_y}"
             f" --epochs 100"
             f" --batch-size 16"
             f" --rate 3e-4"
+            for dim_y in [1, 2]
             for objective in [
                 f"loglik --num-samples 5",
                 f"elbo --num-samples 1",
