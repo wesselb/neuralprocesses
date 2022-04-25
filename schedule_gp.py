@@ -143,12 +143,12 @@ async def main():
     ]
 
     # First, run through the commands and eject the ones that have already completed.
-    for c in conditional_commands:
+    for c in list(conditional_commands):  # Copy, because we're removing as we go!
         if test_success(with_gpu(c + " --check-completed")):
             with out.Section("Command already completed"):
                 out.kv("Command", c)
             conditional_commands.remove(c)
-    for c in lv_commands:
+    for c in list(lv_commands):  # Copy, because we're removing as we go!
         if test_success(with_gpu(c + " --check-completed")):
             with out.Section("Command already completed"):
                 out.kv("Command", c)
