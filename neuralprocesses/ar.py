@@ -150,7 +150,7 @@ def ar_loglik(
         random state, optional: Random state.
         tensor: Log-likelihoods.
     """
-    xt, yt, _ = _sort_targets(xt, yt, order=order)
+    state, xt, yt, _ = _sort_targets(state, xt, yt, order=order)
 
     # Now evaluate the log-likelihood autoregressively.
     logpdfs = []
