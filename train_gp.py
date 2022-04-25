@@ -391,8 +391,10 @@ if args.check_completed:
     # Simply check if the final plot exists.
     # TODO: Do this in a better way.
     if os.path.exists(wd.file(f"train-epoch-{args.epochs:03d}.pdf")):
+        out.out("Completed!")
         sys.exit(0)
     else:
+        out.out("Not completed.")
         sys.exit(1)
 
 # Use a GPU if one is available.
