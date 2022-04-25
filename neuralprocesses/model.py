@@ -155,10 +155,10 @@ def _sample(state: B.RandomState, x: Parallel, num: B.Int = 1):
 @_dispatch
 def _fix_noise(d: MultiOutputNormal, epoch: Union[int, None]):
     if epoch is not None and epoch < 3:
-        # Fix noise to `1e-3`.
+        # Fix noise to `1e-4`.
         var_diag = d.normal.var_diag
         with B.on_device(var_diag):
-            var = Diagonal(1e-3 * B.ones(var_diag))
+            var = Diagonal(1e-4 * B.ones(var_diag))
         d = MultiOutputNormal(Normal(d.normal.mean, var), d.shape)
     return d
 
@@ -192,7 +192,7 @@ def loglik(
         normalise (bool, optional): Normalise the objective by the number of targets.
             Defaults to `True`.
         epoch (int, optional): Current epoch. If it is given, the likelihood variance
-            is fixed to `1e-3` for the first three epochs to encourage the model to fit.
+            is fixed to `1e-4` for the first three epochs to encourage the model to fit.
 
     Returns:
         random state, optional: Random state.
@@ -301,7 +301,7 @@ def elbo(
         subsume_context (bool, optional): Subsume the context set into the target set.
             Defaults to `True`.
         epoch (int, optional): Current epoch. If it is given, the likelihood variance
-            is fixed to `1e-3` for the first three epochs to encourage the model to fit.
+            is fixed to `1e-4` for the first three epochs to encourage the model to fit.
 
     Returns:
         random state, optional: Random state.
