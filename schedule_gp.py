@@ -157,7 +157,13 @@ async def main():
     parser.add_argument("--gpu", type=int, required=True)
     parser.add_argument(
         "--data",
-        choices=["eq", "matern", "weakly-periodic", "sawtooth", "mixture"],
+        choices=[
+            "eq",
+            "matern",
+            "weakly-periodic",
+            "sawtooth",
+            "mixture",
+        ],
         required=True,
     )
     parser.add_argument("--evaluate", action="store_true")
@@ -170,8 +176,23 @@ async def main():
     # Setup script.
     out.report_time = True
 
+    def loglik_num_samples(model, dim_x):
+        if model == "convnp" and dim_x == 2:
+            # Need to control runtime.
+            return 5
+        else:
+            return 20
+
+    def elbo_num_samples(model, dim_x):
+        if model == "convnp" and dim_x == 2:
+            # Need to control runtime.
+            return 1
+        else:
+            return 5
+
     # Determine the suite of experiments to run.
     commands = (
+        # Conditional models:
         [
             f"python train_gp.py"
             f" --model {model}"
@@ -183,6 +204,7 @@ async def main():
             for dim_y in [1, 2]
             for model in ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
         ]
+        # FullConvGNP:
         + [
             f"python train_gp.py"
             f" --model fullconvgnp"
@@ -191,6 +213,7 @@ async def main():
             f" --dim-y 1"
             f" --epochs 100"
         ]
+        # Latent-variable models:
         + [
             f"python train_gp.py"
             f" --model {model}"
@@ -202,7 +225,10 @@ async def main():
             for dim_x in [1, 2]
             for dim_y in [1, 2]
             for model in ["np", "anp", "convnp"]
-            for objective in ["loglik --num-samples 20", "elbo --num-samples 5"]
+            for objective in [
+                f"loglik --num-samples {loglik_num_samples(model, dim_x)}",
+                f"elbo --num-samples {elbo_num_samples(model, dim_x)}",
+            ]
         ]
     )
     if args.evaluate:

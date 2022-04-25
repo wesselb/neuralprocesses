@@ -347,19 +347,6 @@ models_which_use_arch = {
 if args.model not in models_which_use_arch:
     args.arch = None
 
-# The ConvNP with 2D inputs and the ML is particularly memory intensive. In that case,
-# reduce the batch size.
-if args.dim_x == 2 and args.model == "convnp" and args.objective == "loglik":
-    args.batch_size //= 4
-    # With reducing the batch size, we will have more gradient updates per epoch, so
-    # correspondingly decrease the learning rate.
-    args.rate /= 4
-
-# Make a similar exception for the ConvGNP with 2D inputs and 2D outputs.
-if args.dim_x == args.dim_y == 2 and args.model == "convgnp":
-    args.batch_size //= 2
-    args.rate /= 2
-
 # Determine the mode of the script.
 if args.check_completed or args.no_action:
     # Don't add any mode suffix.
@@ -469,6 +456,8 @@ if args.dim_x == 1:
 elif args.dim_x == 2:
     # Reduce the PPU to reduce memory consumption.
     points_per_unit = 32
+    # Since the PPU is reduced, we can also take off a layer of the UNet.
+    unet_channels = unet_channels[:-1]
 else:
     raise RuntimeError(f"Invalid input dimensionality {args.dim_x}.")
 
