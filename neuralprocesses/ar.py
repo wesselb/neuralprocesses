@@ -121,9 +121,10 @@ def ar_predict(model: Model, xc, yc, xt, **kw_args):
     return mean, var, noiseless_samples
 
 
+@_dispatch
 def ar_loglik(
-    state,
-    model,
+    state: B.RandomState,
+    model: Model,
     xc,
     yc,
     xt,
