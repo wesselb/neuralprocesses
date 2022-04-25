@@ -291,7 +291,7 @@ if __name__ == "__main__":
         loop.run_until_complete(main())
     except KeyboardInterrupt:
         # If the user kills the program, kill all spawned processes.
-        with out.Section("Killing all spawned processes."):
+        with out.Section("Killing all spawned processes"):
             for p in spawned:
                 if p.returncode is None:
                     os.killpg(os.getpgid(p.pid), signal.SIGKILL)
