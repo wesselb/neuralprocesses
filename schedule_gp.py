@@ -176,20 +176,6 @@ async def main():
     # Setup script.
     out.report_time = True
 
-    def loglik_num_samples(model, dim_x):
-        if model == "convnp" and dim_x == 2:
-            # Need to control runtime.
-            return 5
-        else:
-            return 20
-
-    def elbo_num_samples(model, dim_x):
-        if model == "convnp" and dim_x == 2:
-            # Need to control runtime.
-            return 1
-        else:
-            return 5
-
     # Determine the suite of experiments to run.
     commands = (
         # Conditional models:
@@ -200,9 +186,24 @@ async def main():
             f" --dim-x {dim_x}"
             f" --dim-y {dim_y}"
             f" --epochs 100"
+            f" --batch-size 16"
+            f" --rate 3e-4"
             for dim_x in [1, 2]
             for dim_y in [1, 2]
             for model in ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
+            if not (model == "convgnp" and dim_x == dim_y == 2)
+        ]
+        # The ConvGNP for 2D inputs and 2D outputs just doesn't fit in memory. Reduce
+        # the batch size and learning rate by a factor two.
+        + [
+            f"python train_gp.py"
+            f" --model convgnp"
+            f" --data {args.data}"
+            f" --dim-x 2"
+            f" --dim-y 2"
+            f" --epochs 100"
+            f" --batch-size 8"
+            f" --rate 1.5e-4"
         ]
         # FullConvGNP:
         + [
@@ -212,6 +213,8 @@ async def main():
             f" --dim-x 1"
             f" --dim-y 1"
             f" --epochs 100"
+            f" --batch-size 16"
+            f" --rate 3e-4"
         ]
         # Latent-variable models:
         + [
@@ -222,12 +225,33 @@ async def main():
             f" --dim-x {dim_x}"
             f" --dim-y {dim_y}"
             f" --epochs 100"
+            f" --batch-size 16"
+            f" --rate 3e-4"
             for dim_x in [1, 2]
             for dim_y in [1, 2]
             for model in ["np", "anp", "convnp"]
+            if not (model == "convnp" and dim_x == dim_y == 2)
             for objective in [
-                f"loglik --num-samples {loglik_num_samples(model, dim_x)}",
-                f"elbo --num-samples {elbo_num_samples(model, dim_x)}",
+                f"loglik --num-samples 20",
+                f"elbo --num-samples 5",
+            ]
+        ]
+        # The ConvNP for 2D inputs and 2D outputs is too expensive and doesn't fit in
+        # memory. We reduce the numbers of samples to keep the memory and runtime in
+        # check.
+        + [
+            f"python train_gp.py"
+            f" --model convnp"
+            f" --objective {objective}"
+            f" --data {args.data}"
+            f" --dim-x 2"
+            f" --dim-y 2"
+            f" --epochs 100"
+            f" --batch-size 16"
+            f" --rate 3e-4"
+            for objective in [
+                f"loglik --num-samples 5",
+                f"elbo --num-samples 1",
             ]
         ]
     )
