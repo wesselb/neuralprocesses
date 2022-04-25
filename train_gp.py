@@ -15,7 +15,7 @@ from wbml.plot import tweak
 import neuralprocesses.torch as nps
 
 
-def train(state, model, objective, gen):
+def train(state, model, objective, gen, *, epoch):
     """Train for an epoch."""
     vals = []
     for batch in gen.epoch():
@@ -26,6 +26,7 @@ def train(state, model, objective, gen):
             batch["yc"],
             batch["xt"],
             batch["yt"],
+            epoch=epoch,
         )
         vals.append(B.to_numpy(obj))
         # Be sure to negate the output of `objective`.
@@ -690,7 +691,7 @@ else:
     for i in range(start, args.epochs):
         with out.Section(f"Epoch {i + 1}"):
             # Perform an epoch.
-            state = train(state, model, objective, gen_train)
+            state = train(state, model, objective, gen_train, epoch=i)
 
             # Save current model.
             torch.save(model.state_dict(), wd.file(f"model-last.torch"))

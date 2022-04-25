@@ -1,12 +1,14 @@
 import lab as B
 import numpy as np
+from matrix import Diagonal
 from matrix.util import indent
 from plum import List, Tuple, Union
+from stheno import Normal
 
 from . import _dispatch
 from .augment import AugmentedInput
 from .coding import code, code_track, recode_stochastic
-from .dist import AbstractMultiOutputDistribution
+from .dist import AbstractMultiOutputDistribution, MultiOutputNormal
 from .mask import Masked
 from .parallel import Parallel
 from .util import register_module
@@ -151,6 +153,17 @@ def _sample(state: B.RandomState, x: Parallel, num: B.Int = 1):
 
 
 @_dispatch
+def _fix_noise(d: MultiOutputNormal, epoch: Union[int, None]):
+    if epoch is not None and epoch < 3:
+        # Fix noise to `1e-3`.
+        var_diag = d.normal.var_diag
+        with B.on_device(var_diag):
+            var = Diagonal(1e-3 * B.ones(var_diag))
+        d = MultiOutputNormal(Normal(d.normal.mean, var), d.shape)
+    return d
+
+
+@_dispatch
 def loglik(
     state: B.RandomState,
     model: Model,
@@ -162,6 +175,7 @@ def loglik(
     num_samples=1,
     batch_size=256,
     normalise=True,
+    epoch=None,
     **kw_args,
 ):
     """Log-likelihood objective.
@@ -177,6 +191,8 @@ def loglik(
         batch_size (int, optional): Batch size to use for sampling. Defaults to 256.
         normalise (bool, optional): Normalise the objective by the number of targets.
             Defaults to `True`.
+        epoch (int, optional): Current epoch. If it is given, the likelihood variance
+            is fixed to `1e-3` for the first three epochs to encourage the model to fit.
 
     Returns:
         random state, optional: Random state.
@@ -207,6 +223,7 @@ def loglik(
             dtype_lik=float64,
             **kw_args,
         )
+        pred = _fix_noise(pred, epoch)
         this_logpdfs = pred.logpdf(B.cast(float64, yt))
 
         # If the number of samples is equal to one but `num_samples > 1`, then the
@@ -266,6 +283,7 @@ def elbo(
     num_samples=1,
     normalise=True,
     subsume_context=True,
+    epoch=None,
     **kw_args,
 ):
     """ELBO objective.
@@ -282,6 +300,8 @@ def elbo(
             Defaults to `True`.
         subsume_context (bool, optional): Subsume the context set into the target set.
             Defaults to `True`.
+        epoch (int, optional): Current epoch. If it is given, the likelihood variance
+            is fixed to `1e-3` for the first three epochs to encourage the model to fit.
 
     Returns:
         random state, optional: Random state.
@@ -307,6 +327,7 @@ def elbo(
 
     # Run sample through decoder.
     _, d = code(model.decoder, xz, z, xt, dtype_lik=float64, **kw_args)
+    d = _fix_noise(d, epoch)
 
     # Compute the ELBO.
     elbos = B.mean(d.logpdf(B.cast(float64, yt)), axis=0) - _kl(qz, pz)
