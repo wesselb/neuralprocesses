@@ -390,7 +390,7 @@ wd = WorkingDirectory(
 if args.check_completed:
     # Simply check if the final plot exists.
     # TODO: Do this in a better way.
-    if os.path.exists(wd.file(f"train-epoch-{args.epochs}.pdf")):
+    if os.path.exists(wd.file(f"train-epoch-{args.epochs:03d}.pdf")):
         sys.exit(0)
     else:
         sys.exit(1)
