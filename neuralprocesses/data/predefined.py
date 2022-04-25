@@ -64,7 +64,7 @@ def construct_predefined_gens(
             dtype,
             noise=0.05,
             kernel=kernel,
-            num_context_points=(0, 20 * dim_x),
+            num_context_points=(0, 30 * dim_x),
             num_target_points=50 * dim_x,
             pred_logpdf=pred_logpdf,
             pred_logpdf_diag=pred_logpdf_diag,
@@ -77,7 +77,7 @@ def construct_predefined_gens(
         # The sawtooth is hard already as it is. Do not add noise.
         noise=0,
         freqs=(2 / factor, 4 / factor),
-        num_context_points=(0, 50 * dim_x),
+        num_context_points=(0, 75 * dim_x),
         num_target_points=100 * dim_x,
         **config,
     )
