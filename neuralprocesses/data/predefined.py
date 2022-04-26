@@ -82,7 +82,8 @@ def construct_predefined_gens(
         **config,
     )
     gens["mixture"] = MixtureGenerator(
-        *gens.values(),
+        # Ensure that the order here is always the same.
+        *[gens[k] for k in sorted(gens.keys())],
         seed=config["seed"],
     )
     return gens
