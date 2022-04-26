@@ -326,6 +326,7 @@ parser.add_argument("--check-completed", action="store_true")
 parser.add_argument("--evaluate", action="store_true")
 parser.add_argument("--evaluate-last", action="store_true")
 parser.add_argument("--evaluate-fast", action="store_true")
+parser.add_argument("--evaluate-plot-num-samples", type=int, default=10)
 parser.add_argument(
     "--evaluate-objective",
     choices=["loglik", "elbo"],
@@ -425,7 +426,7 @@ gens_eval = [
             seed=30,  # Use yet another seed!
             batch_size=args.batch_size,
             # Use a high number of tasks.
-            num_tasks=2**8 if args.evaluate_fast else 2**14,
+            num_tasks=2**6 if args.evaluate_fast else 2**14,
             dim_x=args.dim_x,
             dim_y=args.dim_y,
             pred_logpdf=True,
@@ -637,28 +638,36 @@ if args.evaluate:
 
     if args.ar:
         # Do AR evaluation. First, load the model.
-        for i in range(10):
+        for i in range(args.evaluate_plot_num_samples):
             plot_first_of_batch(
                 model,
                 gen_cv,
                 name="evaluate-ar",
                 epoch=i + 1,
-                predict=nps.ar_predict,
+                predict=partial(nps.ar_predict, grid=True),
             )
 
         # Do AR testing.
         for name, gen in gens_eval:
             with out.Section(name.capitalize()):
-                state, _ = eval(
-                    state,
-                    model,
-                    partial(nps.ar_loglik, normalise=True),
-                    gen,
-                )
+                with out.Section("ELBO"):
+                    state, _ = eval(
+                        state,
+                        model,
+                        partial(nps.ar_elbo, normalise=True),
+                        gen,
+                    )
+                with out.Section("Naive AR"):
+                    state, _ = eval(
+                        state,
+                        model,
+                        partial(nps.ar_loglik, normalise=True),
+                        gen,
+                    )
 
     else:
         # Do regular evaluation.
-        for i in range(10):
+        for i in range(args.evaluate_plot_num_samples):
             plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
 
         for name, gen in gens_eval:
