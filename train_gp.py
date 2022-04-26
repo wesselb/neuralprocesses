@@ -644,26 +644,18 @@ if args.evaluate:
                 gen_cv,
                 name="evaluate-ar",
                 epoch=i + 1,
-                predict=partial(nps.ar_predict, grid=True),
+                predict=nps.ar_predict,
             )
 
         # Do AR testing.
         for name, gen in gens_eval:
             with out.Section(name.capitalize()):
-                with out.Section("ELBO"):
-                    state, _ = eval(
-                        state,
-                        model,
-                        partial(nps.ar_elbo, normalise=True),
-                        gen,
-                    )
-                with out.Section("Naive AR"):
-                    state, _ = eval(
-                        state,
-                        model,
-                        partial(nps.ar_loglik, normalise=True),
-                        gen,
-                    )
+                state, _ = eval(
+                    state,
+                    model,
+                    partial(nps.ar_loglik, normalise=True),
+                    gen,
+                )
 
     else:
         # Do regular evaluation.
