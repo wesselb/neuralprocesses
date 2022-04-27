@@ -60,6 +60,10 @@ class SyntheticGenerator(DataGenerator):
         batch_size (int, optional): Batch size. Defaults to 16.
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
+        x_ranges (tuple[tuple[float, float]...], optional): Ranges of the inputs of the
+            context and target points. Every range corresponds to a dimension of the
+            input, which means that the number of ranges determine the dimensionality
+            of the input. Defaults to `((-2, 2),)`.
         x_ranges_context (tuple[tuple[float, float]...], optional): Ranges of the inputs
             of the context points. Every range corresponds to a dimension of the input,
             which means that the number of ranges determine the dimensionality of the
@@ -111,8 +115,9 @@ class SyntheticGenerator(DataGenerator):
         noise=0.05**2,
         batch_size=16,
         num_tasks=2**14,
-        x_ranges_context=((-2, 2),),
-        x_ranges_target=((-2, 2),),
+        x_ranges=((-2, 2),),
+        x_ranges_context=None,
+        x_ranges_target=None,
         dim_y=1,
         dim_y_latent=None,
         num_context_points=(1, 50),
@@ -142,7 +147,11 @@ class SyntheticGenerator(DataGenerator):
                 f"the batch size {batch_size}."
             )
 
-        # Determine the dimensionality of the inputs and outputs..
+        # Make sure `x_ranges_context` and `x_ranges_target` exist.
+        x_ranges_context = x_ranges_context or x_ranges
+        x_ranges_target = x_ranges_target or x_ranges
+
+        # Determine the dimensionality of the inputs and outputs.
         if not len(x_ranges_context) == len(x_ranges_target):
             raise ValueError(
                 f"The dimensionalities specified in `x_ranges_context` and "
