@@ -174,7 +174,7 @@ def loglik(
     *,
     num_samples=1,
     batch_size=256,
-    normalise=True,
+    normalise=False,
     epoch=None,
     **kw_args,
 ):
@@ -190,7 +190,7 @@ def loglik(
         num_samples (int, optional): Number of samples. Defaults to 1.
         batch_size (int, optional): Batch size to use for sampling. Defaults to 256.
         normalise (bool, optional): Normalise the objective by the number of targets.
-            Defaults to `True`.
+            Defaults to `False`.
         epoch (int, optional): Current epoch. If it is given, the likelihood variance
             is fixed to `1e-4` for the first three epochs to encourage the model to fit.
 
@@ -281,8 +281,8 @@ def elbo(
     yt,
     *,
     num_samples=1,
-    normalise=True,
-    subsume_context=True,
+    normalise=False,
+    subsume_context=False,
     epoch=None,
     **kw_args,
 ):
@@ -297,9 +297,9 @@ def elbo(
         yt (tensor): Outputs of the target set.
         num_samples (int, optional): Number of samples. Defaults to 1.
         normalise (bool, optional): Normalise the objective by the number of targets.
-            Defaults to `True`.
+            Defaults to `False`.
         subsume_context (bool, optional): Subsume the context set into the target set.
-            Defaults to `True`.
+            Defaults to `False`.
         epoch (int, optional): Current epoch. If it is given, the likelihood variance
             is fixed to `1e-4` for the first three epochs to encourage the model to fit.
 
