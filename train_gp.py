@@ -317,6 +317,7 @@ parser.add_argument(
         "weakly-periodic",
         "sawtooth",
         "mixture",
+        "predprey",
     ],
     default="eq",
 )
@@ -397,52 +398,75 @@ B.set_global_device(device)
 state = B.create_random_state(torch.float32, seed=0)
 
 # Setup data generators for training and for evaluation.
-gen_train = nps.construct_predefined_gens(
-    torch.float32,
-    seed=10,
-    batch_size=args.batch_size,
-    num_tasks=2**14,
-    dim_x=args.dim_x,
-    dim_y=args.dim_y,
-    pred_logpdf=False,
-    pred_logpdf_diag=False,
-    device=device,
-)[args.data]
-gen_cv = nps.construct_predefined_gens(
-    torch.float32,
-    seed=20,  # Use a different seed!
-    batch_size=args.batch_size,
-    num_tasks=2**12,  # Lower the number of tasks.
-    dim_x=args.dim_x,
-    dim_y=args.dim_y,
-    pred_logpdf=True,
-    pred_logpdf_diag=True,
-    device=device,
-)[args.data]
-gens_eval = [
-    (
-        name,
-        nps.construct_predefined_gens(
-            torch.float32,
-            seed=30,  # Use yet another seed!
-            batch_size=args.batch_size,
-            # Use a high number of tasks.
-            num_tasks=2**6 if args.evaluate_fast else 2**14,
-            dim_x=args.dim_x,
-            dim_y=args.dim_y,
-            pred_logpdf=True,
-            pred_logpdf_diag=True,
-            device=device,
-            x_range_context=x_range_context,
-            x_range_target=x_range_target,
-        )[args.data],
+if args.data == "predprey":
+    gen_train = nps.PredPreyGenerator(
+        torch.float32,
+        seed=10,
+        x_ranges=((0, 100),) * args.dim_x,
+        dim_y=args.dim_y,
     )
-    for name, x_range_context, x_range_target in [
-        ("interpolation in training range", (-2, 2), (-2, 2)),
-        ("interpolation beyond training range", (2, 6), (2, 6)),
-        ("extrapolation beyond training range", (-2, 2), (2, 4)),
+    gen_cv = nps.PredPreyGenerator(
+        torch.float32,
+        seed=20,
+        x_ranges=((0, 100),) * args.dim_x,
+        dim_y=args.dim_y,
+    )
+    gens_eval = (
+        "Evaluation",
+        nps.PredPreyGenerator(
+            torch.float32,
+            seed=30,
+            x_ranges=((0, 100),) * args.dim_x,
+            dim_y=args.dim_y,
+        ),
+    )
+else:
+    gen_train = nps.construct_predefined_gens(
+        torch.float32,
+        seed=10,
+        batch_size=args.batch_size,
+        num_tasks=2**14,
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        pred_logpdf=False,
+        pred_logpdf_diag=False,
+        device=device,
+    )[args.data]
+    gen_cv = nps.construct_predefined_gens(
+        torch.float32,
+        seed=20,  # Use a different seed!
+        batch_size=args.batch_size,
+        num_tasks=2**12,  # Lower the number of tasks.
+        dim_x=args.dim_x,
+        dim_y=args.dim_y,
+        pred_logpdf=True,
+        pred_logpdf_diag=True,
+        device=device,
+    )[args.data]
+    gens_eval = [
+        (
+            name,
+            nps.construct_predefined_gens(
+                torch.float32,
+                seed=30,  # Use yet another seed!
+                batch_size=args.batch_size,
+                # Use a high number of tasks.
+                num_tasks=2**6 if args.evaluate_fast else 2**14,
+                dim_x=args.dim_x,
+                dim_y=args.dim_y,
+                pred_logpdf=True,
+                pred_logpdf_diag=True,
+                device=device,
+                x_range_context=x_range_context,
+                x_range_target=x_range_target,
+            )[args.data],
+        )
+        for name, x_range_context, x_range_target in [
+            ("interpolation in training range", (-2, 2), (-2, 2)),
+            ("interpolation beyond training range", (2, 6), (2, 6)),
+            ("extrapolation beyond training range", (-2, 2), (2, 4)),
+        ]
     ]
-]
 
 # Setup architectures.
 width = 256

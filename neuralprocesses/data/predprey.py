@@ -83,12 +83,25 @@ class PredPreyGenerator(SyntheticGenerator):
     :class:`.data.SyntheticGenerator`. Moreover, also has the attributes of
     :class:`.data.SyntheticGenerator`.
 
-    For this class, `x_ranges` initialises to `((0, 100),)` and `dim_y` initialises to
-    2.
     """
 
-    def __init__(self, *args, x_ranges=((0, 100),), dim_y=2, **kw_args):
-        super().__init__(*args, x_ranges=x_ranges, dim_y=dim_y, **kw_args)
+    def __init__(
+        self,
+        *args,
+        x_ranges=((0, 100),),
+        num_context_points=(100, 100),
+        num_target_points=(100, 100),
+        dim_y=2,
+        **kw_args
+    ):
+        super().__init__(
+            *args,
+            x_ranges=x_ranges,
+            num_context_points=num_context_points,
+            num_target_points=num_target_points,
+            dim_y=dim_y,
+            **kw_args,
+        )
         if not (self.dim_x == 1 and self.dim_y == 2):
             raise RuntimeError("`dim_x` must be 1 and `dim_y` must be 2.")
         if not (
