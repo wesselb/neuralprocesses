@@ -70,7 +70,7 @@ def _predprey_simulate(state, dtype, t0, t1, dt, n_out, *, batch_size=16):
             ts.append(t)
             t_out += (t1 - t0) / n_out
 
-    t = B.tile(B.stack(*ts)[None, None, :], self.batch_size, 1, 1)
+    t = B.tile(B.stack(*ts)[None, None, :], batch_size, 1, 1)
     traj = 7 * B.stack(*traj, axis=-1)
 
     return state, t, traj
@@ -101,25 +101,25 @@ class PredPreyGenerator(SyntheticGenerator):
 
     def generate_batch(self):
         if self._big_batch_num_left > 0:
-            batch = {k: v[: self.batch_size] for k, v in self._big_batch.items()}
-            self._big_batch = {
-                k: v[self.batch_size :] for k, v in self._big_batch.items()
-            }
+            n = self.batch_size
+            batch = {k: v[:n] for k, v in self._big_batch.items()}
+            self._big_batch = {k: v[n:] for k, v in self._big_batch.items()}
             self._big_batch_num_left -= 1
             return batch
 
         with B.on_device(self.device):
+            multiplier = max(1024 // self.batch_size, 1)
             batch = {}
 
             # Simulate the equations.
             self.state, x, y = _predprey_simulate(
                 self.state,
-                self.dtype,
+                self.dtype64,
                 float(self.x_ranges_context[0][0]),
                 float(self.x_ranges_context[1][0]),
                 7 / 365,
                 200,
-                batch_size=64 * self.batch_size,
+                batch_size=multiplier * self.batch_size,
             )
 
             # Sample numbers of context and target points.
@@ -141,7 +141,7 @@ class PredPreyGenerator(SyntheticGenerator):
             batch["xt"] = x[:, :, num_context_points:]
             batch["yt"] = y[:, :, num_context_points:]
 
-            self._big_batch_num_left = 64
+            self._big_batch_num_left = multiplier
             self._big_batch = batch
 
             return self.generate_batch()
