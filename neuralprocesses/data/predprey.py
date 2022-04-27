@@ -1,8 +1,4 @@
-import matplotlib.pyplot as plt
-from wbml.plot import tweak
-
-import jax.numpy as jnp
-import lab.jax as B
+import lab as B
 
 from .data import SyntheticGenerator
 
