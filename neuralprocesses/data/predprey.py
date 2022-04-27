@@ -114,7 +114,7 @@ class PredPreyGenerator(SyntheticGenerator):
             # Simulate the equations.
             self.state, x, y = _predprey_simulate(
                 self.state,
-                self.dtype64,
+                self.float64,
                 float(self.x_ranges_context[0][0]),
                 float(self.x_ranges_context[1][0]),
                 7 / 365,
@@ -136,10 +136,10 @@ class PredPreyGenerator(SyntheticGenerator):
             x = x[..., perm[: num_context_points + num_target_points]]
             y = y[..., perm[: num_context_points + num_target_points]]
 
-            batch["xc"] = x[:, :, :num_context_points]
-            batch["yc"] = y[:, :, :num_context_points]
-            batch["xt"] = x[:, :, num_context_points:]
-            batch["yt"] = y[:, :, num_context_points:]
+            batch["xc"] = B.cast(self.dtype, x[:, :, :num_context_points])
+            batch["yc"] = B.cast(self.dtype, y[:, :, :num_context_points])
+            batch["xt"] = B.cast(self.dtype, x[:, :, num_context_points:])
+            batch["yt"] = B.cast(self.dtype, y[:, :, num_context_points:])
 
             self._big_batch_num_left = multiplier
             self._big_batch = batch
