@@ -104,8 +104,8 @@ class PredPreyGenerator(SyntheticGenerator):
             self.state, x, y = _predprey_simulate(
                 self.state,
                 self.dtype,
-                self.x_ranges_context[0][0],
-                self.x_ranges_context[1][0],
+                float(self.x_ranges_context[0][0]),
+                float(self.x_ranges_context[1][0]),
                 7 / 365,
                 200,
                 batch_size=self.batch_size,
