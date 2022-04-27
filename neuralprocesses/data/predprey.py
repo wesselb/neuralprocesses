@@ -96,7 +96,18 @@ class PredPreyGenerator(SyntheticGenerator):
         ):
             raise RuntimeError("`x_ranges_context` must be equal to `x_ranges_target`.")
 
+        self._big_batch = None
+        self._big_batch_num_left = 0
+
     def generate_batch(self):
+        if self._big_batch_num_left > 0:
+            batch = {k: v[: self.batch_size] for k, v in self._big_batch.items()}
+            self._big_batch = {
+                k: v[self.batch_size :] for k, v in self._big_batch.items()
+            }
+            self._big_batch_num_left -= 1
+            return batch
+
         with B.on_device(self.device):
             batch = {}
 
@@ -108,7 +119,7 @@ class PredPreyGenerator(SyntheticGenerator):
                 float(self.x_ranges_context[1][0]),
                 7 / 365,
                 200,
-                batch_size=self.batch_size,
+                batch_size=64 * self.batch_size,
             )
 
             # Sample numbers of context and target points.
@@ -130,4 +141,7 @@ class PredPreyGenerator(SyntheticGenerator):
             batch["xt"] = x[:, :, num_context_points:]
             batch["yt"] = y[:, :, num_context_points:]
 
-            return batch
+            self._big_batch_num_left = 64
+            self._big_batch = batch
+
+            return self.generate_batch()

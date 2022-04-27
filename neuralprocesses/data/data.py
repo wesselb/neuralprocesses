@@ -76,7 +76,7 @@ class SyntheticGenerator(DataGenerator):
         dim_y_latent (int, optional): If `y_dim > 1`, this specifies the number of
             latent processes. Defaults to `y_dim`.
         num_context_points (int or tuple[int, int], optional): A fixed number of context
-            points or a lower and upper bound. Defaults to the range `(1, 50)`.
+            points or a lower and upper bound. Defaults to the range `(0, 50)`.
         num_target_points (int or tuple[int, int], optional): A fixed number of target
             points or a lower and upper bound. Defaults to the fixed number `50`.
         device (str, optional): Device on which to generate data. Defaults to `"cpu"`.
@@ -120,7 +120,7 @@ class SyntheticGenerator(DataGenerator):
         x_ranges_target=None,
         dim_y=1,
         dim_y_latent=None,
-        num_context_points=(1, 50),
+        num_context_points=(0, 50),
         num_target_points=50,
         device="cpu",
     ):
