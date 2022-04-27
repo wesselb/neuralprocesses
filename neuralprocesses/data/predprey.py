@@ -70,7 +70,7 @@ def _predprey_simulate(state, dtype, t0, t1, dt, n_out, *, batch_size=16):
             ts.append(t)
             t_out += (t1 - t0) / n_out
 
-    t = B.tile(B.stack(*ts)[None, None, :], 16, 1, 1)
+    t = B.tile(B.stack(*ts)[None, None, :], self.batch_size, 1, 1)
     traj = 7 * B.stack(*traj, axis=-1)
 
     return state, t, traj
