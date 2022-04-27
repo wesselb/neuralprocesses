@@ -145,6 +145,9 @@ class PredPreyGenerator(SyntheticGenerator):
             x = x[..., perm[: num_context_points + num_target_points]]
             y = y[..., perm[: num_context_points + num_target_points]]
 
+            if B.any(B.isnan(y)):
+                return self.generate_batch()
+
             batch["xc"] = B.cast(self.dtype, x[:, :, :num_context_points])
             batch["yc"] = B.cast(self.dtype, y[:, :, :num_context_points])
             batch["xt"] = B.cast(self.dtype, x[:, :, num_context_points:])
