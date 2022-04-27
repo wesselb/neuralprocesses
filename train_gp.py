@@ -93,7 +93,7 @@ def plot_first_of_batch_1d(model, gen, *, name, epoch, predict):
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
-        x = B.linspace(B.dtype(batch["xt"]), -2, 2, 500)
+        x = B.linspace(B.dtype(batch["xt"]), -2, 4, 500)
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
@@ -162,6 +162,7 @@ def plot_first_of_batch_1d(model, gen, *, name, epoch, predict):
             plt.plot(x, lower, style="pred2")
             plt.plot(x, upper, style="pred2")
 
+        plt.axvline(2, c="k", ls="--", lw=0.5)
         plt.xlim(B.min(x), B.max(x))
         tweak()
 
@@ -439,7 +440,7 @@ gens_eval = [
     for name, x_range_context, x_range_target in [
         ("interpolation in training range", (-2, 2), (-2, 2)),
         ("interpolation beyond training range", (2, 6), (2, 6)),
-        ("extrapolation beyond training range", (-2, 2), (2, 6)),
+        ("extrapolation beyond training range", (-2, 2), (2, 4)),
     ]
 ]
 
@@ -595,12 +596,30 @@ if args.objective == "loglik":
     objective = partial(
         nps.loglik,
         num_samples=args.num_samples,
-        normalise=True,
+        normalise=False,
     )
 elif args.objective == "elbo":
     objective = partial(
         nps.elbo,
         num_samples=args.num_samples,
+        subsume_context=True,
+        normalise=False,
+    )
+else:
+    raise RuntimeError(f'Invalid objective "{args.objective}".')
+
+# Setup cross-validation objective.
+if args.objective == "loglik":
+    cv_objective = partial(
+        nps.loglik,
+        num_samples=args.num_samples,
+        normalise=True,
+    )
+elif args.objective == "elbo":
+    cv_objective = partial(
+        nps.elbo,
+        num_samples=args.num_samples,
+        subsume_context=False,
         normalise=True,
     )
 else:
@@ -614,11 +633,12 @@ if args.evaluate_objective == "loglik":
         batch_size=args.evaluate_batch_size,
         normalise=True,
     )
-elif args.objective == "elbo":
+elif args.evaluate_objective == "elbo":
     evaluate_objective = partial(
         nps.elbo,
         num_samples=args.evaluate_num_samples,
         batch_size=args.evaluate_batch_size,
+        subsume_context=False,
         normalise=True,
     )
 else:
@@ -687,7 +707,7 @@ else:
             torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
             # The epoch is done. Now evaluate.
-            state, val = eval(state, model, objective, gen_cv)
+            state, val = eval(state, model, cv_objective, gen_cv)
 
             # Check if the model is the new best. If so, save it.
             if val > best_eval_lik:
