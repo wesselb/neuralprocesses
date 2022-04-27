@@ -100,9 +100,9 @@ def ar_predict(
     samples = B.concat(*samples, axis=-1)
 
     # Produce predictive statistics.
-    mean = B.mean(B.concat(*(p.mean for p in preds), axis=-1), axis=0)
+    m1 = B.mean(B.concat(*(p.mean for p in preds), axis=-1), axis=0)
     m2 = B.mean(B.concat(*(p.var + p.mean**2 for p in preds), axis=-1), axis=0)
-    var = m2 - mean**2
+    mean, var = m1, m2 - m1**2
 
     # Produce noiseless samples.
     state, pred = model(
