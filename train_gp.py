@@ -348,7 +348,7 @@ parser.add_argument(
     default="loglik",
 )
 parser.add_argument("--evaluate-num-samples", type=int, default=4096)
-parser.add_argument("--evaluate-batch-size", type=int, default=512)
+parser.add_argument("--evaluate-batch-size", type=int, default=16)
 parser.add_argument("--no-action", action="store_true")
 parser.add_argument("--ar", action="store_true")
 args = parser.parse_args()

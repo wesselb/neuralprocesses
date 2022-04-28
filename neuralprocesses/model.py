@@ -173,7 +173,7 @@ def loglik(
     yt,
     *,
     num_samples=1,
-    batch_size=256,
+    batch_size=16,
     normalise=False,
     epoch=None,
     **kw_args,
@@ -188,7 +188,7 @@ def loglik(
         xt (tensor): Inputs of the target set.
         yt (tensor): Outputs of the target set.
         num_samples (int, optional): Number of samples. Defaults to 1.
-        batch_size (int, optional): Batch size to use for sampling. Defaults to 256.
+        batch_size (int, optional): Batch size to use for sampling. Defaults to 16.
         normalise (bool, optional): Normalise the objective by the number of targets.
             Defaults to `False`.
         epoch (int, optional): Current epoch. If it is given, the likelihood variance
