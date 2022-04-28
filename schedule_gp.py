@@ -289,7 +289,7 @@ async def main():
             if stats["memory"] + 1.10 * benchmark[c]["memory"] > 0.9 * args.memory:
                 # Takes too much memory.
                 continue
-            if stats["utilisation"] + benchmark[c]["utilisation"] > 100:
+            if stats["utilisation"] + benchmark[c]["utilisation"] > 120:
                 # Fine to max out the GPU, but not much more than that.
                 continue
             eligible_commands.append(c)
@@ -308,6 +308,13 @@ async def main():
             commands.remove(c)
             spawned.append(p)
             out.kv("Remaining", len(commands))
+
+        # Wait for all spawned processes to finish before exiting the script.
+        out.out("Waiting for processes to finish...")
+        for p in spawned:
+            if p.returncode is None:
+                await p.wait()
+        out.out("Done!")
 
 
 if __name__ == "__main__":
