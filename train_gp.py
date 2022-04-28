@@ -455,7 +455,7 @@ if args.data == "predprey":
     dws_receptive_field = 100
 
     # Other settings specific to the predator-prey experiments:
-    plot_config = {1: {"range": (0, 100), "axvlines": []}}
+    plot_config = {1: {"range": (0, 100), "axvline": []}}
 else:
     gen_train = nps.construct_predefined_gens(
         torch.float32,
@@ -521,7 +521,7 @@ else:
 
     # Other settings specific to the GP experiments:
     plot_config = {
-        1: {"range": (-2, 4), "axvlines": [2]},
+        1: {"range": (-2, 4), "axvline": [2]},
         2: {"range": (-2, 2)},
     }
 
