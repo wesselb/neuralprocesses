@@ -49,7 +49,13 @@ def test_predefined_gens(nps, dim_x, dim_y):
 
                 # Check the location of the inputs.
                 for d in range(dim_x):
-                    assert B.all(gen.x_ranges_context[0][d] <= batch["xc"][:, d, :])
-                    assert B.all(batch["xc"][:, d, :] <= gen.x_ranges_context[1][d])
-                    assert B.all(gen.x_ranges_target[0][d] <= batch["xt"][:, d, :])
-                    assert B.all(batch["xt"][:, d, :] <= gen.x_ranges_target[1][d])
+                    # Convert the limits to the right data type before comparing!
+                    lower = B.cast(nps.dtype, gen.x_ranges_context[0][d])
+                    upper = B.cast(nps.dtype, gen.x_ranges_context[1][d])
+                    assert B.all(lower <= batch["xc"][:, d, :])
+                    assert B.all(batch["xc"][:, d, :] <= upper)
+                    
+                    lower = B.cast(nps.dtype, gen.x_ranges_target[0][d])
+                    upper = B.cast(nps.dtype, gen.x_ranges_target[1][d])
+                    assert B.all(lower <= batch["xt"][:, d, :])
+                    assert B.all(batch["xt"][:, d, :] <= upper)
