@@ -428,6 +428,7 @@ if args.data == "predprey":
         num_tasks=2**14,
         x_ranges=((0, 100),) * args.dim_x,
         dim_y=args.dim_y,
+        device=device,
     )
     gen_cv = nps.PredPreyGenerator(
         torch.float32,
@@ -436,6 +437,7 @@ if args.data == "predprey":
         num_tasks=2**12,
         x_ranges=((0, 100),) * args.dim_x,
         dim_y=args.dim_y,
+        device=device,
     )
     gens_eval = lambda: (
         "Evaluation",
@@ -446,6 +448,7 @@ if args.data == "predprey":
             num_tasks=2**6 if args.evaluate_fast else 2**14,
             x_ranges=((0, 100),) * args.dim_x,
             dim_y=args.dim_y,
+            device=device,
         ),
     )
 

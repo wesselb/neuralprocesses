@@ -28,7 +28,7 @@ def _sort_targets(state, xt, yt=None, *, order):
 
         xt[..., i, :, :] = B.take(xt[..., i, :, :], perm, axis=-1)
         if yt is not None:
-            yt[..., i, :, :] = B.take(yt[..., i, :, :], axis=-1)
+            yt[..., i, :, :] = B.take(yt[..., i, :, :], perm, axis=-1)
 
     def unsort(z):
         """Undo the sorting."""
