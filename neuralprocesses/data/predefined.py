@@ -46,7 +46,6 @@ def construct_predefined_gens(
     # We achieve this by blowing up all length scales by `sqrt(dim_x)`.
     factor = B.sqrt(dim_x)
     config = {
-        "seed": seed,
         "num_tasks": num_tasks,
         "batch_size": batch_size,
         "x_ranges_context": (x_range_context,) * dim_x,
@@ -62,6 +61,7 @@ def construct_predefined_gens(
     gens = {
         name: GPGenerator(
             dtype,
+            seed=seed,
             noise=0.05,
             kernel=kernel,
             num_context_points=(0, 30 * dim_x),
@@ -74,6 +74,7 @@ def construct_predefined_gens(
     }
     gens["sawtooth"] = SawtoothGenerator(
         dtype,
+        seed=seed,
         # The sawtooth is hard already as it is. Do not add noise.
         noise=0,
         freqs=(2 / factor, 4 / factor),
@@ -81,9 +82,34 @@ def construct_predefined_gens(
         num_target_points=100 * dim_x,
         **config,
     )
+    # Be sure to use different seeds in the mixture components. We also use the high
+    # number of context and target points for the mixture data in all components.
     gens["mixture"] = MixtureGenerator(
-        # Ensure that the order here is always the same.
-        *[gens[k] for k in sorted(gens.keys())],
-        seed=config["seed"],
+        *(
+            GPGenerator(
+                dtype,
+                seed=seed + i,
+                noise=0.05,
+                kernel=kernel,
+                num_context_points=(0, 75 * dim_x),
+                num_target_points=100 * dim_x,
+                pred_logpdf=pred_logpdf,
+                pred_logpdf_diag=pred_logpdf_diag,
+                **config,
+            )
+            # Make sure that the order of `kernels.items()` is fixed.
+            for i, (_, kernel) in enumerate(sorted(kernels.items(), key=lambda x: x[0]))
+        ),
+        SawtoothGenerator(
+            dtype,
+            seed=seed + len(kernels.items()),
+            # The sawtooth is hard already as it is. Do not add noise.
+            noise=0,
+            freqs=(2 / factor, 4 / factor),
+            num_context_points=(0, 75 * dim_x),
+            num_target_points=100 * dim_x,
+            **config,
+        ),
+        seed=seed,
     )
     return gens
