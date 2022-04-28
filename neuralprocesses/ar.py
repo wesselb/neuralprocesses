@@ -34,7 +34,7 @@ def _sort_targets(state, xt, yt=None, *, order):
         """Undo the sorting."""
         z = B.identity(z)  # Make a copy, because we'll modify it.
         for i, perm in enumerate(inv_perms):
-            z[..., i, :, :] = B.take(z[..., i, :, :], axis=-1)
+            z[..., i, :, :] = B.take(z[..., i, :, :], perm, axis=-1)
         return z
 
     if yt is None:
