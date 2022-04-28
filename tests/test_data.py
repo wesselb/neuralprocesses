@@ -54,7 +54,7 @@ def test_predefined_gens(nps, dim_x, dim_y):
                     upper = B.cast(nps.dtype, gen.x_ranges_context[1][d])
                     assert B.all(lower <= batch["xc"][:, d, :])
                     assert B.all(batch["xc"][:, d, :] <= upper)
-                    
+
                     lower = B.cast(nps.dtype, gen.x_ranges_target[0][d])
                     upper = B.cast(nps.dtype, gen.x_ranges_target[1][d])
                     assert B.all(lower <= batch["xt"][:, d, :])
