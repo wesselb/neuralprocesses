@@ -5,7 +5,7 @@ from matrix import Diagonal, LowRank
 from plum import Dispatcher, Union
 from stheno import Normal
 from wbml.util import indented_kv
-from .util import batch
+from .util import batch, register_module
 
 __all__ = ["Dirac", "MultiOutputNormal", "Transform"]
 
@@ -271,6 +271,7 @@ def cast(dtype: B.DType, dist: MultiOutputNormal):
     return MultiOutputNormal(B.cast(dtype, dist.normal), dist.num_outputs)
 
 
+@register_module
 class Transform:
     """A transform for distributions.
 
