@@ -153,6 +153,12 @@ def _sample(state: B.RandomState, x: Parallel, num: B.Int = 1):
 
 
 @_dispatch
+def _fix_noise(d: AbstractMultiOutputDistribution, epoch: Union[int, None]):
+    # Cannot handle the general case.
+    return d
+
+
+@_dispatch
 def _fix_noise(d: MultiOutputNormal, epoch: Union[int, None]):
     if epoch is not None and epoch < 3:
         # Fix noise to `1e-4`.
