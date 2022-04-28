@@ -78,22 +78,36 @@ def with_err(vals):
     return f"{mean:8.4f} +- {err:8.4f}"
 
 
-def plot_first_of_batch(model, gen, *, name, epoch, predict=nps.predict):
+def visualise(model, gen, *, name, epoch, config, predict=nps.predict):
     """Plot the prediction for the first element of a batch."""
     if args.dim_x == 1:
-        plot_first_of_batch_1d(model, gen, name=name, epoch=epoch, predict=predict)
+        visualise_1d(
+            model,
+            gen,
+            name=name,
+            epoch=epoch,
+            config=config[1],
+            predict=predict,
+        )
     elif args.dim_x == 2:
-        plot_first_of_batch_2d(model, gen, name=name, epoch=epoch, predict=predict)
+        visualise_2d(
+            model,
+            gen,
+            name=name,
+            epoch=epoch,
+            config=config[2],
+            predict=predict,
+        )
     else:
         pass  # Not implemented. Just do nothing.
 
 
-def plot_first_of_batch_1d(model, gen, *, name, epoch, predict):
+def visualise_1d(model, gen, *, name, epoch, config, predict):
     batch = gen.generate_batch()
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
-        x = B.linspace(B.dtype(batch["xt"]), -2, 4, 500)
+        x = B.linspace(B.dtype(batch["xt"]), *config["range"], 500)
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
@@ -162,7 +176,8 @@ def plot_first_of_batch_1d(model, gen, *, name, epoch, predict):
             plt.plot(x, lower, style="pred2")
             plt.plot(x, upper, style="pred2")
 
-        plt.axvline(2, c="k", ls="--", lw=0.5)
+        for x_axvline in config["axvline"]:
+            plt.axvline(x_axvline, c="k", ls="--", lw=0.5)
         plt.xlim(B.min(x), B.max(x))
         tweak()
 
@@ -170,12 +185,12 @@ def plot_first_of_batch_1d(model, gen, *, name, epoch, predict):
     plt.close()
 
 
-def plot_first_of_batch_2d(model, gen, *, name, epoch, predict):
+def visualise_2d(model, gen, *, name, epoch, config, predict):
     batch = gen.generate_batch()
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
-        x = B.linspace(B.dtype(batch["xt"]), -2, 2, 100)[None, None, :]
+        x = B.linspace(B.dtype(batch["xt"]), *config["range"], 100)[None, None, :]
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
@@ -307,8 +322,6 @@ parser.add_argument(
     default="convcnp",
 )
 parser.add_argument("--arch", choices=["unet", "dws"], default="unet")
-parser.add_argument("--margin", type=float, default=0.1)
-parser.add_argument("--receptive-field", type=float, default=2)
 parser.add_argument(
     "--data",
     choices=[
@@ -397,29 +410,52 @@ B.set_global_device(device)
 # Maintain an explicit random state through the execution.
 state = B.create_random_state(torch.float32, seed=0)
 
+# General architecture choices:
+width = 256
+dim_embedding = 256
+num_heads = 8
+num_layers = 6
+unet_channels = (64,) * num_layers
+dws_channels = 64
+num_basis_functions = 512
+
 # Setup data generators for training and for evaluation.
 if args.data == "predprey":
     gen_train = nps.PredPreyGenerator(
         torch.float32,
         seed=10,
+        batch_size=args.batch_size,
+        num_tasks=2**14,
         x_ranges=((0, 100),) * args.dim_x,
         dim_y=args.dim_y,
     )
     gen_cv = nps.PredPreyGenerator(
         torch.float32,
         seed=20,
+        batch_size=args.batch_size,
+        num_tasks=2**12,
         x_ranges=((0, 100),) * args.dim_x,
         dim_y=args.dim_y,
     )
-    gens_eval = (
+    gens_eval = lambda: (
         "Evaluation",
         nps.PredPreyGenerator(
             torch.float32,
             seed=30,
+            batch_size=args.batch_size,
+            num_tasks=2**6 if args.evaluate_fast else 2**14,
             x_ranges=((0, 100),) * args.dim_x,
             dim_y=args.dim_y,
         ),
     )
+
+    # Architecture choices specific for the predator-prey experiments:
+    points_per_unit = 4
+    margin = 1
+    dws_receptive_field = 100
+
+    # Other settings specific to the predator-prey experiments:
+    plot_config = {1: {"range": (0, 100), "axvlines": []}}
 else:
     gen_train = nps.construct_predefined_gens(
         torch.float32,
@@ -443,49 +479,52 @@ else:
         pred_logpdf_diag=True,
         device=device,
     )[args.data]
-    gens_eval = [
-        (
-            name,
-            nps.construct_predefined_gens(
-                torch.float32,
-                seed=30,  # Use yet another seed!
-                batch_size=args.batch_size,
-                # Use a high number of tasks.
-                num_tasks=2**6 if args.evaluate_fast else 2**14,
-                dim_x=args.dim_x,
-                dim_y=args.dim_y,
-                pred_logpdf=True,
-                pred_logpdf_diag=True,
-                device=device,
-                x_range_context=x_range_context,
-                x_range_target=x_range_target,
-            )[args.data],
-        )
-        for name, x_range_context, x_range_target in [
-            ("interpolation in training range", (-2, 2), (-2, 2)),
-            ("interpolation beyond training range", (2, 6), (2, 6)),
-            ("extrapolation beyond training range", (-2, 2), (2, 4)),
-        ]
-    ]
 
-# Setup architectures.
-width = 256
-dim_embedding = 256
-num_heads = 8
-num_layers = 6
-unet_channels = (64,) * num_layers
-dws_channels = 64
-dws_receptive_field = args.receptive_field
-num_basis_functions = 512
-if args.dim_x == 1:
-    points_per_unit = 64
-elif args.dim_x == 2:
-    # Reduce the PPU to reduce memory consumption.
-    points_per_unit = 32
-    # Since the PPU is reduced, we can also take off a layer of the UNet.
-    unet_channels = unet_channels[:-1]
-else:
-    raise RuntimeError(f"Invalid input dimensionality {args.dim_x}.")
+    def gens_eval():
+        return [
+            (
+                name,
+                nps.construct_predefined_gens(
+                    torch.float32,
+                    seed=30,  # Use yet another seed!
+                    batch_size=args.batch_size,
+                    # Use a high number of tasks.
+                    num_tasks=2**6 if args.evaluate_fast else 2**14,
+                    dim_x=args.dim_x,
+                    dim_y=args.dim_y,
+                    pred_logpdf=True,
+                    pred_logpdf_diag=True,
+                    device=device,
+                    x_range_context=x_range_context,
+                    x_range_target=x_range_target,
+                )[args.data],
+            )
+            for name, x_range_context, x_range_target in [
+                ("interpolation in training range", (-2, 2), (-2, 2)),
+                ("interpolation beyond training range", (2, 6), (2, 6)),
+                ("extrapolation beyond training range", (-2, 2), (2, 4)),
+            ]
+        ]
+
+    # Architecture choices specific for the GP{ experiments:
+    dws_receptive_field = 4
+    margin = 0.1
+    if args.dim_x == 1:
+        points_per_unit = 64
+    elif args.dim_x == 2:
+        # Reduce the PPU to reduce memory consumption.
+        points_per_unit = 32
+        # Since the PPU is reduced, we can also take off a layer of the UNet.
+        unet_channels = unet_channels[:-1]
+    else:
+        raise RuntimeError(f"Invalid input dimensionality {args.dim_x}.")
+
+    # Other settings specific to the GP experiments:
+    plot_config = {
+        1: {"range": (-2, 4), "axvlines": [2]},
+        2: {"range": (-2, 2)},
+    }
+
 
 # Construct the model.
 if args.model == "cnp":
@@ -566,7 +605,7 @@ elif args.model == "convcnp":
         dws_channels=dws_channels,
         dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
-        margin=args.margin,
+        margin=margin,
     )
 elif args.model == "convgnp":
     model = nps.construct_convgnp(
@@ -580,7 +619,7 @@ elif args.model == "convgnp":
         dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
         num_basis_functions=num_basis_functions,
-        margin=args.margin,
+        margin=margin,
     )
 elif args.model == "convnp":
     model = nps.construct_convgnp(
@@ -594,7 +633,7 @@ elif args.model == "convnp":
         dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
         dim_lv=16,
-        margin=args.margin,
+        margin=margin,
     )
 elif args.model == "fullconvgnp":
     model = nps.construct_fullconvgnp(
@@ -606,7 +645,7 @@ elif args.model == "fullconvgnp":
         dws_channels=dws_channels,
         dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
-        margin=args.margin,
+        margin=margin,
     )
 else:
     raise ValueError(f'Invalid model "{args.model}".')
@@ -620,51 +659,58 @@ if args.objective == "loglik":
     objective = partial(
         nps.loglik,
         num_samples=args.num_samples,
-        normalise=False,
+        normalise=True,
     )
+    objective_cv = partial(
+        nps.loglik,
+        num_samples=args.num_samples,
+        normalise=True,
+    )
+    objectives_eval = [
+        (
+            "Loglik",
+            partial(
+                nps.loglik,
+                num_samples=args.evaluate_num_samples,
+                batch_size=args.evaluate_batch_size,
+                normalise=True,
+            ),
+        )
+    ]
 elif args.objective == "elbo":
     objective = partial(
         nps.elbo,
         num_samples=args.num_samples,
         subsume_context=True,
-        normalise=False,
-    )
-else:
-    raise RuntimeError(f'Invalid objective "{args.objective}".')
-
-# Setup cross-validation objective.
-if args.objective == "loglik":
-    cv_objective = partial(
-        nps.loglik,
-        num_samples=args.num_samples,
         normalise=True,
     )
-elif args.objective == "elbo":
-    cv_objective = partial(
+    objective_cv = partial(
         nps.elbo,
         num_samples=args.num_samples,
-        subsume_context=False,
+        subsume_context=False,  # Lower bound the right quantity.
         normalise=True,
     )
-else:
-    raise RuntimeError(f'Invalid objective "{args.objective}".')
-
-# Setup evaluation objective.
-if args.evaluate_objective == "loglik":
-    evaluate_objective = partial(
-        nps.loglik,
-        num_samples=args.evaluate_num_samples,
-        batch_size=args.evaluate_batch_size,
-        normalise=True,
-    )
-elif args.evaluate_objective == "elbo":
-    evaluate_objective = partial(
-        nps.elbo,
-        num_samples=args.evaluate_num_samples,
-        batch_size=args.evaluate_batch_size,
-        subsume_context=False,
-        normalise=True,
-    )
+    objectives_eval = [
+        (
+            "ELBO",
+            partial(
+                nps.elbo,
+                # Don't need a high number of samples, because it is unbiased.
+                num_samples=5,
+                subsume_context=False,  # Lower bound the right quantity.
+                normalise=True,
+            ),
+        ),
+        (
+            "Loglik",
+            partial(
+                nps.loglik,
+                num_samples=args.evaluate_num_samples,
+                batch_size=args.evaluate_batch_size,
+                normalise=True,
+            ),
+        ),
+    ]
 else:
     raise RuntimeError(f'Invalid objective "{args.objective}".')
 
@@ -680,35 +726,49 @@ if args.evaluate:
         name = "model-best.torch"
     model.load_state_dict(torch.load(wd.file(name), map_location=device))
 
-    if args.ar:
-        # Do AR evaluation. First, load the model.
+    if not args.ar:
+        # Make some plots.
         for i in range(args.evaluate_plot_num_samples):
-            plot_first_of_batch(
+            visualise(
+                model,
+                gen_cv,
+                name="evaluate",
+                epoch=i + 1,
+                config=plot_config,
+            )
+
+        # For every objective and evaluation generator, do the evaluation.
+        for objecive_name, objective_eval in objectives_eval:
+            with out.Section(objecive_name.capitalize()):
+                for gen_name, gen in gens_eval():
+                    with out.Section(gen_name.capitalize()):
+                        state, _ = eval(state, model, objective_eval, gen)
+
+    # Do AR evaluation, but only for the conditional models.
+    # TODO: Enable this for all input and output dimensionalities once possible.
+    if args.model in {"cnp", "acnp", "convcnp"} and args.dim_x == args.dim_y == 1:
+        # Make some plots.
+        for i in range(args.evaluate_plot_num_samples):
+            visualise(
                 model,
                 gen_cv,
                 name="evaluate-ar",
                 epoch=i + 1,
                 predict=nps.ar_predict,
+                config=plot_config,
             )
 
-        # Do AR testing.
-        for name, gen in gens_eval:
-            with out.Section(name.capitalize()):
-                state, _ = eval(
-                    state,
-                    model,
-                    partial(nps.ar_loglik, normalise=True),
-                    gen,
-                )
-
-    else:
-        # Do regular evaluation.
-        for i in range(args.evaluate_plot_num_samples):
-            plot_first_of_batch(model, gen_cv, name="evaluate", epoch=i + 1)
-
-        for name, gen in gens_eval:
-            with out.Section(name.capitalize()):
-                state, _ = eval(state, model, evaluate_objective, gen)
+        # For both random and left-to-right ordering, do AR testing.
+        for order in ["random", "left-to-right"]:
+            with out.Section(order.capitalize()):
+                for name, gen in gens_eval():
+                    with out.Section(name.capitalize()):
+                        state, _ = eval(
+                            state,
+                            model,
+                            partial(nps.ar_loglik, order=order, normalise=True),
+                            gen,
+                        )
 else:
     # Perform training. First, check if we want to resume training.
     start = 0
@@ -731,7 +791,7 @@ else:
             torch.save(model.state_dict(), wd.file(f"model-last.torch"))
 
             # The epoch is done. Now evaluate.
-            state, val = eval(state, model, cv_objective, gen_cv)
+            state, val = eval(state, model, objective_cv, gen_cv)
 
             # Check if the model is the new best. If so, save it.
             if val > best_eval_lik:
@@ -740,4 +800,10 @@ else:
                 torch.save(model.state_dict(), wd.file(f"model-best.torch"))
 
             # Visualise a prediction by the model.
-            plot_first_of_batch(model, gen_cv, name="train-epoch", epoch=i + 1)
+            visualise(
+                model,
+                gen_cv,
+                name="train-epoch",
+                epoch=i + 1,
+                config=plot_config,
+            )
