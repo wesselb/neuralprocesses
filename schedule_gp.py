@@ -309,12 +309,12 @@ async def main():
             spawned.append(p)
             out.kv("Remaining", len(commands))
 
-        # Wait for all spawned processes to finish before exiting the script.
-        out.out("Waiting for processes to finish...")
-        for p in spawned:
-            if p.returncode is None:
-                await p.wait()
-        out.out("Done!")
+    # Wait for all spawned processes to finish before exiting the script.
+    out.out("Waiting for processes to finish...")
+    for p in spawned:
+        if p.returncode is None:
+            await p.wait()
+    out.out("Done!")
 
 
 if __name__ == "__main__":
