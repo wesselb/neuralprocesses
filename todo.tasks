@@ -1,14 +1,38 @@
-TODOs:
-    ☐ ConvNP + x2_y* + loglik? Too memory intensive. @high
-        Only ELBO or batch/4 rate/4?
-        Batch size 4 takes 25 min/epoch
-        ELBO@5 takes 9 min/epoch
+Predator-prey:
+    ☐ Leave off bits of five years for match prediction task
+        ☐ Give inputs and select based on those?
+    ☐ Clean up generator:
+        ☐ Mechanism for unused arguments?
+        ☐ Split off one more abstract class?
+        ☐ Do not use
 
-    ☐ Stabilise tests
-        ☐ Masking?
+    ☐ WBML: predator prey data + generator
+        http://people.whitman.edu/~hundledr/courses/M250F03/LynxHare.txt
+        ☐ Other data? TODO?
+
+    ☐ Read model modifications here:
+        https://jckantor.github.io/CBE30338/02.05-Hare-and-Lynx-Population-Dynamics.html
+
+Union inputs (EEG and synthetic):
+    ☐ `nps.Union((x1, 0), (x2, 1), ...)` for output selection @high
+    ☐ Different x locations and different number in different outputs in data gens. @high
+        ☐ Multiple context sets:
+            ☐ Support multiple contexts in NP, ANP
+
+AR:
+    ☐ Support grid-like inputs in AR functions. @high
+    ☐ AR sampling for multi-dimensional outputs. @high
+
+1D Improvements:
+    ☐ UNet receptive field for sawtooth extrapolation? Decide! @high
+    ☐ Increase lengthscale of weakly-periodic period EQ @high
+
+TODOs:
+    ☐ Noisy samples for CIs
+    ☐ Stabilise masking test
 
 UNet:
-    ☐ Multiple conv blocks: @high
+    ☐ Multiple conv blocks:
         ☐ `unet_skip_connections=(True, True, False, False)`
         ☐ `unet_striding=(True, True, False, False)`
         ☐ `unet_repeat_block=(1, 2, 1, 1)`
@@ -18,7 +42,6 @@ Short Term:
     ☐ Copy README from NeuralProcesses.jl and finish first version @high
     ☐ Speed up `dim-y >= 2 generation? Necessary? Cache Stheno model?
     ☐ IW for `loglik`
-    ☐ Ability to fix the noise to be small for early epochs?
 
 Refactor:
     ☐ Integrate transforms with `probmods`.
@@ -35,6 +58,50 @@ Features:
 
 ＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
 Archive:
+ ✓ Scaling of outputs in generator @done (22-04-28 16:13) @project(Predator-prey)
+ ✓ Ensure never reaches zero: positive noise @done (22-04-28 16:13) @project(Predator-prey)
+ ✓ Random scaling? @done (22-04-28 16:12) @project(Predator-prey)
+ ✓ Random offset? @done (22-04-28 16:12) @project(Predator-prey)
+ ✓ LAB: @done (22-04-28 16:12) @project(Predator-prey)
+ ✓ Indexing with GPU tensors: converts to NumPy automatically: is there a specialised functions for taking indices? Overload for PyTorch! @done (22-04-28 16:12) @project(Predator-prey)
+ ✓ Indexing int32s @done (22-04-28 16:12) @project(Predator-prey)
+ ✓ Cap maximum. @done (22-04-28 16:12) @project(Predator-prey)
+ ✓ `schedule_gp`: wait until processes finished. @done (22-04-28 14:01) @project(TODO)
+ ✓ Fix up snippet @done (22-04-28 12:16) @project(TODO)
+ ✓ Fix `git diff` locally @done (22-04-28 12:01) @project(Predator-prey)
+ ✓ `predprey.py` @done (22-04-28 11:59) @project(Predator-prey)
+ ✓ Fix `git diff` on server @done (22-04-28 11:59) @project(Predator-prey)
+ ✓ Same number of contexts in mixture generator @high @done (22-04-28 11:38) @project(1D Improvements)
+ ✓ Reconstruct data gen for every eval @done (22-04-28 11:38)
+ x Train without normalisation, but report with normalisation @critical @cancelled (22-04-27 17:56) @project(Bugs)
+ ✓ Loglik versus ELBO?! What's going on? @critical @done (22-04-27 16:07) @project(Bugs)
+ ✓ Check 2D weakly-periodic samples @critical @done (22-04-27 16:07) @project(Bugs)
+ ✓ `cv_objective` @critical @done (22-04-27 10:28) @project(Bugs)
+ ✓ ELBO ConvNP with loglik objective failing? @critical @done (22-04-27 10:05) @project(Bugs)
+ ✓ Add `ar_elbo`. @high @done (22-04-26 18:10) @project(AR)
+ x DWS over UNet to enable same settings for all models? @cancelled (22-04-26 09:12) @project(1D Improvements)
+  More expensive than UNet!
+ ✓ Add `grid` option to `ar_predict`. @done (22-04-25 21:29) @project(AR)
+ ✓ `B.randperm` @done (22-04-25 19:54) @project(AR)
+ ✓ Random states for AR functions @done (22-04-25 19:54) @project(AR)
+ ✓ Implement random order in _sort_targets @done (22-04-25 19:54) @project(AR)
+ ✓ Timing of ConvGNP x2_y2 on sawtooth? @done (22-04-25 18:32) @project(AR)
+ ✓ Everything <= 2 min / epoch @done (22-04-25 14:30) @project(AR)
+ x Check ConvNP sawtooth x2_y2 fit @cancelled (22-04-25 14:30) @project(AR)
+ x Check ConvCNP sawtooth x2_y2 fit @cancelled (22-04-25 14:30) @project(AR)
+ ✓ Ability to fix the noise to be small for early epochs? @done (22-04-25 12:22) @project(Short Term)
+ ✓ Make ConvNP 2D outputs fit on sawtooth and weakly-periodic @high @done (22-04-25 12:14) @project(AR)
+ ✓ Check ANP ELBO? @high @done (22-04-25 11:54) @project(AR)
+ ✓ `schedule_gp.py`: ability to ignore runs which already finished! @done (22-04-25 11:49) @project(AR)
+ ✓ Check 2D plotting for CNP: do ConvCNP in same way! @high @done (22-04-25 11:49) @project(AR)
+ ✓ 200 -> 500 in 1d function, remove plt.show() @done (22-04-23 15:40) @project(AR)
+ ✓ Undo sorting of inputs @done (22-04-23 15:22) @project(AR)
+ ✓ ConvNP + x2_y* + loglik? Too memory intensive. @high @done (22-04-23 15:05) @project(TODOs)
+  Only ELBO or batch/4 rate/4?
+  Batch size 4 takes 25 min/epoch
+  ELBO@5 takes 9 min/epoch
+  Simply exclude ConvNP?
+ ✓ Change folder to first x1_y1 @high @done (22-04-23 15:05) @project(TODOs)
  ✓ Reduce num contexts for 1D again! @done (22-04-23 14:00) @project(TODOs)
  ✓ Add LVs option to script @done (22-04-23 14:00) @project(TODOs)
  ✓ Check ConvGNP on eq and weakly-periodic from epoch 38 @high @done (22-04-23 13:53) @project(TODOs)

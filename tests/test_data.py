@@ -14,6 +14,13 @@ def test_predefined_gens(nps, dim_x, dim_y):
         dim_x=dim_x,
         dim_y=dim_y,
     )
+    if dim_x == 1 and dim_y == 2:
+        gens["predprey"] = nps.PredPreyGenerator(
+            nps.dtype,
+            x_ranges_context=((0, 50),),
+            x_ranges_target=((50, 100),),
+            dim_y=2,
+        )
     for name, gen in gens.items():
         for _ in range(10):
             batch = gen.generate_batch()
@@ -40,6 +47,9 @@ def test_predefined_gens(nps, dim_x, dim_y):
                 assert gen.num_target_points[0] <= B.shape(batch["xt"], 2)
                 assert B.shape(batch["xt"], 2) <= gen.num_target_points[1]
 
-            # Check the location of the inputs.
-            assert B.all((-2 <= batch["xc"]) & (batch["xc"] <= 2))
-            assert B.all((2 <= batch["xt"]) & (batch["xt"] <= 6))
+                # Check the location of the inputs.
+                for d in range(dim_x):
+                    assert B.all(gen.x_ranges_context[0][d] <= batch["xc"][:, d, :])
+                    assert B.all(batch["xc"][:, d, :] <= gen.x_ranges_context[1][d])
+                    assert B.all(gen.x_ranges_target[0][d] <= batch["xt"][:, d, :])
+                    assert B.all(batch["xt"][:, d, :] <= gen.x_ranges_target[1][d])
