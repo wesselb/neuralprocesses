@@ -456,6 +456,7 @@ if args.data == "predprey":
     points_per_unit = 4
     margin = 1
     dws_receptive_field = 100
+    transform = "positive"
 
     # Other settings specific to the predator-prey experiments:
     plot_config = {1: {"range": (0, 100), "axvline": []}}
@@ -527,6 +528,7 @@ else:
         1: {"range": (-2, 4), "axvline": [2]},
         2: {"range": (-2, 2)},
     }
+    transform = None
 
 
 # Construct the model.
@@ -539,6 +541,7 @@ if args.model == "cnp":
         num_dec_layers=num_layers,
         width=width,
         likelihood="het",
+        transform=transform,
     )
 elif args.model == "gnp":
     model = nps.construct_gnp(
@@ -550,6 +553,7 @@ elif args.model == "gnp":
         width=width,
         likelihood="lowrank",
         num_basis_functions=num_basis_functions,
+        transform=transform,
     )
 elif args.model == "np":
     model = nps.construct_gnp(
@@ -561,6 +565,7 @@ elif args.model == "np":
         width=width,
         likelihood="het",
         dim_lv=dim_embedding,
+        transform=transform,
     )
 elif args.model == "acnp":
     model = nps.construct_agnp(
@@ -572,6 +577,7 @@ elif args.model == "acnp":
         num_dec_layers=num_layers,
         width=width,
         likelihood="het",
+        transform=transform,
     )
 elif args.model == "agnp":
     model = nps.construct_agnp(
@@ -584,6 +590,7 @@ elif args.model == "agnp":
         width=width,
         likelihood="lowrank",
         num_basis_functions=num_basis_functions,
+        transform=transform,
     )
 elif args.model == "anp":
     model = nps.construct_agnp(
@@ -596,6 +603,7 @@ elif args.model == "anp":
         width=width,
         likelihood="het",
         dim_lv=dim_embedding,
+        transform=transform,
     )
 elif args.model == "convcnp":
     model = nps.construct_convgnp(
@@ -609,6 +617,7 @@ elif args.model == "convcnp":
         dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
         margin=margin,
+        transform=transform,
     )
 elif args.model == "convgnp":
     model = nps.construct_convgnp(
@@ -623,6 +632,7 @@ elif args.model == "convgnp":
         dws_receptive_field=dws_receptive_field,
         num_basis_functions=num_basis_functions,
         margin=margin,
+        transform=transform,
     )
 elif args.model == "convnp":
     model = nps.construct_convgnp(
@@ -637,6 +647,7 @@ elif args.model == "convnp":
         dws_receptive_field=dws_receptive_field,
         dim_lv=16,
         margin=margin,
+        transform=transform,
     )
 elif args.model == "fullconvgnp":
     model = nps.construct_fullconvgnp(
@@ -649,6 +660,7 @@ elif args.model == "fullconvgnp":
         dws_layers=num_layers,
         dws_receptive_field=dws_receptive_field,
         margin=margin,
+        transform=transform,
     )
 else:
     raise ValueError(f'Invalid model "{args.model}".')
