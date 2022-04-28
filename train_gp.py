@@ -739,7 +739,7 @@ if args.evaluate:
 
         # For every objective and evaluation generator, do the evaluation.
         for objecive_name, objective_eval in objectives_eval:
-            with out.Section(objecive_name.capitalize()):
+            with out.Section(objecive_name):
                 for gen_name, gen in gens_eval():
                     with out.Section(gen_name.capitalize()):
                         state, _ = eval(state, model, objective_eval, gen)
