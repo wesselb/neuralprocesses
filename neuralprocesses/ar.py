@@ -21,22 +21,20 @@ def _sort_targets(state, xt, yt=None, *, order):
         if order == "left-to-right":
             perm = np.lexsort(B.to_numpy(xt)[i, ::-1, :])
         elif order == "random":
-            # Generate 64-bytes indices: PyTorch doesn't support indexing with 32 bytes.
-            dtype = B.promote_dtypes(B.dtype_int(xt), int)
-            state, perm = B.randperm(state, dtype, B.shape(xt, -1))
+            state, perm = B.randperm(state, B.dtype_int(xt), B.shape(xt, -1))
         else:
             raise RuntimeError(f'Invalid ordering "{order}".')
         inv_perms.append(inv_perm(perm))
 
-        xt[..., i, :, :] = xt[..., i, :, perm]
+        xt[..., i, :, :] = B.take(xt[..., i, :, :], perm, axis=-1)
         if yt is not None:
-            yt[..., i, :, :] = yt[..., i, :, perm]
+            yt[..., i, :, :] = B.take(yt[..., i, :, :], axis=-1)
 
     def unsort(z):
         """Undo the sorting."""
         z = B.identity(z)  # Make a copy, because we'll modify it.
         for i, perm in enumerate(inv_perms):
-            z[..., i, :, :] = z[..., i, :, perm]
+            z[..., i, :, :] = B.take(z[..., i, :, :], axis=-1)
         return z
 
     if yt is None:
