@@ -258,12 +258,13 @@ async def main():
     if args.evaluate:
         commands = [c + " --evaluate" for c in commands]
 
-    # First, run through the commands and eject the ones that have already completed.
-    for c in list(commands):  # Copy, because we're removing as we go!
-        if test_success(with_gpu(c + " --check-completed")):
-            with out.Section("Command already completed"):
-                out.kv("Command", c)
-            commands.remove(c)
+    if not args.evaluate:
+        # Run through the commands and eject the ones that have already completed.
+        for c in list(commands):  # Copy, because we're removing as we go!
+            if test_success(with_gpu(c + " --check-completed")):
+                with out.Section("Command already completed"):
+                    out.kv("Command", c)
+                commands.remove(c)
 
     # Benchmark every command before commit to the long run.
     benchmark = {c: await benchmark_command(args.gpu, c) for c in commands}
