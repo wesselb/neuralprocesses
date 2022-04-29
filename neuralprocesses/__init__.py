@@ -16,6 +16,7 @@ from .disc import *
 from .augment import *
 from .mask import *
 from .ar import *
+from .union import *
 
 from .architectures import *
 
