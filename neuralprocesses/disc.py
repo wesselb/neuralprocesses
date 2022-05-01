@@ -6,6 +6,7 @@ from plum import List
 
 from . import _dispatch
 from .augment import AugmentedInput
+from .aggregate import AggregateTargets
 from .parallel import Parallel
 from .util import register_module, is_nonempty, batch
 
@@ -136,3 +137,11 @@ def _split_coordinates(
     x: AugmentedInput, dim: Optional[int] = None
 ) -> List[List[B.Numeric]]:
     return _split_coordinates(x.x, dim=dim)
+
+
+@_dispatch
+def _split_coordinates(
+    x: AggregateTargets, dim: Optional[int] = None
+) -> List[List[B.Numeric]]:
+    # Can treat it like a parallel of inputs. However, be sure to remove the indices.
+    return _split_coordinates(Parallel(*(xi for xi, i in x)), dim=dim)

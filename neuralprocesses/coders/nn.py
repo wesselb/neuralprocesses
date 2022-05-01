@@ -3,9 +3,10 @@ from typing import Tuple, Union, Optional
 
 import lab as B
 
-from . import _dispatch
-from .parallel import Parallel
-from .util import register_module, compress_batch_dimensions, data_dims, split_channels
+from .. import _dispatch
+from ..datadims import data_dims
+from ..parallel import Parallel
+from ..util import register_module, compress_batch_dimensions, split_channels
 
 __all__ = ["MLP", "UNet", "ConvNet", "Splitter"]
 

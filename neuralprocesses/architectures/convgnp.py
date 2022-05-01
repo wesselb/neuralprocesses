@@ -1,3 +1,4 @@
+import lab as B
 import wbml.out as out
 from plum import convert
 
@@ -324,8 +325,12 @@ def construct_convgnp(
         ),
         nps.Chain(
             conv,
-            _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
-            likelihood,
+            nps.AggregateTargetsCoder(
+                _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
+                likelihood,
+            ),
+            nps.ConcatenateAggregate(),
+            nps.DensifyLowRankVariance(),
             parse_transform(nps, transform=transform),
         ),
     )

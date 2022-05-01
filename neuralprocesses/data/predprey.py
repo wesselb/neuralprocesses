@@ -1,9 +1,13 @@
 import lab as B
 import wbml.util
+from wbml.data.predprey import load
 
-from .data import SyntheticGenerator, _sample_all_inputs_noise
+from .data import DataGenerator, SyntheticGenerator
+from .. import _dispatch
+from ..aggregate import Aggregate, AggregateTargets
+from ..dist.uniform import UniformDiscrete, UniformContinuous
 
-__all__ = ["PredPreyGenerator"]
+__all__ = ["PredPreyGenerator", "PredPreyRealGenerator"]
 
 
 def _predprey_step(state, x_y, t, dt, *, alpha, beta, delta, gamma, sigma):
@@ -67,30 +71,25 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
 
     # Note the magic constant 10 here.
     x_y = 10 * B.rand(dtype, batch_size, 2)
-    t = t0
-    traj, ts = [x_y], [t]
+    t, traj = t0, [x_y]
 
     while t < t1:
         state, x_y, t = _predprey_step(state, x_y, t, dt, **params)
         while B.shape(t_target, 0) > 0 and t >= t_target[0]:
             traj.append(x_y)
-            ts.append(t)
             t_target = t_target[1:]
 
-    t = B.tile(B.stack(*ts)[None, None, :], batch_size, 1, 1)
     # Note the magic scaling `7 / 100` here.
     traj = B.stack(*traj, axis=-1) * 7 / 100
 
     # Undo the sorting.
-    t = B.take(t, inv_perm, axis=-1)
     traj = B.take(traj, inv_perm, axis=-1)
 
-    # We now apply a random scaling and offset.
-    state, offset = B.rand(state, dtype, batch_size, 2, 1)
+    # We now apply a random scaling.
     state, scale = B.rand(state, dtype, batch_size, 2, 1)
-    traj = 0.25 * offset + (0.5 + scale) * traj
+    traj = (0.5 + scale) * traj
 
-    return state, t, traj
+    return state, traj
 
 
 class PredPreyGenerator(SyntheticGenerator):
@@ -105,22 +104,27 @@ class PredPreyGenerator(SyntheticGenerator):
     def __init__(
         self,
         *args,
-        x_ranges=((0, 100),),
-        num_context_points=(50, 100),
-        num_target_points=(100, 100),
+        noise=0,
+        dist_x=UniformContinuous(0, 100),
+        num_context=UniformDiscrete(25, 100),
+        num_target=UniformDiscrete(100, 100),
         dim_y=2,
         **kw_args
     ):
         super().__init__(
             *args,
-            x_ranges=x_ranges,
-            num_context_points=num_context_points,
-            num_target_points=num_target_points,
+            noise=noise,
+            dist_x=dist_x,
+            num_context=num_context,
+            num_target=num_target,
             dim_y=dim_y,
             **kw_args,
         )
-        if not (self.dim_x == 1 and self.dim_y == 2):
-            raise RuntimeError("`dim_x` must be 1 and `dim_y` must be 2.")
+        if noise != 0:
+            raise RuntimeError("`noise` must be 0.")
+        if self.dim_y != 2:
+            raise RuntimeError("`dim_y` must be 2.")
+
         self._big_batch = None
         self._big_batch_num_left = 0
 
@@ -128,8 +132,8 @@ class PredPreyGenerator(SyntheticGenerator):
         # Attempt to return a batch from the big batch.
         if self._big_batch_num_left > 0:
             n = self.batch_size
-            batch = {k: v[:n] for k, v in self._big_batch.items()}
-            self._big_batch = {k: v[n:] for k, v in self._big_batch.items()}
+            batch = _select_batch(slice(None, n, None), self._big_batch)
+            self._big_batch = _select_batch(slice(n, None, None), self._big_batch)
             self._big_batch_num_left -= 1
             return batch
 
@@ -138,35 +142,65 @@ class PredPreyGenerator(SyntheticGenerator):
             # `multiplier` many batches.
             multiplier = max(1024 // self.batch_size, 1)
 
-            batch = {}
-
-            # Sample inputs
-            x, num_context_points, noise = _sample_all_inputs_noise(self)
-            # We fix the inputs across all tasks, because that is what the simulator
-            # requires.
-            x = x[0, 0]
-
-            # Simulate the equations.
-            self.state, _, y = _predprey_simulate(
-                self.state,
-                self.float64,
-                min(self.x_ranges_context[0][0], self.x_ranges_target[0][0]),
-                max(self.x_ranges_context[1][0], self.x_ranges_target[1][0]),
-                7 / 365,
-                x,
+            set_batch, xcs, xc, nc, xts, xt, nt = self._new_batch(
+                fix_x_across_batch=True,
                 batch_size=multiplier * self.batch_size,
             )
-            # Now make the inputs of the right size.
-            x = B.tile(x[None, None, :], multiplier * self.batch_size, 1, 1)
 
-            batch["xc"] = B.cast(self.dtype, x[:, :, :num_context_points])
-            batch["yc"] = B.cast(self.dtype, y[:, :, :num_context_points])
-            batch["xt"] = B.cast(self.dtype, x[:, :, num_context_points:])
-            batch["yt"] = B.cast(self.dtype, y[:, :, num_context_points:])
+            # Simulate the equations.
+            t0 = min(B.min(xc), B.min(xt))
+            t1 = max(B.max(xc), B.max(xt))
+            self.state, y = _predprey_simulate(
+                self.state,
+                self.float64,
+                t0,
+                t1,
+                # Use a budget of 5000 steps.
+                (t1 - t0) / 5000,
+                B.concat(xc, xt, axis=1)[0, :, 0],
+                batch_size=multiplier * self.batch_size,
+            )
 
             # Save the big batch.
+            batch = {}
+            set_batch(batch, y[:, :, :nc], y[:, :, nc:], transpose=False)
             self._big_batch_num_left = multiplier
             self._big_batch = batch
 
             # Call the function again to obtain a batch from the big batch.
             return self.generate_batch()
+
+
+@_dispatch
+def _select_batch(index: slice, x: B.Numeric):
+    return x[(index, Ellipsis)]
+
+
+@_dispatch
+def _select_batch(index: slice, d: dict):
+    return {k: _select_batch(index, v) for k, v in d.items()}
+
+
+@_dispatch
+def _select_batch(index: slice, t: tuple):
+    return tuple(_select_batch(index, ti) for ti in t)
+
+
+@_dispatch
+def _select_batch(index: slice, t: list):
+    return [_select_batch(index, ti) for ti in t]
+
+
+@_dispatch
+def _select_batch(index: slice, xt: AggregateTargets):
+    return AggregateTargets(*((_select_batch(index, xti), i) for xti, i in xt))
+
+
+@_dispatch
+def _select_batch(index: slice, yt: Aggregate):
+    return Aggregate(*(_select_batch(index, yti) for yti in yt))
+
+
+class PredPreyRealGenerator(DataGenerator):
+    def __init__(self, dtype):
+        df = load()

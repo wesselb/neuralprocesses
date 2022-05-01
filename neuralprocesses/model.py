@@ -7,6 +7,7 @@ from stheno import Normal
 
 from . import _dispatch
 from .augment import AugmentedInput
+from .aggregate import Aggregate
 from .coding import code, code_track, recode_stochastic
 from .dist import AbstractMultiOutputDistribution, MultiOutputNormal
 from .mask import Masked
@@ -73,14 +74,14 @@ class Model:
         enc_kw_args = dict(kw_args)
         if "noiseless" in enc_kw_args:
             del enc_kw_args["noiseless"]
-        xz, pz = code(self.encoder, xc, yc, xt, **enc_kw_args)
+        xz, pz = code(self.encoder, xc, yc, xt, root=True, **enc_kw_args)
 
         # Sample and convert sample to the right data type.
         state, z = _sample(state, pz, num=num_samples)
         if dtype_enc_sample:
             z = B.cast(dtype_enc_sample, z)
 
-        _, d = code(self.decoder, xz, z, xt, **kw_args)
+        _, d = code(self.decoder, xz, z, xt, root=True, **kw_args)
 
         return state, d
 
@@ -322,17 +323,42 @@ def elbo(
         yt = B.concat(yc, yt, axis=-1)
 
     # Construct prior.
-    xz, pz, h = code_track(model.encoder, xc, yc, xt, dtype_lik=float64, **kw_args)
+    xz, pz, h = code_track(
+        model.encoder,
+        xc,
+        yc,
+        xt,
+        root=True,
+        dtype_lik=float64,
+        **kw_args,
+    )
 
     # Construct posterior.
-    qz = recode_stochastic(model.encoder, pz, xt, yt, h, dtype_lik=float64, **kw_args)
+    qz = recode_stochastic(
+        model.encoder,
+        pz,
+        xt,
+        yt,
+        h,
+        root=True,
+        dtype_lik=float64,
+        **kw_args,
+    )
 
     # Sample from poster.
     state, z = _sample(state, qz, num=num_samples)
     z = B.cast(float, z)
 
     # Run sample through decoder.
-    _, d = code(model.decoder, xz, z, xt, dtype_lik=float64, **kw_args)
+    _, d = code(
+        model.decoder,
+        xz,
+        z,
+        xt,
+        dtype_lik=float64,
+        root=True,
+        **kw_args,
+    )
     d = _fix_noise(d, epoch)
 
     # Compute the ELBO.

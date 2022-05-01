@@ -47,14 +47,6 @@ class Parallel:
         )
 
 
-@_dispatch
-def data_dims(x: Parallel):
-    dims = [data_dims(xi) for xi in x]
-    if not all(d == dims[0] for d in dims[1:]):
-        raise RuntimeError("Inconsistent data dimensions.")
-    return dims[0]
-
-
 @B.cast.dispatch
 def cast(dtype, x: Parallel):
     return Parallel(*(B.cast(dtype, xi) for xi in x))
@@ -76,19 +68,6 @@ def code(p: Parallel, xz, z: Parallel, x, **kw_args):
 def code(p: Parallel, xz: Parallel, z: Parallel, x, **kw_args):
     xz, z = zip(*[code(pi, xzi, zi, x, **kw_args) for (pi, xzi, zi) in zip(p, xz, z)])
     return Parallel(*xz), Parallel(*z)
-
-
-def broadcast_coder_over_parallel(coder_type):
-    """Broadcast a coder over parallel encodings.
-
-    Args:
-        coder_type (type): Type of coder.
-    """
-
-    @_dispatch
-    def code(p: coder_type, xz: Parallel, z: Parallel, x, **kw_args):
-        xz, z = zip(*[code(p, xzi, zi, x, **kw_args) for (xzi, zi) in zip(xz, z)])
-        return Parallel(*xz), Parallel(*z)
 
 
 @_dispatch
@@ -136,3 +115,16 @@ def recode(p: Parallel, xz: Parallel, z: Parallel, h, **kw_args):
         ]
     )
     return Parallel(*xz), Parallel(*z), h[1:]
+
+
+def broadcast_coder_over_parallel(coder_type):
+    """Broadcast a coder over parallel encodings.
+
+    Args:
+        coder_type (type): Type of coder.
+    """
+
+    @_dispatch
+    def code(p: coder_type, xz: Parallel, z: Parallel, x, **kw_args):
+        xz, z = zip(*[code(p, xzi, zi, x, **kw_args) for (xzi, zi) in zip(xz, z)])
+        return Parallel(*xz), Parallel(*z)

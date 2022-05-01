@@ -6,29 +6,23 @@ __all__ = ["construct_agnp"]
 
 
 @register_model
-def construct_agnp(
-    dim_x=1,
-    dim_y=1,
-    dim_embedding=256,
-    num_heads=8,
-    num_enc_layers=6,
-    num_dec_layers=6,
-    width=512,
-    likelihood="lowrank",
-    num_basis_functions=512,
-    dim_lv=0,
-    lv_likelihood="het",
-    dtype=None,
-    transform=None,
-    nps=nps,
-):
+def construct_agnp(*args, nps=nps, num_heads=8, **kw_args):
     """An Attentive Gaussian Neural Process.
 
     Args:
         dim_x (int, optional): Dimensionality of the inputs. Defaults to 1.
         dim_y (int, optional): Dimensionality of the outputs. Defaults to 1.
-        dim_embedding (int, optional): Dimensionality of the embedding. Defaults to 256.
-        num_heads (int, optional): Number of heads. Defaults to 16.
+        dim_yc (int or tuple[int], optional): Dimensionality of the outputs of the
+            context set. You should set this if the dimensionality of the outputs
+            of the context set is not equal to the dimensionality of the outputs
+            of the target set. You should also set this if you want to use multiple
+            context sets. In that case, set this equal to a tuple of integers
+            indicating the respective output dimensionalities.
+        dim_yt (int, optional): Dimensionality of the outputs of the target set. You
+            should set this if the dimensionality of the outputs of the target set is
+            not equal to the dimensionality of the outputs of the context set.
+        dim_embedding (int, optional): Dimensionality of the embedding. Defaults to 128.
+        num_heads (int, optional): Number of heads. Defaults to `8`.
         num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 6.
         num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
@@ -46,74 +40,12 @@ def construct_agnp(
         dtype (dtype, optional): Data type.
 
     Returns:
-        :class:`.model.Model`: GNP model.
+        :class:`.model.Model`: AGNP model.
     """
-    likelihood_in_channels, likelihood = construct_likelihood(
-        nps,
-        spec=likelihood,
-        dim_y=dim_y,
-        num_basis_functions=num_basis_functions,
-        dtype=dtype,
+    return nps.construct_gnp(
+        *args,
+        nps=nps,
+        attention=True,
+        attention_num_heads=num_heads,
+        **kw_args,
     )
-
-    if dim_lv > 0:
-        lv_likelihood_in_channels, lv_likelihood = construct_likelihood(
-            nps,
-            spec=lv_likelihood,
-            dim_y=dim_lv,
-            num_basis_functions=num_basis_functions,
-            dtype=dtype,
-        )
-        lv_encoder = nps.Chain(
-            nps.DeepSet(
-                nps.MLP(
-                    in_dim=dim_x + dim_y,
-                    out_dim=dim_embedding,
-                    num_layers=num_enc_layers // 2,
-                    width=width,
-                    dtype=dtype,
-                ),
-                nps.MLP(
-                    in_dim=dim_embedding,
-                    out_dim=lv_likelihood_in_channels,
-                    num_layers=num_enc_layers - num_enc_layers // 2,
-                    width=width,
-                    dtype=dtype,
-                ),
-            ),
-            lv_likelihood,
-        )
-
-    encoder = nps.Chain(
-        nps.Parallel(
-            nps.Chain(
-                nps.InputsCoder(),
-                nps.DeterministicLikelihood(),
-            ),
-            nps.Chain(
-                nps.Attention(
-                    dim_x=dim_x,
-                    dim_y=dim_y,
-                    dim_embedding=dim_embedding,
-                    num_heads=num_heads,
-                    num_enc_layers=num_enc_layers,
-                    dtype=dtype,
-                ),
-                nps.DeterministicLikelihood(),
-            ),
-            *((lv_encoder,) if dim_lv > 0 else ())
-        ),
-    )
-    decoder = nps.Chain(
-        nps.Materialise(),
-        nps.MLP(
-            in_dim=dim_x + dim_embedding + dim_lv,
-            out_dim=likelihood_in_channels,
-            num_layers=num_dec_layers,
-            width=width,
-            dtype=dtype,
-        ),
-        likelihood,
-        parse_transform(nps, transform=transform),
-    )
-    return nps.Model(encoder, decoder)

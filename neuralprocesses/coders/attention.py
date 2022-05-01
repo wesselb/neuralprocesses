@@ -1,6 +1,9 @@
-from . import _dispatch
-from .util import register_module, batch
 import lab as B
+
+from .. import _dispatch
+from ..util import register_module, batch
+
+__all__ = ["Attention", "SelfAttention"]
 
 
 @register_module
@@ -37,9 +40,11 @@ class Attention:
         dtype=None,
         _self=False,
     ):
-        self._self = False
+        self._self = _self
+
         self.num_heads = num_heads
         self.dim_head = dim_embedding // num_heads
+
         self.encoder_x = self.nps.MLP(
             in_dim=dim_x,
             layers=(self.dim_head * num_heads,) * num_enc_layers,
@@ -52,6 +57,7 @@ class Attention:
             out_dim=self.dim_head * num_heads,
             dtype=dtype,
         )
+
         self.mixer = self.nps.MLP(
             in_dim=self.dim_head * num_heads,
             layers=(),

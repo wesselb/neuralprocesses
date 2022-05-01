@@ -1,18 +1,14 @@
-import lab as B
 import matrix  # noqa
-from plum import Union
 
 from . import _dispatch
-from .parallel import Parallel
-from .util import register_module, data_dims
 from .dist import Dirac, AbstractMultiOutputDistribution
+from .parallel import Parallel
 
 __all__ = [
     "code",
     "code_track",
     "recode",
     "recode_stochastic",
-    "Materialise",
 ]
 
 
@@ -139,70 +135,3 @@ def _choose(new: Dirac, old: Dirac):
 def _choose(new: AbstractMultiOutputDistribution, old: AbstractMultiOutputDistribution):
     # Do recode other distributions.
     return new
-
-
-@register_module
-class Materialise:
-    """Materialise an aggregate encoding."""
-
-
-@_dispatch
-def code(coder: Materialise, xz, z, x, **kw_args):
-    return _merge(xz), _repeat_concat(xz, z)
-
-
-@_dispatch
-def _merge(z: Union[B.Numeric, None]):
-    return z
-
-
-@_dispatch
-def _merge(zs: Parallel):
-    return _merge(*zs)
-
-
-@_dispatch
-def _merge(z0: Union[B.Numeric, None], *zs: Union[B.Numeric, None]):
-    zs = (z0,) + zs
-    # Remove all `None`s: those correspond to global features.
-    zs = [z for z in zs if z is not None]
-    if len(zs) == 0:
-        raise ValueError("No inputs specified.")
-    elif len(zs) > 1:
-        diffs = sum([B.mean(B.abs(zs[0] - z)) for z in zs[1:]])
-        if B.jit_to_numpy(diffs) > B.epsilon:
-            raise ValueError("Cannot merge inputs.")
-    return zs[0]
-
-
-@_dispatch
-def _merge(z0: tuple, *zs: tuple):
-    zs = (z0,) + zs
-    return tuple(_merge(*zis) for zis in zip(*zs))
-
-
-@_dispatch
-def _repeat_concat(xz: B.Numeric, z: B.Numeric):
-    return z
-
-
-@_dispatch
-def _repeat_concat(xz: Parallel, z: Parallel):
-    return _repeat_concat_parallel(*z, dims=data_dims(xz))
-
-
-@_dispatch
-def _repeat_concat_parallel(z0: B.Numeric, *zs: B.Numeric, dims):
-    zs = (z0,) + zs
-    # Some may be batched, but not all.
-    rank = max([B.rank(z) for z in zs])
-    zs = [B.expand_dims(z, axis=0) if B.rank(z) < rank else z for z in zs]
-    # Broadcast the data dimensions. There are `dims` many of them, so perform a loop.
-    # Also incoporate the first dimension, because that might be a batch dimension.
-    shapes = [list(B.shape(z)) for z in zs]
-    for i in [0] + list(range(rank - 1, rank - 1 - dims, -1)):
-        shape_n = max(shape[i] for shape in shapes)
-        for shape in shapes:
-            shape[i] = shape_n
-    zs = [B.broadcast_to(z, *shape) for (z, shape) in zip(zs, shapes)]
-    return B.concat(*zs, axis=-1 - dims)

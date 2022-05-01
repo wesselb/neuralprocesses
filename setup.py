@@ -6,7 +6,7 @@ requirements = [
     "backends-matrix>=1.2.10",
     "plum-dispatch>=1",
     "stheno>=1.3.10",
-    "wbml>=0.3.17",
+    "wbml>=0.3.18",
 ]
 
 setup(
