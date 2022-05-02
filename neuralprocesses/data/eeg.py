@@ -218,7 +218,7 @@ class EEGGenerator(DataGenerator):
             self.i += 1
 
         x = np.repeat(
-            np.array(batch_trials[0].index)[None, :, None],
+            np.array(batch_trials[0].index)[None, None, :],
             self.batch_size,
             axis=0,
         )
@@ -246,9 +246,9 @@ class EEGGenerator(DataGenerator):
                 c_idx = idx[:k]
                 t_idx = idx[k:]
 
-                contexts.append((x[:, c_idx, :], y[:, i : i + 1, c_idx]))
+                contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
 
-                xt.append(x[:, t_idx, :])
+                xt.append(x[:, :, t_idx])
                 yt.append(y[:, i : i + 1, t_idx])
 
             else:
