@@ -78,7 +78,7 @@ def with_err(vals):
 
 def visualise(model, gen, *, name, epoch, config, predict=nps.predict):
     """Plot the prediction for the first element of a batch."""
-    if args.dim_x == 1:
+    if dim_x == 1:
         visualise_1d(
             model,
             gen,
@@ -87,7 +87,7 @@ def visualise(model, gen, *, name, epoch, config, predict=nps.predict):
             config=config[1],
             predict=predict,
         )
-    elif args.dim_x == 2:
+    elif dim_x == 2:
         visualise_2d(
             model,
             gen,
@@ -115,10 +115,10 @@ def visualise_1d(model, gen, *, name, epoch, config, predict):
             x[None, None, :],
         )
 
-    plt.figure(figsize=(8, 6 * args.dim_y))
+    plt.figure(figsize=(8, 6 * dim_y))
 
-    for i in range(args.dim_y):
-        plt.subplot(args.dim_y, 1, 1 + i)
+    for i in range(dim_y):
+        plt.subplot(dim_y, 1, 1 + i)
 
         # Plot context and target.
         plt.scatter(
@@ -159,7 +159,7 @@ def visualise_1d(model, gen, *, name, epoch, config, predict):
         )
 
         # Plot prediction by ground truth.
-        if hasattr(gen, "kernel") and args.dim_y == 1:
+        if hasattr(gen, "kernel") and dim_y == 1:
             f = stheno.GP(gen.kernel)
             # Make sure that everything is of `float64`s and on the GPU.
             noise = B.to_active_device(B.cast(torch.float64, gen.noise))
@@ -263,25 +263,25 @@ def visualise_2d(model, gen, *, name, epoch, config, predict):
         plt.gca().set_xticks([])
         plt.gca().set_yticks([])
 
-    plt.figure(figsize=(12, 4 * args.dim_y))
+    plt.figure(figsize=(12, 4 * dim_y))
 
-    for i in range(args.dim_y):
+    for i in range(dim_y):
         # Plot mean.
-        plt.subplot(args.dim_y, 3, 1 + i * 3)
+        plt.subplot(dim_y, 3, 1 + i * 3)
         if i == 0:
             plt.title("Mean")
         plot_imshow(mean[0, i], i, label="Mean")
         tweak(grid=False)
 
         # Plot first sample.
-        plt.subplot(args.dim_y, 3, 2 + i * 3)
+        plt.subplot(dim_y, 3, 2 + i * 3)
         if i == 0:
             plt.title("Sample")
         plot_imshow(samples[0, 0, i], i, label="Sample 1")
         tweak(grid=False)
 
         # Plot second sample.
-        plt.subplot(args.dim_y, 3, 3 + i * 3)
+        plt.subplot(dim_y, 3, 3 + i * 3)
         if i == 0:
             plt.title("Sample")
         plot_imshow(samples[1, 0, i], i, label="Sample 2")
@@ -357,6 +357,18 @@ models_which_use_arch = {
 }
 if args.model not in models_which_use_arch:
     args.arch = None
+    
+# Remove the dimensionality specification if the experiment doesn't need it.
+data_which_use_dims = {
+    "eq",
+    "matern",
+    "weakly-periodic",
+    "sawtooth",
+    "mixture",
+}
+if args.data not in data_which_use_dims:
+    args.dim_x = None
+    args.dim_y = None
 
 # Determine the mode of the script.
 if args.check_completed or args.no_action:
@@ -377,7 +389,7 @@ wd = WorkingDirectory(
     *args.root,
     *(args.subdir or ()),
     args.data,
-    f"x{args.dim_x}_y{args.dim_y}",
+    *((f"x{args.dim_x}_y{args.dim_y}",) if args.dim_x else ()),
     args.model,
     *((args.arch,) if args.arch else ()),
     args.objective,
@@ -416,12 +428,14 @@ num_basis_functions = 512
 
 # Setup data generators for training and for evaluation.
 if args.data == "predprey":
+    dim_x = 1
+    dim_y = 2
+
     gen_train = nps.PredPreyGenerator(
         torch.float32,
         seed=10,
         batch_size=args.batch_size,
         num_tasks=2**14,
-        dim_y=args.dim_y,
         device=device,
     )
     gen_cv = nps.PredPreyGenerator(
@@ -429,7 +443,6 @@ if args.data == "predprey":
         seed=20,
         batch_size=args.batch_size,
         num_tasks=2**12,
-        dim_y=args.dim_y,
         device=device,
     )
     gens_eval = lambda: (
@@ -439,7 +452,6 @@ if args.data == "predprey":
             seed=30,
             batch_size=args.batch_size,
             num_tasks=2**6 if args.evaluate_fast else 2**14,
-            dim_y=args.dim_y,
             device=device,
         ),
     )
@@ -453,13 +465,16 @@ if args.data == "predprey":
     # Other settings specific to the predator-prey experiments:
     plot_config = {1: {"range": (0, 100), "axvline": []}}
 else:
+    dim_x = args.dim_x
+    dim_y = args.dim_y
+
     gen_train = nps.construct_predefined_gens(
         torch.float32,
         seed=10,
         batch_size=args.batch_size,
         num_tasks=2**14,
-        dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_x=dim_x,
+        dim_y=dim_y,
         pred_logpdf=False,
         pred_logpdf_diag=False,
         device=device,
@@ -469,8 +484,8 @@ else:
         seed=20,  # Use a different seed!
         batch_size=args.batch_size,
         num_tasks=2**12,  # Lower the number of tasks.
-        dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_x=dim_x,
+        dim_y=dim_y,
         pred_logpdf=True,
         pred_logpdf_diag=True,
         device=device,
@@ -486,8 +501,8 @@ else:
                     batch_size=args.batch_size,
                     # Use a high number of tasks.
                     num_tasks=2**6 if args.evaluate_fast else 2**14,
-                    dim_x=args.dim_x,
-                    dim_y=args.dim_y,
+                    dim_x=dim_x,
+                    dim_y=dim_y,
                     pred_logpdf=True,
                     pred_logpdf_diag=True,
                     device=device,
@@ -502,18 +517,18 @@ else:
             ]
         ]
 
-    # Architecture choices specific for the GP{ experiments:
+    # Architecture choices specific for the GP experiments:
     dws_receptive_field = 4
     margin = 0.1
-    if args.dim_x == 1:
+    if dim_x == 1:
         points_per_unit = 64
-    elif args.dim_x == 2:
+    elif dim_x == 2:
         # Reduce the PPU to reduce memory consumption.
         points_per_unit = 32
         # Since the PPU is reduced, we can also take off a layer of the UNet.
         unet_channels = unet_channels[:-1]
     else:
-        raise RuntimeError(f"Invalid input dimensionality {args.dim_x}.")
+        raise RuntimeError(f"Invalid input dimensionality {dim_x}.")
 
     # Other settings specific to the GP experiments:
     plot_config = {
@@ -522,13 +537,12 @@ else:
     }
     transform = None
 
-
 # Construct the model.
 if args.model == "cnp":
     model = nps.construct_gnp(
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         dim_embedding=dim_embedding,
         num_dec_layers=num_layers,
         width=width,
@@ -537,9 +551,9 @@ if args.model == "cnp":
     )
 elif args.model == "gnp":
     model = nps.construct_gnp(
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         dim_embedding=dim_embedding,
         num_dec_layers=num_layers,
         width=width,
@@ -549,9 +563,9 @@ elif args.model == "gnp":
     )
 elif args.model == "np":
     model = nps.construct_gnp(
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         dim_embedding=dim_embedding,
         num_dec_layers=num_layers,
         width=width,
@@ -561,9 +575,9 @@ elif args.model == "np":
     )
 elif args.model == "acnp":
     model = nps.construct_agnp(
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
         num_dec_layers=num_layers,
@@ -573,9 +587,9 @@ elif args.model == "acnp":
     )
 elif args.model == "agnp":
     model = nps.construct_agnp(
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
         num_dec_layers=num_layers,
@@ -586,9 +600,9 @@ elif args.model == "agnp":
     )
 elif args.model == "anp":
     model = nps.construct_agnp(
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
         num_dec_layers=num_layers,
@@ -600,9 +614,9 @@ elif args.model == "anp":
 elif args.model == "convcnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         likelihood="het",
         conv_arch=args.arch,
         unet_channels=unet_channels,
@@ -615,9 +629,9 @@ elif args.model == "convcnp":
 elif args.model == "convgnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         likelihood="lowrank",
         conv_arch=args.arch,
         unet_channels=unet_channels,
@@ -631,9 +645,9 @@ elif args.model == "convgnp":
 elif args.model == "convnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         likelihood="het",
         conv_arch=args.arch,
         unet_channels=unet_channels,
@@ -647,9 +661,9 @@ elif args.model == "convnp":
 elif args.model == "fullconvgnp":
     model = nps.construct_fullconvgnp(
         points_per_unit=points_per_unit,
-        dim_x=args.dim_x,
-        dim_yc=(1,) * args.dim_y,
-        dim_yt=args.dim_y,
+        dim_x=dim_x,
+        dim_yc=(1,) * dim_y,
+        dim_yt=dim_y,
         conv_arch=args.arch,
         unet_channels=unet_channels,
         dws_channels=dws_channels,
@@ -757,7 +771,7 @@ if args.evaluate:
 
     # Do AR evaluation, but only for the conditional models.
     # TODO: Enable this for all input and output dimensionalities once possible.
-    if args.model in {"cnp", "acnp", "convcnp"} and args.dim_x == args.dim_y == 1:
+    if args.model in {"cnp", "acnp", "convcnp"} and dim_x == dim_y == 1:
         # Make some plots.
         for i in range(args.evaluate_plot_num_samples):
             visualise(
