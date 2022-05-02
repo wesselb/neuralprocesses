@@ -44,12 +44,12 @@ def _predprey_step(state, x_y, t, dt, *, alpha, beta, delta, gamma, sigma):
 def _predprey_rand_params(state, dtype, batch_size=16):
     state, rand = B.rand(state, dtype, 5, batch_size)
 
-    alpha = 0.25 + rand[0]
-    beta = alpha * (0.2 + 0.2 * rand[1])
-    delta = 0.25 + rand[2]
-    gamma = delta * (0.2 + 0.2 * rand[3])
+    alpha = 0.5 + rand[0]
+    beta = alpha * (0.1 + 0.2 * rand[1])
+    delta = 0.5 + rand[2]
+    gamma = delta * (0.1 + 0.2 * rand[3])
 
-    sigma = 0.2 + 0.6 * rand[4]
+    sigma = 0.3 + 0.3 * rand[4]
 
     return state, {
         "alpha": alpha,
@@ -83,10 +83,6 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
 
     # Undo the sorting.
     traj = B.take(traj, inv_perm, axis=-1)
-
-    # We now apply a random scaling.
-    state, scale = B.rand(state, dtype, batch_size, 2, 1)
-    traj = (0.5 + scale) * traj
 
     return state, traj
 
