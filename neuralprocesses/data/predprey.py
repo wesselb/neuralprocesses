@@ -99,7 +99,7 @@ class PredPreyGenerator(SyntheticGenerator):
     def __init__(
         self,
         *args,
-        noise=0,
+        noise=0.1,
         dist_x=UniformContinuous(0, 100),
         num_context=UniformDiscrete(25, 100),
         num_target=UniformDiscrete(100, 100),
@@ -115,8 +115,6 @@ class PredPreyGenerator(SyntheticGenerator):
             dim_y=dim_y,
             **kw_args,
         )
-        if noise != 0:
-            raise RuntimeError("`noise` must be 0.")
         if self.dim_y != 2:
             raise RuntimeError("`dim_y` must be 2.")
 
@@ -155,6 +153,10 @@ class PredPreyGenerator(SyntheticGenerator):
                 B.concat(xc, xt, axis=1)[0, :, 0],
                 batch_size=multiplier * self.batch_size,
             )
+
+            # Add observation noise.
+            self.state, randn = B.randn(self.state, y)
+            y = y + B.sqrt(self.noise) * randn
 
             # Save the big batch.
             batch = {}
