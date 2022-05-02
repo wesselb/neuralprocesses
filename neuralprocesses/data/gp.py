@@ -1,7 +1,7 @@
 import lab as B
 import stheno
 
-from .data import SyntheticGenerator
+from .data import SyntheticGenerator, new_batch
 
 __all__ = ["GPGenerator"]
 
@@ -50,7 +50,7 @@ class GPGenerator(SyntheticGenerator):
                 Also possibly contains the keys "pred_logpdf" and "pred_logpdf_diag".
         """
         with B.on_device(self.device):
-            set_batch, xcs, xc, nc, xts, xt, nt = self._new_batch()
+            set_batch, xcs, xc, nc, xts, xt, nt = new_batch(self, self.dim_y)
 
             # If `self.h` is specified, then we create a multi-output GP. Otherwise, we
             # use a simple regular GP.

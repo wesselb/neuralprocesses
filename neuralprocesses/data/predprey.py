@@ -1,9 +1,11 @@
 import lab as B
 import wbml.util
+from plum import convert
 from wbml.data.predprey import load
 
-from .data import DataGenerator, SyntheticGenerator
 from .batch import batch_index
+from .data import DataGenerator, new_batch
+from ..dist import AbstractDistribution
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
 __all__ = ["PredPreyGenerator", "PredPreyRealGenerator"]
@@ -87,36 +89,76 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
     return state, traj
 
 
-class PredPreyGenerator(SyntheticGenerator):
+class PredPreyGenerator(DataGenerator):
     """Predator–prey generator.
 
-    Further takes in arguments and keyword arguments from the constructor of
-    :class:`.data.SyntheticGenerator`. Moreover, also has the attributes of
-    :class:`.data.SyntheticGenerator`. However, the defaults for this class are
-    different.
+    Args:
+        dtype (dtype): Data type to generate.
+        noise (float, optional): Observation noise. Defaults to 0.
+        seed (int, optional): Seed. Defaults to 0.
+        num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
+            integer multiple of `batch_size`. Defaults to 2^14.
+        batch_size (int, optional): Batch size. Defaults to 16.
+        dist_x (:class:`neuralprocesses.dist.dist.AbstractDistribution`, optional):
+            Distribution of the inputs. Defaults to a uniform distribution over
+            $[0, 100]$.
+        dist_x_context (:class:`neuralprocesses.dist.dist.AbstractDistribution`,
+            optional): Distribution of the context inputs. Defaults to `dist_x`.
+        dist_x_target (:class:`neuralprocesses.dist.dist.AbstractDistribution`,
+            optional): Distribution of the target inputs. Defaults to `dist_x`.
+        num_context (:class:`neuralprocesses.dist.dist.AbstractDistribution`, optional):
+            Distribution of the number of context inputs. Defaults to a uniform
+            distribution over $[25, 100]$.
+        num_target (:class:`neuralprocesses.dist.dist.AbstractDistribution`, optional):
+            Distribution of the number of target inputs. Defaults to the fixed number
+            100.
+        device (str, optional): Device on which to generate data. Defaults to `"cpu"`.
+
+    Attributes:
+        dtype (dtype): Data type.
+        float64 (dtype): Floating point version of `dtype` with 64 bits.
+        int64 (dtype): Integer version of `dtype` with 64 bits.
+        noise (float): Observation noise.
+        num_tasks (int): Number of tasks to generate per epoch. Is an integer multiple
+            of `batch_size`.
+        batch_size (int): Batch size.
+        dist_x_context (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
+            Distribution of the context inputs.
+        dist_x_target (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
+            Distribution of the target inputs.
+        num_batches (int): Number batches in an epoch.
+        num_context (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
+            Distribution of the number of context inputs.
+        num_target (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
+            Distribution of the number of target inputs.
+        state (random state): Random state.
+        device (str): Device.
     """
 
     def __init__(
         self,
-        *args,
+        dtype,
+        seed=0,
         noise=0,
+        num_tasks=2**14,
+        batch_size=16,
         dist_x=UniformContinuous(0, 100),
+        dist_x_context=None,
+        dist_x_target=None,
         num_context=UniformDiscrete(25, 100),
         num_target=UniformDiscrete(100, 100),
-        dim_y=2,
-        **kw_args
+        device="cpu",
     ):
-        super().__init__(
-            *args,
-            noise=noise,
-            dist_x=dist_x,
-            num_context=num_context,
-            num_target=num_target,
-            dim_y=dim_y,
-            **kw_args,
-        )
-        if self.dim_y != 2:
-            raise RuntimeError("`dim_y` must be 2.")
+        super().__init__(dtype, seed, num_tasks, batch_size, device)
+
+        with B.on_device(self.device):
+            self.noise = B.to_active_device(B.cast(self.float64, noise))
+
+        self.dist_x_context = convert(dist_x_context or dist_x, AbstractDistribution)
+        self.dist_x_target = convert(dist_x_target or dist_x, AbstractDistribution)
+
+        self.num_context = convert(num_context, AbstractDistribution)
+        self.num_target = convert(num_target, AbstractDistribution)
 
         self._big_batch = None
         self._big_batch_num_left = 0
@@ -135,7 +177,9 @@ class PredPreyGenerator(SyntheticGenerator):
             # `multiplier` many batches.
             multiplier = max(1024 // self.batch_size, 1)
 
-            set_batch, xcs, xc, nc, xts, xt, nt = self._new_batch(
+            set_batch, xcs, xc, nc, xts, xt, nt = new_batch(
+                self,
+                2,
                 fix_x_across_batch=True,
                 batch_size=multiplier * self.batch_size,
             )
