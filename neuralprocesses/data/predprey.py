@@ -156,7 +156,7 @@ class PredPreyGenerator(SyntheticGenerator):
 
             # Add observation noise.
             self.state, randn = B.randn(self.state, y)
-            y = y + B.sqrt(self.noise) * randn
+            y = y + B.abs(B.sqrt(self.noise) * randn)
 
             # Save the big batch.
             batch = {}
