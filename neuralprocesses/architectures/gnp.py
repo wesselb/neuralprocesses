@@ -17,7 +17,7 @@ def construct_gnp(
     dim_embedding=256,
     attention=False,
     attention_num_heads=8,
-    num_enc_layers=6,
+    num_enc_layers=3,
     num_dec_layers=6,
     width=512,
     likelihood="lowrank",
@@ -46,7 +46,7 @@ def construct_gnp(
         attention (bool, optional): Use attention for the deterministic encoder.
             Defaults to `False`.
         attention_num_heads (int, optional): Number of heads. Defaults to `8`.
-        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 6.
+        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 3.
         num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
@@ -178,7 +178,7 @@ def construct_gnp(
                 in_dim=dim_x + dim_embedding * len(dim_yc) + dim_lv,
                 out_dim=mlp_out_channels,
                 num_layers=num_dec_layers,
-                width=width,
+                width=width * len(dim_yc),
                 dtype=dtype,
             ),
             likelihood,

@@ -410,7 +410,7 @@ width = 256
 dim_embedding = 256
 num_heads = 8
 num_layers = 6
-unet_channels = (64,) * num_layers
+unet_channels = (64, 64, 64, 128, 128, 128, 256)
 dws_channels = 64
 num_basis_functions = 512
 
@@ -530,7 +530,6 @@ if args.model == "cnp":
         dim_yc=(1,) * args.dim_y,
         dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
-        num_enc_layers=num_layers,
         num_dec_layers=num_layers,
         width=width,
         likelihood="het",
@@ -542,7 +541,6 @@ elif args.model == "gnp":
         dim_yc=(1,) * args.dim_y,
         dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
-        num_enc_layers=num_layers,
         num_dec_layers=num_layers,
         width=width,
         likelihood="lowrank",
@@ -555,7 +553,6 @@ elif args.model == "np":
         dim_yc=(1,) * args.dim_y,
         dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
-        num_enc_layers=num_layers,
         num_dec_layers=num_layers,
         width=width,
         likelihood="het",
@@ -569,7 +566,6 @@ elif args.model == "acnp":
         dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
-        num_enc_layers=num_layers,
         num_dec_layers=num_layers,
         width=width,
         likelihood="het",
@@ -582,7 +578,6 @@ elif args.model == "agnp":
         dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
-        num_enc_layers=num_layers,
         num_dec_layers=num_layers,
         width=width,
         likelihood="lowrank",
@@ -596,7 +591,6 @@ elif args.model == "anp":
         dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
-        num_enc_layers=num_layers,
         num_dec_layers=num_layers,
         width=width,
         likelihood="het",

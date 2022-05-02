@@ -23,7 +23,7 @@ def construct_agnp(*args, nps=nps, num_heads=8, **kw_args):
             not equal to the dimensionality of the outputs of the context set.
         dim_embedding (int, optional): Dimensionality of the embedding. Defaults to 128.
         num_heads (int, optional): Number of heads. Defaults to `8`.
-        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 6.
+        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 3.
         num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
