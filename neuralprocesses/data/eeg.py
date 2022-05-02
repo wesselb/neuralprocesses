@@ -1,6 +1,10 @@
 from lab import B
 from wbml.data.eeg import load_full as load_eeg
 
+from ..aggregate import Aggregate, AggregateTargets
+
+import numpy as np
+
 from .data import DataGenerator
 from ..dist import UniformDiscrete
 
@@ -24,7 +28,7 @@ class EEGGenerator(DataGenerator):
         num_tasks,
         batch_size,
         device,
-        num_target=UniformDiscrete(1, 256),
+        num_targets=UniformDiscrete(1, 256),
     ):
 
         super().__init__(
@@ -34,6 +38,8 @@ class EEGGenerator(DataGenerator):
             batch_size=batch_size,
             device=device,
         )
+
+        self.num_targets = num_targets
 
         all_subjects = [
             337,
@@ -150,7 +156,7 @@ class EEGGenerator(DataGenerator):
 
         # Shuffle subjects
         self.split_state, idx = B.randperm(self.split_state, int, len(all_subjects))
-        all_subjects = B.array(all_subjects)[idx]
+        all_subjects = np.array(all_subjects)[idx]
         all_subjects = list(all_subjects)
 
         # Split into training validation and test data
@@ -219,6 +225,7 @@ class EEGGenerator(DataGenerator):
 
         # Carefully order the outputs
         y = np.transpose(np.stack(batch_trials, axis=0), (0, 2, 1))
+        print(x.shape, y.shape)
 
         contexts = [(x, y[:, i : i + 1, :]) for i in range(7)]
 
@@ -239,36 +246,36 @@ class EEGGenerator(DataGenerator):
                 c_idx = idx[:k]
                 t_idx = idx[k:]
 
-                contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
+                contexts.append((x[:, c_idx, :], y[:, i : i + 1, c_idx]))
 
-                xt.append(x[:, :, t_idx])
+                xt.append(x[:, t_idx, :])
                 yt.append(y[:, i : i + 1, t_idx])
 
             else:
                 contexts.append((x[:, :, :], y[:, i : i + 1, :]))
 
-    with B.on_device(self.device):
-        contexts = [
-            (
-                B.to_active_device(B.cast(self.dtype, x)),
-                B.to_active_device(B.cast(self.dtype, y)),
-            )
-            for x, y in context
-        ]
-
-        xt = nps.AggregateTargets(
-            *[
-                (B.to_active_device(B.cast(self.dtype, _xt)), i)
-                for i, _xt in enumerate(xt)
+        with B.on_device(self.device):
+            contexts = [
+                (
+                    B.to_active_device(B.cast(self.dtype, x)),
+                    B.to_active_device(B.cast(self.dtype, y)),
+                )
+                for x, y in contexts
             ]
-        )
 
-        yt = nps.Aggregate(*[B.to_active_device(B.cast(self.dtype, _yt)) for _yt in yt])
+            xt = AggregateTargets(
+                *[
+                    (B.to_active_device(B.cast(self.dtype, _xt)), i)
+                    for i, _xt in enumerate(xt)
+                ]
+            )
 
-    batch = {
-        "contexts": contexts,
-        "xt": xt,
-        "yt": yt,
-    }
+            yt = Aggregate(*[B.to_active_device(B.cast(self.dtype, _yt)) for _yt in yt])
 
-    return batch
+        batch = {
+            "contexts": contexts,
+            "xt": xt,
+            "yt": yt,
+        }
+
+        return batch
