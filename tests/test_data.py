@@ -61,18 +61,27 @@ def test_predefined_gens(nps, gen, dim_x, dim_y):
             # Check the outputs.
             assert B.shape(xc, 2) == B.shape(yc, 2)
 
-        # Check the target inputs.
-        assert isinstance(xt, nps.AggregateTargets)
-        assert len(xt) == dim_y
-        nts = []
-        for i_expected, (xti, i) in enumerate(xt):
-            assert i == i_expected
-            assert B.shape(xti, 0, 1) == (4, dim_x)
-            assert B.all(1 <= xti) and B.all(xti <= 2)
-            nts.append(B.shape(xti, 2))
+        if dim_y == 1:
+            # Check the target inputs.
+            nt = B.shape(xt, 2)
+            assert B.shape(xt, 0, 1) == (4, dim_x)
+            assert B.all(1 <= xt) and B.all(xt <= 2)
 
-        # Check the target outputs.
-        assert isinstance(yt, nps.Aggregate)
-        assert len(yt) == dim_y
-        for nti, yti in zip(nts, yt):
-            assert B.shape(yti) == (4, 1, nti)
+            # Check the target outputs.
+            assert B.shape(yt) == (4, 1, nt)
+        else:
+            # Check the target inputs.
+            assert isinstance(xt, nps.AggregateTargets)
+            assert len(xt) == dim_y
+            nts = []
+            for i_expected, (xti, i) in enumerate(xt):
+                assert i == i_expected
+                assert B.shape(xti, 0, 1) == (4, dim_x)
+                assert B.all(1 <= xti) and B.all(xti <= 2)
+                nts.append(B.shape(xti, 2))
+
+            # Check the target outputs.
+            assert isinstance(yt, nps.Aggregate)
+            assert len(yt) == dim_y
+            for nti, yti in zip(nts, yt):
+                assert B.shape(yti) == (4, 1, nti)

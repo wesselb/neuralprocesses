@@ -193,7 +193,8 @@ def _recode(
 
 @register_module
 class ConcatenateAggregate:
-    pass
+    """If the encoding is aggregate, concatenate it using `B.concat`; otherwise, do
+    nothing."""
 
 
 @_dispatch

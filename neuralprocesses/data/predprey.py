@@ -3,8 +3,7 @@ import wbml.util
 from wbml.data.predprey import load
 
 from .data import DataGenerator, SyntheticGenerator
-from .. import _dispatch
-from ..aggregate import Aggregate, AggregateTargets
+from .batch import batch_index
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
 __all__ = ["PredPreyGenerator", "PredPreyRealGenerator"]
@@ -132,8 +131,8 @@ class PredPreyGenerator(SyntheticGenerator):
         # Attempt to return a batch from the big batch.
         if self._big_batch_num_left > 0:
             n = self.batch_size
-            batch = _select_batch(slice(None, n, None), self._big_batch)
-            self._big_batch = _select_batch(slice(n, None, None), self._big_batch)
+            batch = batch_index(self._big_batch, slice(None, n, None))
+            self._big_batch = batch_index(self._big_batch, slice(n, None, None))
             self._big_batch_num_left -= 1
             return batch
 
@@ -169,36 +168,6 @@ class PredPreyGenerator(SyntheticGenerator):
 
             # Call the function again to obtain a batch from the big batch.
             return self.generate_batch()
-
-
-@_dispatch
-def _select_batch(index: slice, x: B.Numeric):
-    return x[(index, Ellipsis)]
-
-
-@_dispatch
-def _select_batch(index: slice, d: dict):
-    return {k: _select_batch(index, v) for k, v in d.items()}
-
-
-@_dispatch
-def _select_batch(index: slice, t: tuple):
-    return tuple(_select_batch(index, ti) for ti in t)
-
-
-@_dispatch
-def _select_batch(index: slice, t: list):
-    return [_select_batch(index, ti) for ti in t]
-
-
-@_dispatch
-def _select_batch(index: slice, xt: AggregateTargets):
-    return AggregateTargets(*((_select_batch(index, xti), i) for xti, i in xt))
-
-
-@_dispatch
-def _select_batch(index: slice, yt: Aggregate):
-    return Aggregate(*(_select_batch(index, yti) for yti in yt))
 
 
 class PredPreyRealGenerator(DataGenerator):

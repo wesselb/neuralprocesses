@@ -4,3 +4,4 @@ from .mixture import *
 from .predefined import *
 from .predprey import *
 from .sawtooth import *
+from .batch import *

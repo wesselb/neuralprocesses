@@ -22,8 +22,7 @@ def train(state, model, objective, gen, *, epoch):
         state, obj = objective(
             state,
             model,
-            batch["xc"],
-            batch["yc"],
+            batch["contexts"],
             batch["xt"],
             batch["yt"],
             epoch=epoch,
@@ -46,8 +45,7 @@ def eval(state, model, objective, gen):
             state, obj = objective(
                 state,
                 model,
-                batch["xc"],
-                batch["yc"],
+                batch["contexts"],
                 batch["xt"],
                 batch["yt"],
             )
@@ -103,7 +101,7 @@ def visualise(model, gen, *, name, epoch, config, predict=nps.predict):
 
 
 def visualise_1d(model, gen, *, name, epoch, config, predict):
-    batch = gen.generate_batch()
+    batch = nps.batch_index(gen.generate_batch(), slice(0, 1, None))
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
@@ -113,8 +111,7 @@ def visualise_1d(model, gen, *, name, epoch, config, predict):
     with torch.no_grad():
         mean, var, samples = predict(
             model,
-            batch["xc"][:1, ...],
-            batch["yc"][:1, ...],
+            batch["contexts"],
             x[None, None, :],
         )
 
@@ -125,15 +122,15 @@ def visualise_1d(model, gen, *, name, epoch, config, predict):
 
         # Plot context and target.
         plt.scatter(
-            batch["xc"][0, 0],
-            batch["yc"][0, i],
+            nps.batch_xc(batch, i)[0, 0],
+            nps.batch_yc(batch, i)[0],
             label="Context",
             style="train",
             s=20,
         )
         plt.scatter(
-            batch["xt"][0, 0],
-            batch["yt"][0, i],
+            nps.batch_xt(batch, i)[0, 0],
+            nps.batch_yt(batch, i)[0],
             label="Target",
             style="test",
             s=20,
@@ -166,8 +163,8 @@ def visualise_1d(model, gen, *, name, epoch, config, predict):
             f = stheno.GP(gen.kernel)
             # Make sure that everything is of `float64`s and on the GPU.
             noise = B.to_active_device(B.cast(torch.float64, gen.noise))
-            xc = B.cast(torch.float64, batch["xc"][0, 0])
-            yc = B.cast(torch.float64, batch["yc"][0, 0])
+            xc = B.cast(torch.float64, nps.batch_xc(batch, 0)[0, 0])
+            yc = B.cast(torch.float64, nps.batch_yc(batch, 0)[0])
             x = B.cast(torch.float64, x)
             # Compute posterior GP.
             f_post = f | (f(xc, noise), yc)
@@ -186,7 +183,7 @@ def visualise_1d(model, gen, *, name, epoch, config, predict):
 
 
 def visualise_2d(model, gen, *, name, epoch, config, predict):
-    batch = gen.generate_batch()
+    batch = nps.batch_index(gen.generate_batch(), slice(0, 1, None))
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
@@ -197,10 +194,9 @@ def visualise_2d(model, gen, *, name, epoch, config, predict):
         try:
             mean, _, samples = predict(
                 model,
-                batch["xc"][:1, ...],
-                batch["yc"][:1, ...],
+                batch["contexts"],
                 (x, x),
-                num_samples=2,
+                num_samples=5,
             )
         except:
             # The model probably doesn't suppose the tuple shorthand for grids. Do it
@@ -217,10 +213,9 @@ def visualise_2d(model, gen, *, name, epoch, config, predict):
                 # Run model on whole list.
                 mean, _, samples = nps.predict(
                     model,
-                    batch["xc"][:1, ...],
-                    batch["yc"][:1, ...],
+                    batch["contexts"],
                     B.concat(x0, x1, axis=-2),
-                    num_samples=2,
+                    num_samples=5,
                 )
                 # Reshape the results back to images.
                 mean = B.reshape(mean, *B.shape(mean)[:-1], 100, 100)
@@ -240,9 +235,9 @@ def visualise_2d(model, gen, *, name, epoch, config, predict):
             label=label,
         )
         plt.scatter(
-            batch["xc"][0, 0],
-            batch["xc"][0, 1],
-            c=batch["yc"][0, i],
+            nps.batch_xc(batch, i)[0, 0],
+            nps.batch_xc(batch, i)[0, 1],
+            c=nps.batch_yc(batch, i)[0],
             cmap="viridis",
             vmin=vmax,
             vmax=vmin,
@@ -252,9 +247,9 @@ def visualise_2d(model, gen, *, name, epoch, config, predict):
             label="Context",
         )
         plt.scatter(
-            batch["xt"][0, 0],
-            batch["xt"][0, 1],
-            c=batch["yt"][0, i],
+            nps.batch_xt(batch, i)[0, 0],
+            nps.batch_xt(batch, i)[0, 1],
+            c=nps.batch_yt(batch, i)[0],
             cmap="viridis",
             vmin=vmax,
             vmax=vmin,
@@ -426,7 +421,6 @@ if args.data == "predprey":
         seed=10,
         batch_size=args.batch_size,
         num_tasks=2**14,
-        x_ranges=((0, 100),) * args.dim_x,
         dim_y=args.dim_y,
         device=device,
     )
@@ -435,7 +429,6 @@ if args.data == "predprey":
         seed=20,
         batch_size=args.batch_size,
         num_tasks=2**12,
-        x_ranges=((0, 100),) * args.dim_x,
         dim_y=args.dim_y,
         device=device,
     )
@@ -446,7 +439,6 @@ if args.data == "predprey":
             seed=30,
             batch_size=args.batch_size,
             num_tasks=2**6 if args.evaluate_fast else 2**14,
-            x_ranges=((0, 100),) * args.dim_x,
             dim_y=args.dim_y,
             device=device,
         ),
@@ -535,7 +527,8 @@ else:
 if args.model == "cnp":
     model = nps.construct_gnp(
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_enc_layers=num_layers,
         num_dec_layers=num_layers,
@@ -546,7 +539,8 @@ if args.model == "cnp":
 elif args.model == "gnp":
     model = nps.construct_gnp(
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_enc_layers=num_layers,
         num_dec_layers=num_layers,
@@ -558,7 +552,8 @@ elif args.model == "gnp":
 elif args.model == "np":
     model = nps.construct_gnp(
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_enc_layers=num_layers,
         num_dec_layers=num_layers,
@@ -570,7 +565,8 @@ elif args.model == "np":
 elif args.model == "acnp":
     model = nps.construct_agnp(
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
         num_enc_layers=num_layers,
@@ -582,7 +578,8 @@ elif args.model == "acnp":
 elif args.model == "agnp":
     model = nps.construct_agnp(
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
         num_enc_layers=num_layers,
@@ -595,7 +592,8 @@ elif args.model == "agnp":
 elif args.model == "anp":
     model = nps.construct_agnp(
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         dim_embedding=dim_embedding,
         num_heads=num_heads,
         num_enc_layers=num_layers,
@@ -609,7 +607,8 @@ elif args.model == "convcnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         likelihood="het",
         conv_arch=args.arch,
         unet_channels=unet_channels,
@@ -623,7 +622,8 @@ elif args.model == "convgnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         likelihood="lowrank",
         conv_arch=args.arch,
         unet_channels=unet_channels,
@@ -638,7 +638,8 @@ elif args.model == "convnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         likelihood="het",
         conv_arch=args.arch,
         unet_channels=unet_channels,
@@ -653,7 +654,8 @@ elif args.model == "fullconvgnp":
     model = nps.construct_fullconvgnp(
         points_per_unit=points_per_unit,
         dim_x=args.dim_x,
-        dim_y=args.dim_y,
+        dim_yc=(1,) * args.dim_y,
+        dim_yt=args.dim_y,
         conv_arch=args.arch,
         unet_channels=unet_channels,
         dws_channels=dws_channels,

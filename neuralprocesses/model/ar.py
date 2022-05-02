@@ -2,8 +2,8 @@ import lab as B
 import numpy as np
 from wbml.util import inv_perm
 
-from . import _dispatch
 from .model import Model
+from .. import _dispatch
 
 __all__ = ["ar_predict", "ar_loglik"]
 

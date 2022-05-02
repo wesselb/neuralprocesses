@@ -6,7 +6,7 @@ neuralprocesses/_version.py
 
 # Virtual environments
 venv
-dist
+/dist
 pip-wheel-metadata
 
 # Packaging

@@ -32,6 +32,7 @@ from .chain import *
 from .materialise import *
 from .likelihood import *
 from .disc import *
+from .datadims import *
 
 from .augment import *
 from .mask import *
@@ -39,7 +40,6 @@ from .augment import *
 from .aggregate import *
 
 from .model import *
-from .ar import *
 
 from .coders import *
 
