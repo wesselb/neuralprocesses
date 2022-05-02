@@ -22,8 +22,8 @@ def _predprey_step(state, x_y, t, dt, *, alpha, beta, delta, gamma, sigma):
     deriv_y = y * (-delta + gamma * x) * (1 - y / m)
     # Apply an exponent 0.2 to emphasise the noise at lower population levels and
     # prevent the populations from dying out.
-    x = x + deriv_x * dt + (x ** 0.2) * (1 - x / m) * sigma * dw[0]
-    y = y + deriv_y * dt - (y ** 0.2) * (1 - y / m) * sigma * dw[1]
+    x = x + deriv_x * dt + (x**0.2) * (1 - x / m) * sigma * dw[0]
+    y = y + deriv_y * dt - (y**0.2) * (1 - y / m) * sigma * dw[1]
 
     # Make sure that the populations never become negative. Mathematically, the
     # populations should remain positive. Note that if we were to `max(x, 0)`, then
