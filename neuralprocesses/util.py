@@ -1,3 +1,4 @@
+from functools import wraps
 import lab as B
 import numpy as np
 from lab.util import resolve_axis
@@ -7,6 +8,7 @@ __all__ = [
     "register_module",
     "models",
     "register_model",
+    "wrapped_partial",
     "is_nonempty",
     "batch",
     "compress_batch_dimensions",
@@ -30,6 +32,25 @@ def register_model(model):
     """Decorator to register a new model."""
     models.append(model)
     return model
+
+
+def wrapped_partial(f, *partial_args, **partial_kw_args):
+    """Like :func:`functools.partial`, but preserves the docstring.
+
+    Args:
+        f (function): Function to wrap.
+        *partial_args: Partial arguments.
+        **partial_kw_args: Partial keyword arguments.
+
+    Returns:
+        function: Version of `f` with some arguments and keyword arguments already set.
+    """
+
+    @wraps(f)
+    def wrapped_f(*args, **kw_args):
+        return f(*partial_args, *args, **partial_kw_args, **kw_args)
+
+    return wrapped_f
 
 
 def is_nonempty(x):
