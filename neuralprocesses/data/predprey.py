@@ -15,7 +15,7 @@ def _predprey_step(state, x_y, t, dt, *, alpha, beta, delta, gamma, sigma):
     x = x_y[..., 0]
     y = x_y[..., 1]
 
-    m = 25
+    m = 2500
 
     state, randn = B.randn(state, B.dtype(x), 2, *B.shape(x))
     dw = B.sqrt(dt) * randn
@@ -46,12 +46,12 @@ def _predprey_step(state, x_y, t, dt, *, alpha, beta, delta, gamma, sigma):
 def _predprey_rand_params(state, dtype, batch_size=16):
     state, rand = B.rand(state, dtype, 5, batch_size)
 
-    alpha = 0.5 + 0.75 * rand[0]
-    beta = 0.2 + 1.0 * rand[1]
-    delta = 0.5 + 0.75 * rand[2]
-    gamma = 0.2 + 1.0 * rand[3]
+    alpha = 0.4807 + 0.1 * (1.0 - 2.0 * rand[0])
+    beta = 0.02482 + 0.01 * (1.0 - 2.0 * rand[1])
+    delta = 0.9272 + 0.1 * (1.0 - 2.0 * rand[2])
+    gamma = 0.02756 + 0.01 * (1.0 - 2.0 * rand[3])
 
-    sigma = 0.6 + 0.4 * rand[4]
+    sigma = 0.5 + 5.0 * rand[4]
 
     return state, {
         "alpha": alpha,
@@ -80,8 +80,7 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
             traj.append(x_y)
             t_target = t_target[1:]
 
-    # Note the magic scaling `7 / 100` here.
-    traj = B.stack(*traj, axis=-1) * 7 / 100
+    traj = B.stack(*traj, axis=-1)
 
     # Undo the sorting.
     traj = B.take(traj, inv_perm, axis=-1)
