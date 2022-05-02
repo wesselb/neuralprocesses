@@ -47,6 +47,8 @@ class DataGenerator(AbstractGenerator):
 
     Attributes:
         dtype (dtype): Data type.
+        float64 (dtype): Floating point version of the data type with 64 bytes.
+        int64 (dtype): Integral version of the data type with 64 bytes.
         seed (int): Seed.
         batch_size (int): Number of tasks per batch.
         num_batches (int): Number of batches in an epoch.
