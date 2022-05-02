@@ -100,7 +100,7 @@ def _batch_xt(x: B.Numeric, i: int):
 
 @_dispatch
 def _batch_xt(x: AggregateTargets, i: int):
-    return x[i][0]
+    return x[[xi[1] for xi in x].index(i)][0]
 
 
 @_dispatch
@@ -114,14 +114,14 @@ def batch_yt(batch: dict, i: int):
     Returns:
         tensor: Target outputs.
     """
-    return _batch_yt(batch["yt"], i)
+    return _batch_yt(batch["xt"], batch["yt"], i)
 
 
 @_dispatch
-def _batch_yt(y: B.Numeric, i: int):
+def _batch_yt(x: B.Numeric, y: B.Numeric, i: int):
     return y[..., i, :]
 
 
 @_dispatch
-def _batch_yt(y: Aggregate, i: int):
-    return y[i][..., 0, :]
+def _batch_yt(x: AggregateTargets, y: Aggregate, i: int):
+    return y[[xi[1] for xi in x].index(i)][..., 0, :]

@@ -332,6 +332,7 @@ parser.add_argument(
 parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
 parser.add_argument("--num-samples", type=int, default=20)
 parser.add_argument("--resume-at-epoch", type=int)
+parser.add_argument("--train-test", action="store_true")
 parser.add_argument("--check-completed", action="store_true")
 parser.add_argument("--evaluate", action="store_true")
 parser.add_argument("--evaluate-last", action="store_true")
@@ -435,14 +436,14 @@ if args.data == "predprey":
         torch.float32,
         seed=10,
         batch_size=args.batch_size,
-        num_tasks=2**14,
+        num_tasks=2**6 if args.train_test else 2**14,
         device=device,
     )
     gen_cv = nps.PredPreyGenerator(
         torch.float32,
         seed=20,
         batch_size=args.batch_size,
-        num_tasks=2**12,
+        num_tasks=2**6 if args.train_test else 2**12,
         device=device,
     )
     gens_eval = lambda: (
@@ -472,7 +473,7 @@ else:
         torch.float32,
         seed=10,
         batch_size=args.batch_size,
-        num_tasks=2**14,
+        num_tasks=2**6 if args.train_test else 2**14,
         dim_x=dim_x,
         dim_y=dim_y,
         pred_logpdf=False,
@@ -483,7 +484,7 @@ else:
         torch.float32,
         seed=20,  # Use a different seed!
         batch_size=args.batch_size,
-        num_tasks=2**12,  # Lower the number of tasks.
+        num_tasks=2**6 if args.train_test else 2**12,
         dim_x=dim_x,
         dim_y=dim_y,
         pred_logpdf=True,
@@ -499,7 +500,6 @@ else:
                     torch.float32,
                     seed=30,  # Use yet another seed!
                     batch_size=args.batch_size,
-                    # Use a high number of tasks.
                     num_tasks=2**6 if args.evaluate_fast else 2**14,
                     dim_x=dim_x,
                     dim_y=dim_y,
