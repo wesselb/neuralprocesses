@@ -8,7 +8,7 @@ from wbml.plot import tweak
 gen = nps.PredPreyGenerator(
     torch.float32,
     seed=0,
-    num_target=nps.UniformDiscrete(200, 200),
+    num_target=nps.UniformDiscrete(1000, 1000),
 )
 batch = gen.generate_batch()
 
