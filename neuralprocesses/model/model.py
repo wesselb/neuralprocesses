@@ -10,7 +10,7 @@ from ..mask import Masked
 from ..parallel import Parallel
 from ..util import register_module
 
-__all__ = ["Model"]
+__all__ = ["Model", "compress_contexts"]
 
 
 @register_module
@@ -96,17 +96,12 @@ class Model:
         xt,
         **kw_args,
     ):
-        # Don't unnecessarily wrap things in a `Parallel`.
-        if len(contexts) == 1:
-            return self(state, contexts[0][0], contexts[0][1], xt, **kw_args)
-        else:
-            return self(
-                state,
-                Parallel(*(c[0] for c in contexts)),
-                Parallel(*(c[1] for c in contexts)),
-                xt,
-                **kw_args,
-            )
+        return self(
+            state,
+            *compress_contexts(contexts),
+            xt,
+            **kw_args,
+        )
 
     @_dispatch
     def __call__(
@@ -136,4 +131,25 @@ class Model:
             + ",\n"
             + indent(repr(self.decoder), " " * 4)
             + "\n)"
+        )
+
+
+@_dispatch
+def compress_contexts(contexts: list):
+    """Compress multiple context sets into a single `(x, y)` pair.
+
+    Args:
+        contexts (list): Context sets.
+
+    Returns:
+        input: Context inputs.
+        object: Context outputs.
+    """
+    # Don't unnecessarily wrap things in a `Parallel`.
+    if len(contexts) == 1:
+        return contexts[0]
+    else:
+        return (
+            Parallel(*(c[0] for c in contexts)),
+            Parallel(*(c[1] for c in contexts)),
         )
