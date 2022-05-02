@@ -70,8 +70,7 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
     inv_perm = wbml.util.inv_perm(perm)
     t_target = B.take(t_target, perm)
 
-    # Note the magic constant 10 here.
-    x_y = 10 * B.rand(dtype, batch_size, 2)
+    x_y = 5 + 95 * B.rand(dtype, batch_size, 2)
     t, traj = t0, [x_y]
 
     while t < t1:
