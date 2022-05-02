@@ -326,6 +326,7 @@ parser.add_argument(
         "sawtooth",
         "mixture",
         "predprey",
+        "eeg",
     ],
     default="eq",
 )
@@ -452,6 +453,49 @@ if args.data == "predprey":
 
     # Other settings specific to the predator-prey experiments:
     plot_config = {1: {"range": (0, 100), "axvline": []}}
+
+elif args.data == "eeg":
+
+    gen_train = nps.EEGGenerator(
+        dtype=torch.float32,
+        split_seed=10,
+        split="train",
+        batch_size=args.batch_size,
+        num_tasks=2**6,
+        device=device,
+    )
+
+    gen_cv = nps.EEGGenerator(
+        dtype=torch.float32,
+        split_seed=10,
+        split="valid",
+        batch_size=args.batch_size,
+        num_tasks=2**6,
+        device=device,
+    )
+
+    gens_eval = lambda: (
+        "Evaluation",
+        nps.EEGGenerator(
+            dtype=torch.float32,
+            split_seed=10,
+            split="test",
+            batch_size=args.batch_size,
+            num_tasks=2**6,
+            device=device,
+        ),
+    )
+
+    # Architecture choices specific for the predator-prey experiments:
+    points_per_unit = 256.
+    margin = 1e-1
+    dws_receptive_field = 1.
+    transform = None
+
+    # Other settings specific to the predator-prey experiments:
+    plot_config = {1: {"range": (-0.2, 1.2), "axvline": []}}
+
+
 else:
     gen_train = nps.construct_predefined_gens(
         torch.float32,

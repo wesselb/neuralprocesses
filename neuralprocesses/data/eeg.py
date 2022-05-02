@@ -24,10 +24,10 @@ class EEGGenerator(DataGenerator):
         split,
         dtype,
         split_seed,
-        shuffle_seed,
         num_tasks,
         batch_size,
         device,
+        shuffle_seed=0,
         num_targets=UniformDiscrete(1, 256),
     ):
 
@@ -155,7 +155,7 @@ class EEGGenerator(DataGenerator):
         self.shuffle_state = B.create_random_state(np.float32, shuffle_seed)
 
         # Shuffle subjects
-        self.split_state, idx = B.randperm(self.split_state, int, len(all_subjects))
+        self.split_state, idx = B.randperm(self.split_state, np.int64, len(all_subjects))
         all_subjects = np.array(all_subjects)[idx]
         all_subjects = list(all_subjects)
 
@@ -225,7 +225,6 @@ class EEGGenerator(DataGenerator):
 
         # Carefully order the outputs
         y = np.transpose(np.stack(batch_trials, axis=0), (0, 2, 1))
-        print(x.shape, y.shape)
 
         contexts = [(x, y[:, i : i + 1, :]) for i in range(7)]
 
@@ -240,7 +239,7 @@ class EEGGenerator(DataGenerator):
             ctx = (x, y[:, i : i + 1, :])
 
             if i == n:
-                self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, int)
+                self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
                 idx = self.shuffle_state.permutation(256)
 
                 c_idx = idx[:k]
