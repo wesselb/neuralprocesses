@@ -99,7 +99,7 @@ class PredPreyGenerator(SyntheticGenerator):
     def __init__(
         self,
         *args,
-        noise=0.1,
+        noise=0,
         dist_x=UniformContinuous(0, 100),
         num_context=UniformDiscrete(25, 100),
         num_target=UniformDiscrete(100, 100),
