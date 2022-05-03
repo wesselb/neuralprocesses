@@ -1,4 +1,5 @@
 import matrix  # noqa
+from plum import ptype, Signature
 
 from . import _dispatch
 from .dist import Dirac, AbstractMultiOutputDistribution
@@ -27,6 +28,12 @@ def code(coder, xz, z, x, **kw_args):
     Returns:
         tuple[input, tensor]: New encoding.
     """
+    if any([ptype(type(coder)) <= s.base[0] for s in code.methods.keys()]):
+        raise RuntimeError(
+            f"Dispatched to fallback implementation for `code`, but specialised "
+            f"implementation are available. (The signature of the arguments is "
+            f"{Signature(type(coder), type(xz), type(z), type(x))}.)"
+        )
     return xz, coder(z)
 
 
