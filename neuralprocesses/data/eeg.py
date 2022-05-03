@@ -247,11 +247,16 @@ class EEGGenerator(DataGenerator):
 
                 contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
 
-                xt.append(x[:, :, t_idx])
+                xt.append((x[:, :, t_idx], i))
                 yt.append(y[:, i : i + 1, t_idx])
 
             else:
+
                 contexts.append((x[:, :, :], y[:, i : i + 1, :]))
+
+                xt.append((x[:, :, :0], i))
+                yt.append(y[:, i : i + 1, :0])
+
 
         with B.on_device(self.device):
             contexts = [
@@ -265,7 +270,7 @@ class EEGGenerator(DataGenerator):
             xt = AggregateTargets(
                 *[
                     (B.to_active_device(B.cast(self.dtype, _xt)), i)
-                    for i, _xt in enumerate(xt)
+                    for _xt, i in xt
                 ]
             )
 

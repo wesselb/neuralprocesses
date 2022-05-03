@@ -461,7 +461,7 @@ elif args.data == "eeg":
         split_seed=10,
         split="train",
         batch_size=args.batch_size,
-        num_tasks=2**6,
+        num_tasks=2**10,
         device=device,
     )
 
@@ -470,7 +470,7 @@ elif args.data == "eeg":
         split_seed=10,
         split="valid",
         batch_size=args.batch_size,
-        num_tasks=2**6,
+        num_tasks=2**8,
         device=device,
     )
 
@@ -481,7 +481,7 @@ elif args.data == "eeg":
             split_seed=10,
             split="test",
             batch_size=args.batch_size,
-            num_tasks=2**6,
+            num_tasks=2**10,
             device=device,
         ),
     )
