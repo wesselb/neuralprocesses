@@ -358,7 +358,7 @@ models_which_use_arch = {
 }
 if args.model not in models_which_use_arch:
     args.arch = None
-    
+
 # Remove the dimensionality specification if the experiment doesn't need it.
 data_which_use_dims = {
     "eq",
