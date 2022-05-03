@@ -235,19 +235,12 @@ def check_prediction(nps, pred, yt):
     assert np.isfinite(B.to_numpy(objective))
     assert B.dtype(objective) == nps.dtype
 
-    def _equal_shape(s1, s2, prepend_s2=()):
-        if isinstance(s1, nps.Aggregate) and isinstance(s2, nps.Aggregate):
-            s1 = tuple(s1)
-            s2 = tuple(prepend_s2 + s for s in s2)
-        else:
-            s2 = prepend_s2 + s2
-        return s1 == s2
-
-    # Check mean, variance, and samples.
-    assert _equal_shape(B.shape(pred.mean), B.shape(yt))
-    assert _equal_shape(B.shape(pred.var), B.shape(yt))
-    assert _equal_shape(B.shape(pred.sample()), B.shape(yt))
-    assert _equal_shape(B.shape(pred.sample(2)), B.shape(yt), prepend_s2=(2,))
+    if not isinstance(yt, nps.Aggregate):
+        # Check mean, variance, and samples.
+        assert B.shape(pred.mean) == B.shape(yt)
+        assert B.shape(pred.var) == B.shape(yt)
+        assert B.shape(pred.sample()) == B.shape(yt)
+        assert B.shape(pred.sample(2)) == (2,) + B.shape(yt)
 
 
 @pytest.mark.flaky(reruns=3)

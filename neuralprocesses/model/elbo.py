@@ -7,6 +7,7 @@ from .. import _dispatch
 from ..aggregate import Aggregate, AggregateTargets
 from ..coding import code, code_track, recode_stochastic
 from ..dist import AbstractMultiOutputDistribution
+from ..numdata import num_data
 from ..parallel import Parallel
 
 __all__ = ["elbo"]
@@ -98,7 +99,7 @@ def elbo(
 
     if normalise:
         # Normalise by the number of targets.
-        elbos = elbos / B.shape(xt, -1)
+        elbos = elbos / num_data(xt, yt)
 
     return state, elbos
 
@@ -153,8 +154,8 @@ def _merge_context_target(contexts: list, xt: AggregateTargets, yt: Aggregate):
         xti = B.concat(xci, xti, axis=-1)
         yti = B.concat(yci, yti, axis=-1)
 
-        # At this point, `(xti, yti)` contains all data. Hence, make this the context
-        # set for the approximate posterior.
+        # At this point, `(xti, yti)` contains all data for output `i`. Hence, make this
+        # the context set for output `i` for the approximate posterior.
         if q_context_updates[i] is not None:
             raise ValueError(
                 f"Aggregate target inputs specified the same output multiple times."

@@ -4,6 +4,7 @@ import numpy as np
 from .model import Model
 from .util import fix_noise
 from .. import _dispatch
+from ..numdata import num_data
 
 __all__ = ["loglik"]
 
@@ -94,7 +95,7 @@ def loglik(
 
     if normalise:
         # Normalise by the number of targets.
-        logpdfs = logpdfs / B.shape(xt, -1)
+        logpdfs = logpdfs / num_data(xt, yt)
 
     return state, logpdfs
 

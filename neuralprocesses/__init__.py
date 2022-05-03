@@ -33,6 +33,7 @@ from .materialise import *
 from .likelihood import *
 from .disc import *
 from .datadims import *
+from .numdata import *
 
 from .augment import *
 from .mask import *
