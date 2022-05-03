@@ -487,10 +487,11 @@ elif args.data == "eeg":
     )
 
     # Architecture choices specific for the predator-prey experiments:
-    points_per_unit = 256.
+    points_per_unit = 1028.
     margin = 1e-1
     dws_receptive_field = 1.
     transform = None
+    unet_channels = (32, 64, 128, 256, 512, 1024)
 
     # Other settings specific to the predator-prey experiments:
     plot_config = {1: {"range": (-0.2, 1.2), "axvline": []}}

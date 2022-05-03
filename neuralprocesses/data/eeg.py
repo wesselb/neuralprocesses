@@ -28,7 +28,7 @@ class EEGGenerator(DataGenerator):
         batch_size,
         device,
         shuffle_seed=0,
-        num_targets=UniformDiscrete(1, 256),
+        num_targets=UniformDiscrete(100, 256),
     ):
 
         super().__init__(
@@ -224,11 +224,9 @@ class EEGGenerator(DataGenerator):
         )
 
         # Carefully order the outputs
-        y = np.transpose(np.stack(batch_trials, axis=0), (0, 2, 1))
+        y = np.transpose(np.stack(batch_trials, axis=0), (0, 2, 1)) / 10
 
         contexts = [(x, y[:, i : i + 1, :]) for i in range(7)]
-
-        n = self.shuffle_state.randint(low=0, high=6)
 
         contexts = []
         xt = []
@@ -238,25 +236,16 @@ class EEGGenerator(DataGenerator):
 
             ctx = (x, y[:, i : i + 1, :])
 
-            if i == n:
-                self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
-                idx = self.shuffle_state.permutation(256)
+            self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
+            idx = self.shuffle_state.permutation(256)
 
-                c_idx = idx[:k]
-                t_idx = idx[k:]
+            c_idx = idx[k:]
+            t_idx = idx[:k]
 
-                contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
+            contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
 
-                xt.append((x[:, :, t_idx], i))
-                yt.append(y[:, i : i + 1, t_idx])
-
-            else:
-
-                contexts.append((x[:, :, :], y[:, i : i + 1, :]))
-
-                xt.append((x[:, :, :0], i))
-                yt.append(y[:, i : i + 1, :0])
-
+            xt.append((x[:, :, t_idx], i))
+            yt.append(y[:, i : i + 1, t_idx])
 
         with B.on_device(self.device):
             contexts = [
