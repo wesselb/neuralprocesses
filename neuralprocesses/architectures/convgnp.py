@@ -224,8 +224,19 @@ def construct_convgnp(
         )
     else:
         # There is no auxiliary MLP available, so the CNN will have to produce the
-        # right number of channels.
-        conv_out_channels = likelihood_in_channels
+        # right number of channels. In this case, however, it may be more efficient
+        # to produce the right number of channels _after_ the set conv.
+        if conv_out_channels < likelihood_in_channels:
+            # Perform an additional linear layer _after_ the set conv.
+            linear_after_set_conv = nps.Linear(
+                in_channels=conv_out_channels,
+                out_channels=likelihood_in_channels,
+                dtype=dtype,
+            )
+        else:
+            # Not necessary. Just let the CNN produce the right number of channels.
+            conv_out_channels = likelihood_in_channels
+            linear_after_set_conv = lambda x: x
 
     # Construct the core CNN architectures for the encoder, which is only necessary
     # if we're using a latent variable, and for the decoder. First, we determine
@@ -234,10 +245,10 @@ def construct_convgnp(
         lv_in_channels = conv_in_channels
         lv_out_channels = lv_likelihood_in_channels
         in_channels = dim_lv
-        out_channels = conv_out_channels
+        out_channels = conv_out_channels  # These must be equal!
     else:
         in_channels = conv_in_channels
-        out_channels = conv_out_channels
+        out_channels = conv_out_channels  # These must be equal!
     if conv_arch == "unet":
         if dim_lv > 0:
             lv_conv = nps.UNet(
@@ -328,6 +339,7 @@ def construct_convgnp(
             nps.RepeatForAggregateInputs(
                 nps.Chain(
                     _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
+                    linear_after_set_conv,
                     selector,  # Select the right target output.
                 )
             ),

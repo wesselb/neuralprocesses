@@ -3,9 +3,46 @@ from typing import Tuple, Union, Optional
 
 import lab as B
 
+from .. import _dispatch
+from ..datadims import data_dims
 from ..util import register_module, compress_batch_dimensions
 
-__all__ = ["MLP", "UNet", "ConvNet"]
+__all__ = ["Linear", "MLP", "UNet", "ConvNet"]
+
+
+@register_module
+class Linear:
+    """A linear layer over channels.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        dtype (dtype, optional): Data type.
+
+    Attributes:
+        linear (object): Linear layer.
+    """
+
+    def __init__(self, in_channels, out_channels, dtype):
+        self.linear = self.nn.Linear(in_channels, out_channels, dtype=dtype)
+
+
+@_dispatch
+def code(coder: Linear, xz, z: B.Numeric, x, **kw_args):
+    d = data_dims(xz)
+
+    # Construct permutation to switch the channel dimension and the last dimension.
+    switch = list(range(B.rank(z)))
+    switch[-d - 1], switch[-1] = switch[-1], switch[-d - 1]
+
+    # Switch, apply linear layer after compressing the batch dimensions, and switch
+    # again.
+    z = B.transpose(z, perm=switch)
+    z, uncompress = compress_batch_dimensions(z, 2)
+    z = uncompress(coder.linear(z))
+    z = B.transpose(z, perm=switch)
+
+    return xz, z
 
 
 @register_module

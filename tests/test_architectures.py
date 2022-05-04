@@ -248,8 +248,6 @@ def test_forward(nps, model_sample):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-
-    # Check passing in a non-empty context set.
     pred = model(xc, yc, xt, batch_size=2, unused_arg=None)
     check_prediction(nps, pred, yt)
 
