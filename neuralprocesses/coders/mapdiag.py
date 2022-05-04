@@ -4,6 +4,7 @@ import matrix  # noqa
 from .. import _dispatch
 from ..aggregate import AggregateInput
 from ..util import register_module, register_composite_coder
+from ..parallel import Parallel
 
 __all__ = ["MapDiagonal"]
 
@@ -76,3 +77,8 @@ def _mapdiagonal_possibly_duplicate_context(xz: tuple, d: B.Int):
         return xz * 2
     else:
         return xz
+
+
+@_dispatch
+def _mapdiagonal_possibly_duplicate_context(xz: Parallel, d: B.Int):
+    return Parallel(*(_mapdiagonal_possibly_duplicate_context(xzi, d) for xzi in xz))

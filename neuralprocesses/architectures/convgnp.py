@@ -151,7 +151,7 @@ def construct_convgnp(
         dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to `512`.
-        dim_lv (bool, optional): Dimensionality of the latent variable.
+        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
             `"het"` or `"lowrank"`. Defaults to `"het"`.
         encoder_scales (float or tuple[float], optional): Initial value for the length

@@ -361,10 +361,13 @@ def test_recode(nps, model_sample):
         ("construct_gnp", {}),
         ("construct_agnp", {}),
         ("construct_convgnp", {"points_per_unit": 4, "unet_channels": (2,)}),
+        ("construct_fullconvgnp", {"points_per_unit": 4, "unet_channels": (2,)}),
     ],
 )
 @pytest.mark.parametrize("dim_lv", [0, 2])
 def test_data_eq(nps, dim_x, dim_y, constructor, config, dim_lv):
+    if constructor == "construct_fullconvgnp" and (dim_x > 1 or dim_lv > 1):
+        pytest.skip()
     gen = nps.construct_predefined_gens(nps.dtype, dim_x=dim_x, dim_y=dim_y)["eq"]
     model = getattr(nps, constructor)(
         dim_x=dim_x,

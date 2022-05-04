@@ -1,4 +1,3 @@
-import lab as B
 import wbml.out as out
 
 import neuralprocesses as nps  # This fixes inspection below.
@@ -32,6 +31,7 @@ def construct_fullconvgnp(
     dws_receptive_field=None,
     dws_layers=6,
     dws_channels=64,
+    dim_lv=0,
     encoder_scales=None,
     decoder_scale=None,
     divide_by_density=True,
@@ -77,6 +77,7 @@ def construct_fullconvgnp(
             Must be specified if `conv_arch` is set to "dws".
         dws_layers (int, optional): Layers of the DWS architecture. Defaults to 8.
         dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
+        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         encoder_scales (float or tuple[float], optional): Initial value for the length
             scales of the set convolutions for the context sets embeddings. Defaults
             to `2 / points_per_unit`.
@@ -97,10 +98,13 @@ def construct_fullconvgnp(
     """
     dim_yc, dim_yt, conv_in_channels = _convgnp_init_dims(dim_yc, dim_yt, dim_y)
 
-    # This model does not yet support multi-dimensional inputs.
     if dim_x != 1:
         raise NotImplementedError(
             "The FullConvGNP for now only supports single-dimensional inputs."
+        )
+    if dim_lv != 0:
+        raise NotImplementedError(
+            "The FullConvGNP does not yet support latent variables."
         )
 
     # Resolve the architecture.
@@ -181,41 +185,19 @@ def construct_fullconvgnp(
 
     # Construct model.
     model = nps.Model(
-        nps.Parallel(
-            nps.FunctionalCoder(
-                disc_mean,
-                nps.Chain(
-                    nps.PrependDensityChannel(),
-                    _convgnp_construct_encoder_setconvs(
-                        nps,
-                        encoder_scales,
-                        dim_yc,
-                        disc_mean,
-                        dtype,
-                    ),
-                    _convgnp_optional_division_by_density(
-                        nps,
-                        divide_by_density,
-                        epsilon,
-                    ),
-                    nps.Materialise(),
-                    nps.DeterministicLikelihood(),
-                ),
-            ),
-            nps.FunctionalCoder(
-                disc_kernel,
-                nps.MapDiagonal(  # Map to diagonal of squared space.
+        nps.Chain(
+            nps.Copy(2),
+            nps.Parallel(
+                nps.FunctionalCoder(
+                    disc_mean,
                     nps.Chain(
                         nps.PrependDensityChannel(),
                         _convgnp_construct_encoder_setconvs(
                             nps,
                             encoder_scales,
                             dim_yc,
-                            disc_kernel,
+                            disc_mean,
                             dtype,
-                            # Multiply the initialisation by two since we halved the
-                            # PPU.
-                            init_factor=2,
                         ),
                         _convgnp_optional_division_by_density(
                             nps,
@@ -223,10 +205,35 @@ def construct_fullconvgnp(
                             epsilon,
                         ),
                         nps.Materialise(),
-                        # We only need the identity channel once, so insert it after
-                        # materialising.
-                        nps.PrependIdentityChannel(),
                         nps.DeterministicLikelihood(),
+                    ),
+                ),
+                nps.FunctionalCoder(
+                    disc_kernel,
+                    nps.MapDiagonal(  # Map to diagonal of squared space.
+                        nps.Chain(
+                            nps.PrependDensityChannel(),
+                            _convgnp_construct_encoder_setconvs(
+                                nps,
+                                encoder_scales,
+                                dim_yc,
+                                disc_kernel,
+                                dtype,
+                                # Multiply the initialisation by two since we halved the
+                                # PPU.
+                                init_factor=2,
+                            ),
+                            _convgnp_optional_division_by_density(
+                                nps,
+                                divide_by_density,
+                                epsilon,
+                            ),
+                            nps.Materialise(),
+                            # We only need the identity channel once, so insert it after
+                            # materialising.
+                            nps.PrependIdentityChannel(),
+                            nps.DeterministicLikelihood(),
+                        ),
                     ),
                 ),
             ),
@@ -244,7 +251,7 @@ def construct_fullconvgnp(
                                 dtype,
                             ),
                             # Select the right target output.
-                            nps.SelectFromChannels(dim_y, dim_y),
+                            nps.SelectFromChannels(dim_yt, dim_yt),
                         )
                     ),
                 ),

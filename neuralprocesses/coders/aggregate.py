@@ -1,6 +1,6 @@
 import lab as B
 import numpy as np
-from plum import convert
+from plum import convert, Union
 
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
@@ -57,7 +57,14 @@ def recode(coder: RepeatForAggregateInputs, xz, z, h, **kw_args):
 
 
 @_dispatch
-def _recode(coder: RepeatForAggregateInputs, xz, z, x, h, **kw_args):
+def _recode(
+    coder: RepeatForAggregateInputs,
+    xz: Union[B.Numeric, tuple, None],
+    z,
+    x: Union[B.Numeric, tuple, None],
+    h,
+    **kw_args,
+):
     return recode(coder.coder, xz, z, h, **kw_args)
 
 
@@ -69,27 +76,6 @@ def code(coder: RepeatForAggregateInputs, xz, z, x: AggregateInput, **kw_args):
         xzs.append((xzi, i))
         zs.append(zi)
     return AggregateInput(*xzs), Aggregate(*zs)
-
-
-@_dispatch
-def code_track(coder: RepeatForAggregateInputs, xz, z, x: AggregateInput, h, **kw_args):
-    h = h + [x]
-    xzs, zs = [], []
-    for xi, i in x:
-        xzi, zi, h = code_track(coder.coder, xz, z, xi, h, select_channel=i, **kw_args)
-        xzs.append((xzi, i))
-        zs.append(zi)
-    return AggregateInput(*xzs), Aggregate(*zs), h
-
-
-@_dispatch
-def _recode(coder: RepeatForAggregateInputs, xz, z, x: AggregateInput, h, **kw_args):
-    xzs, zs = [], []
-    for xi, i in x:
-        xzi, zi, h = recode(coder.coder, xz, z, h, select_channel=i, **kw_args)
-        xzs.append((xzi, i))
-        zs.append(zi)
-    return AggregateInput(*xzs), Aggregate(*zs), h
 
 
 @_dispatch
@@ -106,43 +92,6 @@ def code(
         xzs.append((xzi, i))
         zs.append(zi)
     return AggregateInput(*xzs), Aggregate(*zs)
-
-
-@_dispatch
-def code_track(
-    coder: RepeatForAggregateInputs,
-    xz: AggregateInput,
-    z: Aggregate,
-    x: AggregateInput,
-    h,
-    **kw_args,
-):
-    h = h + [x]
-    xzs, zs = [], []
-    for (xzi, _), zi, (xi, i) in zip(xz, z, x):
-        xzi, zi, h = code_track(
-            coder.coder, xzi, zi, xi, h, select_channel=i, **kw_args
-        )
-        xzs.append((xzi, i))
-        zs.append(zi)
-    return AggregateInput(*xzs), Aggregate(*zs), h
-
-
-@_dispatch
-def _recode(
-    coder: RepeatForAggregateInputs,
-    xz: AggregateInput,
-    z: Aggregate,
-    x: AggregateInput,
-    h,
-    **kw_args,
-):
-    xzs, zs = [], []
-    for (xzi, _), zi, (xi, i) in zip(xz, z, x):
-        xzi, zi, h = recode(coder.coder, xzi, zi, h, select_channel=i, **kw_args)
-        xzs.append((xzi, i))
-        zs.append(zi)
-    return AggregateInput(*xzs), Aggregate(*zs), h
 
 
 @register_module

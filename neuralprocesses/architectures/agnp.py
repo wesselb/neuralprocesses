@@ -30,7 +30,7 @@ def construct_agnp(*args, nps=nps, num_heads=8, **kw_args):
             Defaults to `"lowrank"`.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to 512.
-        dim_lv (bool, optional): Dimensionality of the latent variable.
+        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
             `"het"` or `"dense"`. Defaults to `"het"`.
         transform (str or tuple[float, float], optional): Bijection applied to the

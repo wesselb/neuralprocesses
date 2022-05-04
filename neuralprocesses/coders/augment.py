@@ -45,15 +45,5 @@ def _augment(xz: AugmentedInput, z: B.Numeric):
 
 
 @_dispatch
-def _augment(xz: B.Numeric, z: B.Numeric):
-    return xz, z
-
-
-@_dispatch
 def _augment(xz: AugmentedInput):
     return xz.x
-
-
-@_dispatch
-def _augment(xz: B.Numeric):
-    return xz
