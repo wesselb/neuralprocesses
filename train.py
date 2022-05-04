@@ -116,7 +116,7 @@ def main(**kw_args):
         choices=["loglik", "elbo"],
         default="loglik",
     )
-    parser.add_argument("--evaluate-num-samples", type=int, default=4096)
+    parser.add_argument("--evaluate-num-samples", type=int, default=512)
     parser.add_argument("--evaluate-batch-size", type=int, default=16)
     parser.add_argument("--no-action", action="store_true")
     parser.add_argument("--load", action="store_true")
@@ -327,6 +327,14 @@ def main(**kw_args):
             transform=config["transform"],
         )
     elif args.model == "convnp":
+        if config["dim_x"] == 2:
+            # Reduce the number of channels in the conv. architectures by a factor
+            # $\sqrt(2)$. This keeps the runtime in check and reduces the parameters
+            # of the ConvNP to the number of parameters of the ConvCNP.
+            config["unet_channels"] = tuple(
+                int(c / 2**0.5) for c in config["unet_channels"]
+            )
+            config["dws_channels"] = int(config["dws_channels"] / 2**0.5)
         model = nps.construct_convgnp(
             points_per_unit=config["points_per_unit"],
             dim_x=config["dim_x"],
