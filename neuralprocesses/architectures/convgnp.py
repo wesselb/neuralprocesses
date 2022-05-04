@@ -222,6 +222,7 @@ def construct_convgnp(
                 likelihood,
             )
         )
+        linear_after_set_conv = lambda x: x  # See the `else` clause below.
     else:
         # There is no auxiliary MLP available, so the CNN will have to produce the
         # right number of channels. In this case, however, it may be more efficient
