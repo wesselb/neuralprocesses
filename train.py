@@ -203,7 +203,7 @@ def main(**kw_args):
         "dim_embedding": 256,
         "num_heads": 8,
         "num_layers": 6,
-        "unet_channels": (64,) * 7,
+        "unet_channels": (64,) * 6,
         "dws_channels": 64,
         # Performance of the ConvGNP is sensitive to this parameter. Moreover, it
         # doesn't make sense to set it to a value higher of the last hidden layer of
