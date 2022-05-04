@@ -88,7 +88,7 @@ class SyntheticGenerator(DataGenerator):
         dtype (dtype): Data type to generate.
         noise (float, optional): Observation noise. Defaults to `5e-2`.
         seed (int, optional): Seed. Defaults to 0.
-        seed_params (int, optional): Seed for the model parameters. Defaults to 19.
+        seed_params (int, optional): Seed for the model parameters. Defaults to 99.
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
         batch_size (int, optional): Batch size. Defaults to 16.
@@ -138,7 +138,7 @@ class SyntheticGenerator(DataGenerator):
         self,
         dtype,
         seed=0,
-        seed_params=19,
+        seed_params=99,
         noise=0.05**2,
         num_tasks=2**14,
         batch_size=16,
