@@ -1,7 +1,7 @@
 import lab as B
 
 from .. import _dispatch
-from ..aggregate import Aggregate, AggregateTargets
+from ..aggregate import Aggregate, AggregateInput
 
 __all__ = [
     "batch_index",
@@ -42,8 +42,8 @@ def batch_index(t: list, index):
 
 
 @_dispatch
-def batch_index(xt: AggregateTargets, index):
-    return AggregateTargets(*((batch_index(xti, index), i) for xti, i in xt))
+def batch_index(xt: AggregateInput, index):
+    return AggregateInput(*((batch_index(xti, index), i) for xti, i in xt))
 
 
 @_dispatch
@@ -99,7 +99,7 @@ def _batch_xt(x: B.Numeric, i: int):
 
 
 @_dispatch
-def _batch_xt(x: AggregateTargets, i: int):
+def _batch_xt(x: AggregateInput, i: int):
     return x[[xi[1] for xi in x].index(i)][0]
 
 
@@ -123,5 +123,5 @@ def _batch_yt(x: B.Numeric, y: B.Numeric, i: int):
 
 
 @_dispatch
-def _batch_yt(x: AggregateTargets, y: Aggregate, i: int):
+def _batch_yt(x: AggregateInput, y: Aggregate, i: int):
     return y[[xi[1] for xi in x].index(i)][..., 0, :]

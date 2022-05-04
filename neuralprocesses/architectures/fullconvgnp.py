@@ -97,11 +97,10 @@ def construct_fullconvgnp(
     """
     dim_yc, dim_yt, conv_in_channels = _convgnp_init_dims(dim_yc, dim_yt, dim_y)
 
-    # This model does not yet support multi-dimensional inputs or targets.
-    if not (dim_x == 1 and dim_yt == 1):
+    # This model does not yet support multi-dimensional inputs.
+    if dim_x != 1:
         raise NotImplementedError(
-            "The FullConvGNP for now only supports single-dimensional inputs and "
-            "single-dimensional targets."
+            "The FullConvGNP for now only supports single-dimensional inputs."
         )
 
     # Resolve the architecture.
@@ -117,7 +116,7 @@ def construct_fullconvgnp(
         conv_mean = nps.UNet(
             dim=dim_x,
             in_channels=conv_in_channels,
-            out_channels=2,  # Mean and noise
+            out_channels=2 * dim_yt,  # Mean and noise
             channels=unet_channels,
             kernels=unet_kernels,
             activations=unet_activations,
@@ -128,7 +127,8 @@ def construct_fullconvgnp(
         conv_kernel = nps.UNet(
             dim=2 * dim_x,
             in_channels=conv_in_channels + 1,  # Add identity channel.
-            out_channels=1,  # Kernel matrix
+            # We need covariance matrices for every pair of outputs.
+            out_channels=dim_yt * dim_yt,
             # Keep the parameters in check.
             channels=tuple(n // 2 for n in unet_channels),
             kernels=unet_kernels,
@@ -142,7 +142,7 @@ def construct_fullconvgnp(
         conv_mean = nps.ConvNet(
             dim=dim_x,
             in_channels=conv_in_channels,
-            out_channels=2,  # Mean and noise
+            out_channels=2 * dim_yt,  # Mean and noise
             channels=dws_channels,
             num_layers=dws_layers,
             points_per_unit=points_per_unit,
@@ -152,7 +152,8 @@ def construct_fullconvgnp(
         conv_kernel = nps.ConvNet(
             dim=2 * dim_x,
             in_channels=conv_in_channels + 1,  # Add identity channel.
-            out_channels=1,  # Kernel matrix
+            # We need covariance matrices for every pair of outputs.
+            out_channels=dim_yt * dim_yt,
             channels=dws_channels // 2,  # Keep the parameters in check.
             num_layers=dws_layers,
             points_per_unit=points_per_unit // 2,  # Keep memory in control.
@@ -234,35 +235,42 @@ def construct_fullconvgnp(
             nps.Parallel(
                 nps.Chain(
                     conv_mean,
-                    _convgnp_construct_decoder_setconv(
-                        nps,
-                        decoder_scale,
-                        disc_mean,
-                        dtype,
+                    nps.RepeatForAggregateInputs(
+                        nps.Chain(
+                            _convgnp_construct_decoder_setconv(
+                                nps,
+                                decoder_scale,
+                                disc_mean,
+                                dtype,
+                            ),
+                            # Select the right target output.
+                            nps.SelectFromChannels(dim_y, dim_y),
+                        )
                     ),
                 ),
                 nps.MapDiagonal(
                     nps.Chain(
                         conv_kernel,
-                        # Ensure that the kernel is PD before before applying the
-                        # smoothing. Divide by 1000 to stabilise initialisation.
-                        lambda x: B.matmul(x, x, tr_b=True) / 1000,
-                        _convgnp_construct_decoder_setconv(
-                            nps,
-                            decoder_scale,
-                            disc_kernel,
-                            dtype,
-                            # Multiply the initialisation by two since we halved the
-                            # PPU.
-                            init_factor=2,
+                        nps.ToDenseCovariance(),
+                        nps.DenseCovariancePSDTransform(),
+                        nps.FromDenseCovariance(),
+                        nps.RepeatForAggregateInputPairs(
+                            nps.Chain(
+                                _convgnp_construct_decoder_setconv(
+                                    nps,
+                                    decoder_scale,
+                                    disc_kernel,
+                                    dtype,
+                                    # Multiply the initialisation by two since we halved
+                                    # the PPU.
+                                    init_factor=2,
+                                ),
+                                nps.ToDenseCovariance(),
+                                # Select the right target output.
+                                nps.SelectFromDenseCovarianceChannels(),
+                            ),
                         ),
-                        # Ensure that the encoding is of the form `(*b, c, n, c, n)`.
-                        # The below operation assumes that `c = 1`.
-                        lambda x: x[..., None, :],
                     ),
-                    # The inputs of the encoding already are in the squared space, so
-                    # no need to map those again.
-                    map_encoding=False,
                 ),
             ),
             nps.DenseGaussianLikelihood(),

@@ -71,7 +71,7 @@ def test_predefined_gens(nps, gen, dim_x, dim_y):
             assert B.shape(yt) == (4, 1, nt)
         else:
             # Check the target inputs.
-            assert isinstance(xt, nps.AggregateTargets)
+            assert isinstance(xt, nps.AggregateInput)
             assert len(xt) == dim_y
             nts = []
             for i_expected, (xti, i) in enumerate(xt):

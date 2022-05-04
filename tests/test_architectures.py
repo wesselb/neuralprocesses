@@ -133,14 +133,14 @@ def product_kw_args(config, **kw_args):
     )
     # FullConvGNP:
     + generate_conv_arch_variations(
-        [
+        product_kw_args(
             {
                 "constructor": "construct_fullconvgnp",
                 "points_per_unit": 8,
                 "dim_x": 1,
-                "dim_y": 1,
-            }
-        ]
+            },
+            dim_y=[1, 2],
+        )
     ),
     scope="module",
 )

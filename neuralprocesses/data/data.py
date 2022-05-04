@@ -4,7 +4,7 @@ import lab as B
 import numpy as np
 from plum import convert
 
-from ..aggregate import Aggregate, AggregateTargets
+from ..aggregate import Aggregate, AggregateInput
 from ..dist import UniformDiscrete, UniformContinuous, AbstractDistribution
 from ..util import split
 
@@ -266,7 +266,7 @@ def new_batch(gen, dim_y, *, fix_x_across_batch=False, batch_size=None):
         batch["contexts"] = [(_c(_t(xci)), _c(yci)) for xci, yci in zip(xcs, ycs)]
         if len(xts) > 1:
             # Need to aggregate them together.
-            batch["xt"] = AggregateTargets(
+            batch["xt"] = AggregateInput(
                 *((_c(_t(xti)), i) for i, xti in enumerate(xts))
             )
             batch["yt"] = Aggregate(*(_c(yti) for yti in yts))

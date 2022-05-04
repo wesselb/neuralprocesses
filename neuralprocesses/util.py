@@ -13,7 +13,9 @@ __all__ = [
     "batch",
     "compress_batch_dimensions",
     "split",
-    "split_channels",
+    "split_dimension",
+    "merge_dimensions",
+    "select",
 ]
 
 modules = []  #: Registered modules.
@@ -125,15 +127,58 @@ def split(z, sizes, axis):
     return components
 
 
-def split_channels(z, sizes, d):
-    """Split a tensor at the channels dimension.
+def split_dimension(z, axis, sizes):
+    """Split a dimension of a tensor into multiple dimensions.
 
     Args:
         z (tensor): Tensor to split.
-        sizes (iterable[int]): Sizes of the components.
-        d (int): Dimensionality of the inputs.
+        axis (int): Axis to split
+        sizes (iterable[int]): Sizes of new dimensions.
 
     Returns:
-        list[tensor]: Components of the split.
+        tensor: Reshaped version of `z`.
     """
-    return split(z, sizes, -d - 1)
+    shape = B.shape(z)
+    # The indexing below will only be correct for positive `axis`, so resolve the index.
+    axis = resolve_axis(z, axis)
+    return B.reshape(z, *shape[:axis], *sizes, *shape[axis + 1 :])
+
+
+def merge_dimensions(z, axis, sizes):
+    """Merge dimensions of a tensor into one dimension. This operation is the opposite
+    of :func:`split_dimension`.
+
+    Args:
+        z (tensor): Tensor to merge.
+        axis (int): Axis to merge into.
+        sizes (iterable[int]): Sizes of dimensions to merge.
+
+    Returns:
+        tensor: Reshaped version of `z`.
+    """
+    shape = B.shape(z)
+    # The indexing below will only be correct for positive `axis`, so resolve the index.
+    axis = resolve_axis(z, axis)
+    return B.reshape(
+        z,
+        *shape[: axis - len(sizes) + 1],
+        np.prod(sizes),
+        *shape[axis + 1 :],
+    )
+
+
+def select(z, i, axis):
+    """Select a particular index `i` at axis `axis` without squeezing the tensor.
+
+    Args:
+        z (tensor): Tensor to select from.
+        i (int): Index to select.
+        axis (int): Axis to select from.
+
+    Returns:
+        tensor: Selection from `z`.
+    """
+    axis = resolve_axis(z, axis)
+    index = [slice(None, None, None) for _ in range(B.rank(z))]
+    index[axis] = slice(i, i + 1, None)
+    return z[index]

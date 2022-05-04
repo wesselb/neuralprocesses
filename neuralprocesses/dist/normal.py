@@ -177,37 +177,6 @@ def cast(dtype: B.DType, dist: MultiOutputNormal):
     return MultiOutputNormal(B.cast(dtype, dist.normal), dist.num_outputs)
 
 
-@B.dispatch
-def concat(*ds: MultiOutputNormal):
-    return MultiOutputNormal(
-        Normal(
-            B.concat(*(d.normal.mean for d in ds), axis=-2),
-            B.concat(*(d.normal.var for d in ds)),
-        ),
-        Aggregate(*(d.shape for d in ds)),
-    )
-
-
-@B.dispatch
-def concat(*vars: Diagonal):
-    return Diagonal(B.concat(*(v.diag for v in vars), axis=-1))
-
-
-@B.dispatch
-def concat(*vars: LowRank):
-    if not all([v._middle is None and v._right is None for v in vars]):
-        raise ValueError(
-            "All low-rank matrices must be symmetric"
-            " and without a middle part specified."
-        )
-    return LowRank(B.concat(*(v.left for v in vars), axis=-2))
-
-
-@B.dispatch
-def concat(*vars: Woodbury):
-    return B.concat(*(v.diag for v in vars)) + B.concat(*(v.lr for v in vars))
-
-
 @register_module
 class DensifyLowRankVariance:
     """Densify a Woodbury variance if the low-rank part has more ranks than the

@@ -46,7 +46,7 @@ def _convgnp_construct_encoder_setconvs(
 ):
     # Initialise scale.
     if encoder_scales is not None:
-        encoder_scales = factor * encoder_scales
+        encoder_scales = init_factor * encoder_scales
     else:
         encoder_scales = 2 / disc.points_per_unit
     # Ensure that there is one for every context set.
@@ -64,7 +64,7 @@ def _convgnp_construct_decoder_setconv(
     init_factor=1,
 ):
     if decoder_scale is not None:
-        decoder_scale = factor * decoder_scale
+        decoder_scale = init_factor * decoder_scale
     else:
         decoder_scale = 2 / disc.points_per_unit
     return nps.SetConv(decoder_scale, dtype=dtype)
@@ -180,7 +180,7 @@ def construct_convgnp(
     # Construct likelihood of the encoder, which depends on whether we're using a
     # latent variable or not.
     if dim_lv > 0:
-        lv_likelihood_in_channels, lv_likelihood = construct_likelihood(
+        lv_likelihood_in_channels, _, lv_likelihood = construct_likelihood(
             nps,
             spec=lv_likelihood,
             dim_y=dim_lv,
@@ -192,7 +192,7 @@ def construct_convgnp(
         encoder_likelihood = nps.DeterministicLikelihood()
 
     # Construct likelihood of the decoder.
-    likelihood_in_channels, likelihood = construct_likelihood(
+    likelihood_in_channels, selector, likelihood = construct_likelihood(
         nps,
         spec=likelihood,
         dim_y=dim_yt,
@@ -325,11 +325,13 @@ def construct_convgnp(
         ),
         nps.Chain(
             conv,
-            nps.AggregateTargetsCoder(
-                _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
-                likelihood,
+            nps.RepeatForAggregateInputs(
+                nps.Chain(
+                    _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
+                    selector,  # Select the right target output.
+                )
             ),
-            nps.ConcatenateAggregate(),
+            likelihood,
             nps.DensifyLowRankVariance(),
             parse_transform(nps, transform=transform),
         ),

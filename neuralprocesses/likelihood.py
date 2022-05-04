@@ -5,7 +5,8 @@ from . import _dispatch
 from .datadims import data_dims
 from .dist import MultiOutputNormal, Dirac
 from .parallel import Parallel
-from .util import register_module, split_channels
+from .util import register_module, split, split_dimension, select
+from .aggregate import AggregateInput, Aggregate
 
 __all__ = [
     "DeterministicLikelihood",
@@ -39,40 +40,6 @@ def _vectorise(z, num, offset=0):
     return z, shape_compressed
 
 
-def _split_dimension(z, axis, dims):
-    """Split a dimension of a tensor into multiple dimensions.
-
-    Args:
-        z (tensor): Tensor to split.
-        axis (int): Axis to split
-        dims (iterable[int]): Sizes of new dimensions.
-
-    Returns:
-        tensor: Reshapes version of `z`.
-    """
-    shape = B.shape(z)
-    # The indexing below will only be correct for positive `axis`, so resolve the index.
-    axis = resolve_axis(z, axis)
-    return B.reshape(z, *shape[:axis], *dims, *shape[axis + 1 :])
-
-
-def _select(z, i, axis):
-    """Select a particular index `i` at axis `axis` without squeezing the tensor.
-
-    Args:
-        z (tensor): Tensor to select from.
-        i (int): Index to select.
-        axis (int): Axis to select from.
-
-    Returns:
-        tensor: Selection from `z`.
-    """
-    axis = resolve_axis(z, axis)
-    index = [slice(None, None, None) for _ in range(B.rank(z))]
-    index[axis] = slice(i, i + 1, None)
-    return z[index]
-
-
 class AbstractLikelihood:
     """A likelihood."""
 
@@ -86,17 +53,13 @@ class DeterministicLikelihood(AbstractLikelihood):
 def code(
     coder: DeterministicLikelihood,
     xz,
-    z: B.Numeric,
+    z,
     x,
     *,
     dtype_lik=None,
-    _select_channel=None,
     **kw_args,
 ):
     d = data_dims(xz)
-
-    if _select_channel is not None:
-        z = _select(z, _select_channel, -d - 1)
 
     if dtype_lik:
         z = B.cast(dtype_lik, z)
@@ -130,31 +93,14 @@ class HeterogeneousGaussianLikelihood(AbstractLikelihood):
 def code(
     coder: HeterogeneousGaussianLikelihood,
     xz,
-    z: B.Numeric,
+    z,
     x,
     *,
     dtype_lik=None,
     noiseless=False,
-    select_channel=None,
     **kw_args,
 ):
-    d = data_dims(xz)
-    dim_y = B.shape(z, -d - 1) // 2
-
-    z_mean, z_noise = split_channels(z, (dim_y, dim_y), d)
-
-    # Possibly we want to generate the prediction for just a particular channel.
-    if select_channel is not None:
-        z_mean = _select(z_mean, select_channel, -d - 1)
-        z_noise = _select(z_noise, select_channel, -d - 1)
-
-    # Vectorise the data. Record the shape!
-    z_mean, shape = _vectorise(z_mean, d + 1)
-    z_noise, _ = _vectorise(z_noise, d + 1)
-
-    # Transform into parameters.
-    mean = z_mean
-    noise = coder.epsilon + B.softplus(z_noise)
+    mean, noise, shape = _code_het(coder, xz, z)
 
     # Cast parameters to the right data type.
     if dtype_lik:
@@ -167,6 +113,42 @@ def code(
             noise = B.zeros(noise)
 
     return xz, MultiOutputNormal.diagonal(mean, noise, shape)
+
+
+@_dispatch
+def _code_het(
+    coder: HeterogeneousGaussianLikelihood,
+    xz: AggregateInput,
+    z: Aggregate,
+):
+    means, noises, shapes = zip(
+        *[_code_het(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
+    )
+
+    # Concatenate into one big Gaussian.
+    mean = B.concat(*means, axis=-1)
+    noise = B.concat(*noises, axis=-1)
+    shape = Aggregate(*shapes)
+
+    return mean, noise, shape
+
+
+@_dispatch
+def _code_het(coder: HeterogeneousGaussianLikelihood, xz, z: B.Numeric):
+    d = data_dims(xz)
+    dim_y = B.shape(z, -d - 1) // 2
+
+    z_mean, z_noise = split(z, (dim_y, dim_y), -d - 1)
+
+    # Vectorise the data. Record the shape!
+    z_mean, shape = _vectorise(z_mean, d + 1)
+    z_noise, _ = _vectorise(z_noise, d + 1)
+
+    # Transform into parameters.
+    mean = z_mean
+    noise = coder.epsilon + B.softplus(z_noise)
+
+    return mean, noise, shape
 
 
 @register_module
@@ -198,28 +180,55 @@ class LowRankGaussianLikelihood(AbstractLikelihood):
 def code(
     coder: LowRankGaussianLikelihood,
     xz,
-    z: B.Numeric,
+    z,
     x,
     *,
     noiseless=False,
     dtype_lik=None,
-    select_channel=None,
     **kw_args,
 ):
+
+    mean, noise, var_factor, shape = _lowrank(coder, xz, z)
+
+    # Cast the parameters before constructing the distribution.
+    if dtype_lik:
+        mean = B.cast(dtype_lik, mean)
+        noise = B.cast(dtype_lik, noise)
+        var_factor = B.cast(dtype_lik, var_factor)
+
+    # Make a noiseless prediction.
+    if noiseless:
+        with B.on_device(noise):
+            noise = B.zeros(noise)
+
+    return xz, MultiOutputNormal.lowrank(mean, noise, var_factor, shape)
+
+
+@_dispatch
+def _lowrank(coder: LowRankGaussianLikelihood, xz: AggregateInput, z: Aggregate):
+    means, noises, var_factors, shapes = zip(
+        *[_lowrank(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
+    )
+
+    # Concatenate into one big Gaussian.
+    mean = B.concat(*means, axis=-1)
+    noise = B.concat(*noises, axis=-1)
+    var_factor = B.concat(*var_factors, axis=-2)
+    shape = Aggregate(*shapes)
+
+    return mean, noise, var_factor, shape
+
+
+@_dispatch
+def _lowrank(coder: LowRankGaussianLikelihood, xz, z: B.Numeric):
     d = data_dims(xz)
+
     dim_y = B.shape(z, -d - 1) // (2 + coder.rank)
     dim_inner = B.shape(z, -d - 1) - 2 * dim_y
 
-    z_mean, z_noise, z_var_factor = split_channels(
-        z, (dim_y, dim_y, coder.rank * dim_y), d
-    )
+    z_mean, z_noise, z_var_factor = split(z, (dim_y, dim_y, coder.rank * dim_y), -d - 1)
     # Split of the ranks of the factor.
-    z_var_factor = _split_dimension(z_var_factor, -d - 1, (coder.rank, dim_y))
-
-    if select_channel is not None:
-        z_mean = _select(z_mean, select_channel, -d - 1)
-        z_noise = _select(z_noise, select_channel, -d - 1)
-        z_var_factor = _select(z_var_factor, select_channel, -d - 1)
+    z_var_factor = split_dimension(z_var_factor, -d - 1, (coder.rank, dim_y))
 
     # Vectorise the data. Record the shape!
     z_mean, shape = _vectorise(z_mean, d + 1)
@@ -238,18 +247,7 @@ def code(
     # stabilise this.
     var_factor = z_var_factor / B.shape(z_var_factor, -1)
 
-    # Cast the parameters before constructing the distribution.
-    if dtype_lik:
-        mean = B.cast(dtype_lik, mean)
-        noise = B.cast(dtype_lik, noise)
-        var_factor = B.cast(dtype_lik, var_factor)
-
-    # Make a noiseless prediction.
-    if noiseless:
-        with B.on_device(noise):
-            noise = B.zeros(noise)
-
-    return xz, MultiOutputNormal.lowrank(mean, noise, var_factor, shape)
+    return mean, noise, var_factor, shape
 
 
 @register_module
@@ -287,25 +285,10 @@ def code(
     noiseless=False,
     **kw_args,
 ):
-    z1, z2 = z
 
-    # Extract `d` and `dim_y` from the mean.
-    d = data_dims(xz[0])
-    dim_y = B.shape(z1, -d - 1) // 2
+    z_mean_noise, z_var = z
 
-    z_mean, z_noise = split_channels(z1, (dim_y, dim_y), d)
-
-    # Vectorise the data. Record the shape!
-    z_mean, shape = _vectorise(z_mean, d + 1)
-    z_noise, _ = _vectorise(z_noise, d + 1)
-    # First vectorise inner channels and then vectorise outer channels.
-    z_var, _ = _vectorise(z2, d + 1, offset=d + 1)
-    z_var, _ = _vectorise(z_var, d + 1)
-
-    # Transform into parameters.
-    mean = z_mean
-    noise = coder.epsilon + B.softplus(z_noise)
-    var = z_var
+    mean, noise, var, shape = _dense(coder, *xz, *z)
 
     # Cast parameters to the right data type.
     if dtype_lik:
@@ -318,7 +301,75 @@ def code(
         with B.on_device(noise):
             noise = B.zeros(noise)
 
-    # Just return the inputs for the mean.
+    # Return the inputs for the mean. The inputs for the variance will have been
+    # duplicated.
     xz = xz[0]
 
     return xz, MultiOutputNormal.dense(mean, noise, var, shape)
+
+
+@_dispatch
+def _dense(
+    coder: DenseGaussianLikelihood,
+    xz_mean,
+    xz_var,
+    z_mean: B.Numeric,
+    z_var: B.Numeric,
+):
+    mean, noise, shape = _dense_mean(coder, xz_mean, z_mean)
+    var = _dense_var(coder, xz_var, z_var)
+    return mean, noise, var, shape
+
+
+@_dispatch
+def _dense(
+    coder: DenseGaussianLikelihood,
+    xz_mean: AggregateInput,
+    xz_var: AggregateInput,
+    z_mean: Aggregate,
+    z_var: Aggregate,
+):
+    means, noises, shapes = zip(
+        *[_dense_mean(coder, xzi, zi) for (xzi, _), zi in zip(xz_mean, z_mean)]
+    )
+    vars = [
+        [_dense_var(coder, xzij, zij) for (xzij, _), zij in zip(xzi, zi)]
+        for (xzi, _), zi in zip(xz_var, z_var)
+    ]
+
+    # Concatenate everything into one big Gaussian.
+    mean = B.concat(*means, axis=-1)
+    noise = B.concat(*noises, axis=-1)
+    var = B.concat2d(*vars)
+    shape = Aggregate(*shapes)
+
+    return mean, noise, var, shape
+
+
+@_dispatch
+def _dense_mean(coder: DenseGaussianLikelihood, xz, z: B.Numeric):
+    d = data_dims(xz)
+    dim_y = B.shape(z, -d - 1) // 2
+
+    z_mean, z_noise = split(z, (dim_y, dim_y), -d - 1)
+
+    # Vectorise the data. Record the shape!
+    z_mean, shape = _vectorise(z_mean, d + 1)
+    z_noise, _ = _vectorise(z_noise, d + 1)
+
+    # Transform into parameters.
+    mean = z_mean
+    noise = coder.epsilon + B.softplus(z_noise)
+
+    return mean, noise, shape
+
+
+@_dispatch
+def _dense_var(coder: DenseGaussianLikelihood, xz, z: B.Numeric):
+    d = data_dims(xz) // 2
+
+    # First vectorise inner channels and then vectorise outer channels.
+    z, _ = _vectorise(z, d + 1, offset=d + 1)
+    z, _ = _vectorise(z, d + 1)
+
+    return z

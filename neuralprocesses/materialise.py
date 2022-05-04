@@ -2,7 +2,7 @@ import lab as B
 import matrix  # noqa
 
 from . import _dispatch
-from .aggregate import Aggregate, AggregateTargets
+from .aggregate import Aggregate, AggregateInput
 from .datadims import data_dims
 from .parallel import Parallel
 from .util import register_module
@@ -76,7 +76,7 @@ def _merge(z1: tuple, z2: tuple):
 
 
 @_dispatch
-def _merge(z1: AggregateTargets, z2: AggregateTargets):
+def _merge(z1: AggregateInput, z2: AggregateInput):
     # Merge indices.
     inds1 = tuple(i for _, i in z1)
     inds2 = tuple(i for _, i in z2)
@@ -86,7 +86,7 @@ def _merge(z1: AggregateTargets, z2: AggregateTargets):
     # Merges values and zip indices to them.
     x1 = tuple(x for x, _ in z1)
     x2 = tuple(x for x, _ in z2)
-    return AggregateTargets(
+    return AggregateInput(
         *((_merge(x1i, x2i), i) for (x1i, x2i), i in zip(zip(x1, x2), inds1))
     )
 

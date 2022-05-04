@@ -2,7 +2,7 @@ import lab as B
 from . import _dispatch
 import numpy as np
 
-from .aggregate import Aggregate, AggregateTargets
+from .aggregate import Aggregate, AggregateInput
 from .datadims import data_dims
 
 __all__ = ["num_data"]
@@ -25,5 +25,5 @@ def num_data(x, y: B.Numeric):
 
 
 @_dispatch
-def num_data(x: AggregateTargets, y: Aggregate):
+def num_data(x: AggregateInput, y: Aggregate):
     return sum([num_data(xi, yi) for (xi, i), yi in zip(x, y)])

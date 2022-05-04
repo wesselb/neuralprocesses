@@ -95,8 +95,3 @@ class Dirac(AbstractMultiOutputDistribution):
     def kl(self, other: "Dirac"):
         # Same result as `logpdf`, so just reuse that method.
         return self.logpdf(None)
-
-
-@B.dispatch
-def concat(*ds: Dirac):
-    return Dirac(Aggregate(*(d.x for d in ds)), Aggregate(*(d.d for d in ds)))

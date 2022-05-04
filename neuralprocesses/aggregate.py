@@ -3,7 +3,7 @@ from plum import Tuple
 
 from . import _dispatch
 
-__all__ = ["Aggregate", "AggregateTargets"]
+__all__ = ["Aggregate", "AggregateInput"]
 
 
 class Aggregate:
@@ -44,9 +44,9 @@ def cast(dtype: B.DType, agg: Aggregate):
     return Aggregate(*(B.cast(dtype, x) for x in agg))
 
 
-class AggregateTargets(Aggregate):
-    """An ordered aggregate of target inputs for specific outputs. This allow the user
-    to specify different inputs for different outputs.
+class AggregateInput(Aggregate):
+    """An ordered aggregate of inputs for specific outputs. This allow the user to
+    specify different inputs for different outputs.
 
     Args:
         *elements (tuple[object, int]): A tuple of inputs and integers where the integer
@@ -59,15 +59,15 @@ class AggregateTargets(Aggregate):
 
 
 @B.dispatch
-def on_device(agg: AggregateTargets):
+def on_device(agg: AggregateInput):
     return B.on_device(agg[0][0])
 
 
 @B.dispatch
-def dtype(agg: AggregateTargets):
+def dtype(agg: AggregateInput):
     return B.dtype(*(x for x, i in agg))
 
 
 @B.dispatch
-def cast(dtype: B.DType, agg: AggregateTargets):
+def cast(dtype: B.DType, agg: AggregateInput):
     return Aggregate(*((B.cast(dtype, x), i) for x, i in agg))

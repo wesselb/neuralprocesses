@@ -3,12 +3,9 @@ from typing import Tuple, Union, Optional
 
 import lab as B
 
-from .. import _dispatch
-from ..datadims import data_dims
-from ..parallel import Parallel
-from ..util import register_module, compress_batch_dimensions, split_channels
+from ..util import register_module, compress_batch_dimensions
 
-__all__ = ["MLP", "UNet", "ConvNet", "Splitter"]
+__all__ = ["MLP", "UNet", "ConvNet"]
 
 
 @register_module
@@ -373,24 +370,3 @@ class ConvNet:
     def __call__(self, x):
         x, uncompress = compress_batch_dimensions(x, self.dim + 1)
         return uncompress(self.conv_net(x))
-
-
-@register_module
-class Splitter:
-    """Split a tensor into multiple tensors.
-
-    Args:
-        *sizes (int): Size of every split
-
-    Attributes:
-        sizes (tuple[int]): Size of every split
-    """
-
-    def __init__(self, size0, *sizes):
-        self.sizes = (size0,) + sizes
-
-
-@_dispatch
-def code(coder: Splitter, xz, z: B.Numeric, x, **kw_args):
-    d = data_dims(xz)
-    return xz, Parallel(*split_channels(z, coder.sizes, d))

@@ -70,7 +70,7 @@ def construct_gnp(
     # Make sure that `dim_yt` is initialised.
     dim_yt = dim_yt or dim_y
 
-    mlp_out_channels, likelihood = construct_likelihood(
+    mlp_out_channels, selector, likelihood = construct_likelihood(
         nps,
         spec=likelihood,
         dim_y=dim_yt,
@@ -83,7 +83,7 @@ def construct_gnp(
         det_encoder = nps.Parallel(
             *(
                 nps.Chain(
-                    nps.AggregateTargetsCoder(
+                    nps.RepeatForAggregateInputs(
                         nps.Attention(
                             dim_x=dim_x,
                             dim_y=dim_yci,
@@ -92,9 +92,8 @@ def construct_gnp(
                             num_enc_layers=num_enc_layers,
                             dtype=dtype,
                         ),
-                        nps.DeterministicLikelihood(),
                     ),
-                    nps.ConcatenateAggregate(),
+                    nps.DeterministicLikelihood(),
                 )
                 for dim_yci in dim_yc
             ),
@@ -120,7 +119,7 @@ def construct_gnp(
 
     # Possibly construct the stochastic encoder.
     if dim_lv > 0:
-        lv_mlp_out_channels, lv_likelihood = construct_likelihood(
+        lv_mlp_out_channels, _, lv_likelihood = construct_likelihood(
             nps,
             spec=lv_likelihood,
             dim_y=dim_lv,
@@ -159,13 +158,10 @@ def construct_gnp(
         nps.Copy(2 + (dim_lv > 0)),
         nps.Parallel(
             nps.Chain(
-                nps.AggregateTargetsCoder(
-                    nps.Chain(
-                        nps.InputsCoder(),
-                        nps.DeterministicLikelihood(),
-                    )
+                nps.RepeatForAggregateInputs(
+                    nps.InputsCoder(),
                 ),
-                nps.ConcatenateAggregate(),
+                nps.DeterministicLikelihood(),
             ),
             det_encoder,
             *((lv_encoder,) if dim_lv > 0 else ()),
@@ -173,17 +169,19 @@ def construct_gnp(
     )
     decoder = nps.Chain(
         nps.Materialise(),
-        nps.AggregateTargetsCoder(
-            nps.MLP(
-                in_dim=dim_x + dim_embedding * len(dim_yc) + dim_lv,
-                out_dim=mlp_out_channels,
-                num_layers=num_dec_layers,
-                width=width * len(dim_yc),
-                dtype=dtype,
-            ),
-            likelihood,
+        nps.RepeatForAggregateInputs(
+            nps.Chain(
+                nps.MLP(
+                    in_dim=dim_x + dim_embedding * len(dim_yc) + dim_lv,
+                    out_dim=mlp_out_channels,
+                    num_layers=num_dec_layers,
+                    width=width * len(dim_yc),
+                    dtype=dtype,
+                ),
+                selector,  # Select the right target output.
+            )
         ),
-        nps.ConcatenateAggregate(),
+        likelihood,
         nps.DensifyLowRankVariance(),
         parse_transform(nps, transform=transform),
     )

@@ -4,7 +4,7 @@ import numpy as np
 from .model import Model, compress_contexts
 from .util import sample, fix_noise
 from .. import _dispatch
-from ..aggregate import Aggregate, AggregateTargets
+from ..aggregate import Aggregate, AggregateInput
 from ..coding import code, code_track, recode_stochastic
 from ..dist import AbstractMultiOutputDistribution
 from ..numdata import num_data
@@ -143,7 +143,7 @@ def _merge_context_target(contexts: list, xt: B.Numeric, yt: B.Numeric):
 
 
 @_dispatch
-def _merge_context_target(contexts: list, xt: AggregateTargets, yt: Aggregate):
+def _merge_context_target(contexts: list, xt: AggregateInput, yt: Aggregate):
     updated_xt, updated_yt = [], []
     q_context_updates = [None] * len(xt)
 
@@ -166,7 +166,7 @@ def _merge_context_target(contexts: list, xt: AggregateTargets, yt: Aggregate):
         updated_yt.append(yti)
 
     # Update the target inputs.
-    xt = AggregateTargets(*updated_xt)
+    xt = AggregateInput(*updated_xt)
     yt = Aggregate(*updated_yt)
 
     # Construct the context set for the approximate posterior by applying the recorded
