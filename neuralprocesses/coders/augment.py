@@ -3,11 +3,12 @@ import lab as B
 from .. import _dispatch
 from ..augment import AugmentedInput
 from ..datadims import data_dims
-from ..util import register_module
+from ..util import register_module, register_composite_coder
 
 __all__ = ["Augment"]
 
 
+@register_composite_coder
 @register_module
 class Augment:
     """Concatenate the augmentation of the input to the encoding, and remove any

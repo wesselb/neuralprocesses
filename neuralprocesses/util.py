@@ -8,6 +8,9 @@ __all__ = [
     "register_module",
     "models",
     "register_model",
+    "composite_coders",
+    "register_composite_coder",
+    "is_composite_coder",
     "wrapped_partial",
     "is_nonempty",
     "batch",
@@ -18,7 +21,7 @@ __all__ = [
     "select",
 ]
 
-modules = []  #: Registered modules.
+modules = []  #: Registered modules
 
 
 def register_module(module):
@@ -27,13 +30,34 @@ def register_module(module):
     return module
 
 
-models = []  #: Registered models.
+models = []  #: Registered models
 
 
 def register_model(model):
     """Decorator to register a new model."""
     models.append(model)
     return model
+
+
+composite_coders = []  #: Composite coders
+
+
+def register_composite_coder(coder):
+    """Decorator to register a composite coder."""
+    composite_coders.append(coder)
+    return coder
+
+
+def is_composite_coder(coder):
+    """Check if a coder is composite.
+
+    Args:
+        coder (coder): Coder.
+
+    Returns:
+        bool: Coder is composite.
+    """
+    return any([isinstance(coder, c) for c in composite_coders])
 
 
 def wrapped_partial(f, *partial_args, **partial_kw_args):

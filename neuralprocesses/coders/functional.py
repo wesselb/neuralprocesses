@@ -1,11 +1,12 @@
 import matrix  # noqa
 
 from .. import _dispatch
-from ..util import register_module
+from ..util import register_module, register_composite_coder
 
 __all__ = ["FunctionalCoder"]
 
 
+@register_composite_coder
 @register_module
 class FunctionalCoder:
     """A coder that codes to a discretisation for a functional representation.

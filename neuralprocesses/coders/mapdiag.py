@@ -3,11 +3,12 @@ import matrix  # noqa
 
 from .. import _dispatch
 from ..aggregate import AggregateInput
-from ..util import register_module
+from ..util import register_module, register_composite_coder
 
 __all__ = ["MapDiagonal"]
 
 
+@register_composite_coder
 @register_module
 class MapDiagonal:
     """Map to the diagonal of the squared space.
@@ -30,6 +31,20 @@ def code(coder: MapDiagonal, xz, z, x, **kw_args):
     # inputs if the dimensionalities don't line up.
     xz = _mapdiagonal_possibly_duplicate_context(xz, d)
     return code(coder.coder, xz, z, x, **kw_args)
+
+
+@_dispatch
+def code_track(coder: MapDiagonal, xz, z, x, h, **kw_args):
+    x, d = _mapdiagonal_duplicate_target(x)
+    xz = _mapdiagonal_possibly_duplicate_context(xz, d)
+    return code_track(coder.coder, xz, z, x, h + [(x, d)], **kw_args)
+
+
+@_dispatch
+def recode(coder: MapDiagonal, xz, z, h, **kw_args):
+    (_, d), h = h[0], h[1:]
+    xz = _mapdiagonal_possibly_duplicate_context(xz, d)
+    return recode(coder.coder, xz, z, h, **kw_args)
 
 
 @_dispatch

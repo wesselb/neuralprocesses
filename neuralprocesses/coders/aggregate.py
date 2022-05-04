@@ -7,6 +7,7 @@ from ..aggregate import Aggregate, AggregateInput
 from ..datadims import data_dims
 from ..util import (
     register_module,
+    register_composite_coder,
     split,
     split_dimension,
     merge_dimensions,
@@ -21,6 +22,7 @@ __all__ = [
 ]
 
 
+@register_composite_coder
 @register_module
 class RepeatForAggregateInputs:
     """If the coder `coder` encounters an aggregate of target inputs, perform the
@@ -187,6 +189,7 @@ def code(
     return xz, z
 
 
+@register_composite_coder
 @register_module
 class RepeatForAggregateInputPairs:
     """If the coder `coder` encounters an aggregate of target inputs, perform the
