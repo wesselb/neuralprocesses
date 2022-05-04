@@ -807,8 +807,16 @@ else:
     opt = torch.optim.Adam(model.parameters(), args.rate)
     best_eval_lik = -np.inf
 
+    # Set regularisation high for the first epochs.
+    original_epsilon = B.epsilon
+    B.epsilon = 1e-2
+
     for i in range(start, args.epochs):
         with out.Section(f"Epoch {i + 1}"):
+            # Set regularisation to normal after the first epoch.
+            if i > 0:
+                B.epsilon = original_epsilon
+
             # Perform an epoch.
             state = train(state, model, objective, gen_train, epoch=i)
 
