@@ -122,7 +122,7 @@ def main(**kw_args):
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--ar", action="store_true")
     if kw_args:
-        # Load the argument from the keyword arguments passed to the function.
+        # Load the arguments from the keyword arguments passed to the function.
         # Carefully convert these to command line arguments.
         args = parser.parse_args(
             sum(
@@ -205,7 +205,10 @@ def main(**kw_args):
         "num_layers": 6,
         "unet_channels": (64, 64, 64, 128, 128, 128, 256),
         "dws_channels": 128,
-        "num_basis_functions": 512,
+        # Performance of the ConvGNP is sensitive to this parameter. Moreover, it
+        # doesn't make sense to set it to a value higher of the last hidden layer of
+        # the CNN architecture. We therefore set it to 64.
+        "num_basis_functions": 64,
     }
 
     # Setup data generators for training and for evaluation.
