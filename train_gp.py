@@ -51,7 +51,7 @@ def eval(state, model, objective, gen):
             )
 
             # Save numbers.
-            n = nps.num_data(batch["xt"])
+            n = nps.num_data(batch["xt"], batch["yt"])
             vals.append(B.to_numpy(obj))
             if "pred_logpdf" in batch:
                 kls.append(B.to_numpy(batch["pred_logpdf"] / n - obj))
