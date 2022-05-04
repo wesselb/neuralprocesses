@@ -12,7 +12,11 @@ __all__ = ["AbstractGenerator", "DataGenerator", "SyntheticGenerator", "new_batc
 
 
 class AbstractGenerator(metaclass=abc.ABCMeta):
-    """Abstract generator."""
+    """Abstract generator.
+
+    Attributes:
+        num_batches (int): Number of batches in an epoch.
+    """
 
     @abc.abstractmethod
     def generate_batch(self):
