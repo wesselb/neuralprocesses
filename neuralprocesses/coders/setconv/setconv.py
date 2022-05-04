@@ -186,6 +186,11 @@ def code(coder: SetConv, xz, z, x: AugmentedInput, **kw_args):
     return AugmentedInput(xz, x.augmentation), z
 
 
+_einsum_allowed_fallback = True
+"""bool: Set this to `False` if you wish to avoid a backend implementation of
+`einsum`."""
+
+
 def _einsum(equation, *args):
     """Even though `B.einsum` uses `opt_einsum`, further speed-ups are possible by
     appropriately using broadcasting or matrix multiplications. This function catches
@@ -213,7 +218,11 @@ def _einsum(equation, *args):
     elif equation == "...abc,...bd,...ce->...ade":
         x, y, z = args
         return B.matmul(y[..., None, :, :], x, z[..., None, :, :], tr_a=True)
-    else:
+    elif _einsum_allowed_fallback:
         # Could not find a speed-up. Just use `B.einsum`, which uses `opt_einsum`
         # to find a good contraction order.
         return B.einsum(equation, *args)
+    else:
+        raise RuntimeError(
+            f'Could not find optimised implementation for equation "{equation}".'
+        )
