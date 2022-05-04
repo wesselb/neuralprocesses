@@ -25,7 +25,7 @@ def train(state, model, objective, gen, *, epoch):
             batch["contexts"],
             batch["xt"],
             batch["yt"],
-            epoch=epoch,
+            epoch=epoch if fix_noise else None,
         )
         vals.append(B.to_numpy(obj))
         # Be sure to negate the output of `objective`.
@@ -549,6 +549,9 @@ if args.model == "cnp":
         likelihood="het",
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = False
 elif args.model == "gnp":
     model = nps.construct_gnp(
         dim_x=dim_x,
@@ -561,6 +564,9 @@ elif args.model == "gnp":
         num_basis_functions=num_basis_functions,
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = False
 elif args.model == "np":
     model = nps.construct_gnp(
         dim_x=dim_x,
@@ -573,6 +579,9 @@ elif args.model == "np":
         dim_lv=dim_embedding,
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = True
 elif args.model == "acnp":
     model = nps.construct_agnp(
         dim_x=dim_x,
@@ -585,6 +594,9 @@ elif args.model == "acnp":
         likelihood="het",
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = False
 elif args.model == "agnp":
     model = nps.construct_agnp(
         dim_x=dim_x,
@@ -598,6 +610,9 @@ elif args.model == "agnp":
         num_basis_functions=num_basis_functions,
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = False
 elif args.model == "anp":
     model = nps.construct_agnp(
         dim_x=dim_x,
@@ -611,6 +626,9 @@ elif args.model == "anp":
         dim_lv=dim_embedding,
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = True
 elif args.model == "convcnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
@@ -626,6 +644,9 @@ elif args.model == "convcnp":
         margin=margin,
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = False
 elif args.model == "convgnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
@@ -642,6 +663,9 @@ elif args.model == "convgnp":
         margin=margin,
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = False
 elif args.model == "convnp":
     model = nps.construct_convgnp(
         points_per_unit=points_per_unit,
@@ -658,6 +682,9 @@ elif args.model == "convnp":
         margin=margin,
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = True
 elif args.model == "fullconvgnp":
     model = nps.construct_fullconvgnp(
         points_per_unit=points_per_unit,
@@ -672,12 +699,16 @@ elif args.model == "fullconvgnp":
         margin=margin,
         transform=transform,
     )
+
+    # Settings specific model the model:
+    fix_noise = False
 else:
     raise ValueError(f'Invalid model "{args.model}".')
 
 # Ensure that the model is on the GPU and print some statistics.
 model = model.to(device)
 out.kv("Number of parameters", nps.num_params(model))
+out.kv("Fixing noise in the first three epochs", "yes" if fix_noise else "no")
 
 # Setup training objective.
 if args.objective == "loglik":

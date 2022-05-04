@@ -10,7 +10,7 @@ from ..util import register_module
 from ..aggregate import Aggregate
 from ..datadims import data_dims
 
-__all__ = ["Transform"]
+__all__ = ["Transform", "TransformedMultiOutputDistribution"]
 
 
 @register_module
