@@ -2,20 +2,23 @@ import lab as B
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import wbml.out
 import wbml.out as out
 from wbml.data.predprey import load
-from wbml.plot import tweak, tex, pdfcrop
 from wbml.experiment import WorkingDirectory
+from wbml.plot import tweak, tex, pdfcrop
 
 import neuralprocesses.torch as nps
 from train import main
+
+wbml.out.report_time = True
 
 # Load experiment.
 with out.Section("Loading experiment"):
     exp = main(
         # The keyword arguments here must line up with the arguments you provide on the
         # command line.
-        model="fullconvgnp",
+        model="convcnp",
         data="predprey",
         # Point `root` to where the `_experiments` directory is located. In my case,
         # I'm `rsync`ing it to the directory `server`.
@@ -24,10 +27,10 @@ with out.Section("Loading experiment"):
     )
     model = exp["model"]
     model.load_state_dict(
-        torch.load(exp["wd"].file("model-last.torch"), map_location="cpu")
+        torch.load(exp["wd"].file("model-last.torch"), map_location="cpu")["weights"]
     )
 
-# Setup another working directory to save plot in.
+# Setup another working directory to save output of the evaluation in.
 wd = WorkingDirectory("_experiments", "eval", "predprey")
 tex()
 
@@ -55,43 +58,35 @@ mask_lynx = ~mask_lynx
 # Share tensors into the standard formats.
 x = x[None, None, :]
 y = y.T[None, :, :]
-xt = torch.linspace(-20, 120, 1000, dtype=torch.float32)[None, None, :]
+xt = torch.linspace(-20, 120, 141, dtype=torch.float32)[None, None, :]
 
 contexts = [
     (x[:, :, mask_hare], y[:, 0:1, mask_hare]),
     (x[:, :, mask_lynx], y[:, 1:2, mask_lynx]),
 ]
 
-# Perform evaluation.
-xt_eval = nps.AggregateInput(
-    (x[:, :, ~mask_hare], 0),
-    (x[:, :, ~mask_lynx], 1),
-)
-yt_eval = nps.Aggregate(
-    B.cast(torch.float64, y[:, 0:1, ~mask_hare]),
-    B.cast(torch.float64, y[:, 1:2, ~mask_lynx]),
-)
-logpdf = model(
-    contexts, xt_eval, dtype_enc_sample=torch.float32, dtype_lik=torch.float64
-).logpdf(yt_eval) / nps.num_data(xt_eval, yt_eval)
-out.kv("Eval logpdf", B.mean(logpdf))
+# `torch.no_grad` is necessary to prevent memory from accumulating.
+with torch.no_grad():
 
-# Make predictions.
-pred = model(contexts, xt, dtype_enc_sample=torch.float32, dtype_lik=torch.float64)
-samples = pred.sample(10_000)
-mean = B.mean(samples, axis=0)
-lower = B.quantile(samples, 2.5 / 100, axis=0)
-upper = B.quantile(samples, (100 - 2.5) / 100, axis=0)
+    # Perform evaluation.
+    out.kv(
+        "Eval logpdf",
+        nps.ar_loglik(
+            model,
+            contexts,
+            nps.AggregateInput((x[:, :, ~mask_hare], 0), (x[:, :, ~mask_lynx], 1)),
+            nps.Aggregate(y[:, 0:1, ~mask_hare], y[:, 1:2, ~mask_lynx]),
+            normalise=True,
+        ),
+    )
 
-# Make some noiseless samples.
-pred_noiseless = model(
-    contexts,
-    xt,
-    dtype_enc_sample=torch.float32,
-    dtype_lik=torch.float64,
-    noiseless=True,
-)
-samples = pred_noiseless.sample(5)
+    # Make predictions.
+    mean, _, noiseless_samples, noisy_samples = nps.predict(
+        model,
+        contexts,
+        nps.AggregateInput((xt, 0), (xt, 1)),
+        num_samples=10_000,
+    )
 
 # Plot the result.
 
@@ -107,10 +102,14 @@ plt.scatter(
     label="Hare",
 )
 plt.scatter(x[0, 0, ~mask_hare], y[0, 0, ~mask_hare], marker="o", style="test", s=20)
-plt.plot(xt[0, 0], mean[0, 0, :], style="pred")
-plt.plot(xt[0, 0], samples[:5, 0, 0, :].T, style="pred", ls="-", lw=0.5)
-err = 1.96 * B.sqrt(pred.var[0, 0, :])
-plt.fill_between(xt[0, 0], lower[0, 0, :], upper[0, 0, :], style="pred")
+plt.plot(xt[0, 0], mean[0][0, 0, :], style="pred")
+plt.plot(xt[0, 0], noiseless_samples[0][:5, 0, 0, :].T, style="pred", ls="-", lw=0.5)
+plt.fill_between(
+    xt[0, 0],
+    B.quantile(noisy_samples[0][:, 0, 0, :], 2.5 / 100, axis=0),
+    B.quantile(noisy_samples[0][:, 0, 0, :], (100 - 2.5) / 100, axis=0),
+    style="pred",
+)
 plt.ylim(0, 300)
 tweak()
 
@@ -124,10 +123,14 @@ plt.scatter(
     label="Lynx",
 )
 plt.scatter(x[0, 0, ~mask_lynx], y[0, 1, ~mask_lynx], marker="o", style="test", s=20)
-plt.plot(xt[0, 0], mean[0, 1, :], style="pred")
-plt.plot(xt[0, 0], samples[:5, 0, 1, :].T, style="pred", ls="-", lw=0.5)
-err = 1.96 * B.sqrt(pred.var[0, 1, :])
-plt.fill_between(xt[0, 0], lower[0, 1, :], upper[0, 1, :], style="pred")
+plt.plot(xt[0, 0], mean[1][0, 0, :], style="pred")
+plt.plot(xt[0, 0], noiseless_samples[1][:5, 0, 0, :].T, style="pred", ls="-", lw=0.5)
+plt.fill_between(
+    xt[0, 0],
+    B.quantile(noisy_samples[1][:, 0, 0, :], 2.5 / 100, axis=0),
+    B.quantile(noisy_samples[1][:, 0, 0, :], (100 - 2.5) / 100, axis=0),
+    style="pred",
+)
 plt.ylim(0, 300)
 tweak()
 
