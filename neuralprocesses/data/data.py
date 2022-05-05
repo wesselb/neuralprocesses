@@ -158,14 +158,14 @@ class SyntheticGenerator(DataGenerator):
         self.num_context = convert(num_context, AbstractDistribution)
         self.num_target = convert(num_target, AbstractDistribution)
 
-        with B.on_device(self.device):
-            self.noise = B.to_active_device(B.cast(self.float64, noise))
-
-            # Use a separate random state for the parameters.
+        # Use a separate random state for the parameters. This random must be created
+        # on the CPU, because the particular random sequence can depend on the device.
+        with B.on_device("cpu"):
             state_params = B.create_random_state(dtype, seed_params)
 
             self.dim_y = dim_y
             self.dim_y_latent = dim_y_latent or dim_y
+            
             if self.dim_y > 1 or self.dim_y_latent > 1:
                 # Draw a random mixing matrix.
                 state_params, self.h = B.randn(
@@ -176,6 +176,12 @@ class SyntheticGenerator(DataGenerator):
                 )
             else:
                 self.h = None
+
+        # Move things to the right device.
+        with B.on_device(self.device):
+            self.noise = B.to_active_device(B.cast(self.float64, noise))
+            if self.h is not None:
+                self.h = B.to_active_device(self.h)
 
 
 def new_batch(gen, dim_y, *, fix_x_across_batch=False, batch_size=None):
