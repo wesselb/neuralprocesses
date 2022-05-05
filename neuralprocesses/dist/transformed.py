@@ -1,14 +1,14 @@
-import lab as B
 from functools import partial
-from wbml.util import indented_kv
 
-from .. import _dispatch
+import lab as B
+from wbml.util import indented_kv
 
 from .dist import AbstractMultiOutputDistribution
 from .normal import _map_sample_output
-from ..util import register_module
+from .. import _dispatch
 from ..aggregate import Aggregate
 from ..datadims import data_dims
+from ..util import register_module
 
 __all__ = ["Transform", "TransformedMultiOutputDistribution"]
 
@@ -75,16 +75,28 @@ class Transform:
         """Construct the `softplus` transform."""
 
         def transform(x):
-            return B.log(1 + B.exp(x))
+            return B.softplus(x)
 
         def transform_deriv(x):
-            return B.exp(x) / (1 + B.exp(x))
+            u = B.maximum(x, B.zero(x))
+            x = x - u
+            return B.exp(x) / (B.exp(x) + B.exp(-u))
 
         def untransform(y):
-            return B.log(B.exp(y) - 1)
+            # Clip the values to prevent NaNs
+            y_clipped = B.minimum(B.maximum(y, B.exp(-20) * B.one(y)), 20 * B.one(y))
+            # For big values, use an approximation.
+            res = B.where(y > 20, y, B.log(B.exp(y_clipped) - 1))
+            # For small values, also use an approximation.
+            res = B.where(y < B.exp(-20), B.log(y), res)
+            return res
 
         def untransform_logdet(y):
-            return B.exp(y) / (B.exp(y) - 1)
+            # Use the same approximations as above.
+            y_clipped = B.minimum(B.maximum(y, B.exp(-20) * B.one(y)), 20 * B.one(y))
+            res = B.where(y > 20, B.one(y), B.exp(y_clipped) / (B.exp(y_clipped) - 1))
+            res = B.where(y < B.exp(-20), 1 / y, res)
+            return res
 
         return cls(
             transform=transform,
