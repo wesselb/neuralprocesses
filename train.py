@@ -105,7 +105,7 @@ def main(**kw_args):
     parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
     parser.add_argument("--num-samples", type=int, default=20)
     parser.add_argument("--resume-at-epoch", type=int)
-    parser.add_argument("--train-test", action="store_true")
+    parser.add_argument("--train-fast", action="store_true")
     parser.add_argument("--check-completed", action="store_true")
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
