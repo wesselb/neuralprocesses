@@ -249,8 +249,10 @@ def test_elbo(nps, model_sample):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-    elbo = B.mean(nps.elbo(model, xc, yc, xt, yt, num_samples=2))
-    assert np.isfinite(B.to_numpy(elbo))
+    elbos = nps.elbo(model, xc, yc, xt, yt, num_samples=2)
+    assert B.rank(elbos) == 1
+    assert np.isfinite(B.to_numpy(B.sum(elbos)))
+    assert B.dtype(elbos) == nps.dtype64
 
 
 @pytest.mark.flaky(reruns=3)
@@ -258,8 +260,10 @@ def test_loglik(nps, model_sample):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-    logpdfs = B.mean(nps.loglik(model, xc, yc, xt, yt, num_samples=2))
-    assert np.isfinite(B.to_numpy(logpdfs))
+    logpdfs = nps.loglik(model, xc, yc, xt, yt, num_samples=2)
+    assert B.rank(logpdfs) == 1
+    assert np.isfinite(B.to_numpy(B.sum(logpdfs)))
+    assert B.dtype(logpdfs) == nps.dtype64
 
 
 @pytest.mark.flaky(reruns=3)
