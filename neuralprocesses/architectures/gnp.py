@@ -182,7 +182,6 @@ def construct_gnp(
             )
         ),
         likelihood,
-        nps.DensifyLowRankVariance(),
         parse_transform(nps, transform=transform),
     )
     return nps.Model(encoder, decoder)

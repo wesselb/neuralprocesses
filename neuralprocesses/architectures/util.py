@@ -32,7 +32,7 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
         lik = nps.HeterogeneousGaussianLikelihood()
     elif spec == "lowrank":
         num_channels = (2 + num_basis_functions) * dim_y
-        selector = nps.SelectFromChannels(dim_y, dim_y, (num_basis_functions, dim_y))
+        selector = nps.SelectFromChannels(dim_y, (num_basis_functions, dim_y), dim_y)
         lik = nps.LowRankGaussianLikelihood(num_basis_functions)
     elif spec == "dense":
         # This is intended to only work for global variables.

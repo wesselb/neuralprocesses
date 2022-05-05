@@ -345,7 +345,6 @@ def construct_convgnp(
                 )
             ),
             likelihood,
-            nps.DensifyLowRankVariance(),
             parse_transform(nps, transform=transform),
         ),
     )
