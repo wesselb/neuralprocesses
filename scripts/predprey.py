@@ -81,11 +81,11 @@ with torch.no_grad():
     )
 
     # Make predictions.
-    mean, _, noiseless_samples, noisy_samples = nps.predict(
+    mean, _, noiseless_samples, noisy_samples = nps.ar_predict(
         model,
         contexts,
         nps.AggregateInput((xt, 0), (xt, 1)),
-        num_samples=10_000,
+        num_samples=100,
     )
 
 # Plot the result.
