@@ -165,7 +165,7 @@ class SyntheticGenerator(DataGenerator):
 
             self.dim_y = dim_y
             self.dim_y_latent = dim_y_latent or dim_y
-            
+
             if self.dim_y > 1 or self.dim_y_latent > 1:
                 # Draw a random mixing matrix.
                 state_params, self.h = B.randn(
