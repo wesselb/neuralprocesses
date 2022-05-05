@@ -40,9 +40,9 @@ def predict(
     Args:
         state (random state, optional): Random state.
         model (:class:`.Model`): Model.
-        xc (tensor): Inputs of the context set.
+        xc (input): Inputs of the context set.
         yc (tensor): Output of the context set.
-        xt (tensor): Inputs of the target set.
+        xt (input): Inputs of the target set.
         num_samples (int, optional): Number of samples to produce. Defaults to 50.
         batch_size (int, optional): Batch size. Defaults to 16.
 

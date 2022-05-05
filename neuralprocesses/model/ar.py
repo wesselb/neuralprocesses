@@ -112,7 +112,7 @@ def ar_predict(
     Args:
         state (random state, optional): Random state.
         model (:class:`.Model`): Model.
-        xc (tensor): Inputs of the context set.
+        xc (input): Inputs of the context set.
         yc (tensor): Output of the context set.
         xt (:class:`neuralprocesses.aggregrate.AggregateInput`): Inputs of the target
             set. This must be an aggregate of inputs.

@@ -28,9 +28,9 @@ def loglik(
     Args:
         state (random state, optional): Random state.
         model (:class:`.Model`): Model.
-        xc (tensor): Inputs of the context set.
+        xc (input): Inputs of the context set.
         yc (tensor): Output of the context set.
-        xt (tensor): Inputs of the target set.
+        xt (input): Inputs of the target set.
         yt (tensor): Outputs of the target set.
         num_samples (int, optional): Number of samples. Defaults to 1.
         batch_size (int, optional): Batch size to use for sampling. Defaults to 16.

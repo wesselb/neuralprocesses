@@ -32,9 +32,9 @@ def elbo(
     Args:
         state (random state, optional): Random state.
         model (:class:`.Model`): Model.
-        xc (tensor): Inputs of the context set.
+        xc (input): Inputs of the context set.
         yc (tensor): Output of the context set.
-        xt (tensor): Inputs of the target set.
+        xt (input): Inputs of the target set.
         yt (tensor): Outputs of the target set.
         num_samples (int, optional): Number of samples. Defaults to 1.
         normalise (bool, optional): Normalise the objective by the number of targets.
