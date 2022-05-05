@@ -35,7 +35,7 @@ wd = WorkingDirectory("_experiments", "eval", "predprey")
 tex()
 
 # Increase regularisation.
-B.epsilon = 1e-5
+B.epsilon = 1e-6
 
 # Load the data.
 df = load()
@@ -69,15 +69,15 @@ contexts = [
 with torch.no_grad():
 
     # Perform evaluation.
+    xt_eval = nps.AggregateInput((x[:, :, ~mask_hare], 0), (x[:, :, ~mask_lynx], 1))
+    yt_eval = nps.Aggregate(y[:, 0:1, ~mask_hare], y[:, 1:2, ~mask_lynx])
     out.kv(
-        "Eval logpdf",
-        nps.ar_loglik(
-            model,
-            contexts,
-            nps.AggregateInput((x[:, :, ~mask_hare], 0), (x[:, :, ~mask_lynx], 1)),
-            nps.Aggregate(y[:, 0:1, ~mask_hare], y[:, 1:2, ~mask_lynx]),
-            normalise=True,
-        ),
+        "Logpdf",
+        nps.loglik(model, contexts, xt_eval, yt_eval, normalise=True),
+    )
+    out.kv(
+        "Logpdf (AR)",
+        nps.ar_loglik(model, contexts, xt_eval, yt_eval, normalise=True),
     )
 
     # Make predictions.
