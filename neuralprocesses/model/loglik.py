@@ -46,10 +46,6 @@ def loglik(
     float = B.dtype_float(yt)
     float64 = B.promote_dtypes(float, np.float64)
 
-    # If `num_samples = 1`, then there will not be a sample dimension, so we can
-    # avoid the `logsumexp`.
-    do_logsumexp = num_samples > 1
-
     # Sample in batches to alleviate memory requirements.
     logpdfs = None
     done_num_samples = 0
@@ -77,7 +73,6 @@ def loglik(
         if num_samples > 1 and B.shape(this_logpdfs, 0) == 1:
             logpdfs = this_logpdfs
             num_samples = 1
-            do_logsumexp = False
             break
 
         # Record current samples.
@@ -90,10 +85,8 @@ def loglik(
         # Increase the counter.
         done_num_samples += this_num_samples
 
-    # Average over samples.
-    if do_logsumexp:
-        # Sample dimension should always be the first.
-        logpdfs = B.logsumexp(logpdfs, axis=0) - B.log(num_samples)
+    # Average over samples. Sample dimension should always be the first.
+    logpdfs = B.logsumexp(logpdfs, axis=0) - B.log(num_samples)
 
     if normalise:
         # Normalise by the number of targets.

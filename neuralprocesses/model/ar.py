@@ -188,7 +188,7 @@ def ar_loglik(
     contexts: list,
     xt: AggregateInput,
     yt: Aggregate,
-    normalise=True,
+    normalise=False,
     order="random",
 ):
     """Autoregressive log-likelihood.
@@ -203,7 +203,7 @@ def ar_loglik(
         yt (:class:`neuralprocesses.aggregrate.Aggregate`): Outputs of the target
             set. This must be an aggregate of outputs.
         normalise (bool, optional): Normalise the objective by the number of targets.
-            Defaults to `True`.
+            Defaults to `False`.
         order (str, optional): Order. Must be one of `"random"`, `"given"`, or
             `"left-to-right"`. Defaults to `"random"`.
 
