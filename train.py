@@ -120,7 +120,7 @@ def main(**kw_args):
     parser.add_argument("--evaluate-batch-size", type=int, default=16)
     parser.add_argument("--no-action", action="store_true")
     parser.add_argument("--load", action="store_true")
-    parser.add_argument("--only-ar", action="store_true")
+    parser.add_argument("--ar", action="store_true")
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
         # Carefully convert these to command line arguments.
