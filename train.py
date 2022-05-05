@@ -110,14 +110,14 @@ def main(**kw_args):
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--evaluate-fast", action="store_true")
-    parser.add_argument("--evaluate-num-plots", type=int, default=10)
+    parser.add_argument("--evaluate-num-plots", type=int, default=0)
     parser.add_argument(
         "--evaluate-objective",
         choices=["loglik", "elbo"],
         default="loglik",
     )
     parser.add_argument("--evaluate-num-samples", type=int, default=512)
-    parser.add_argument("--evaluate-batch-size", type=int, default=16)
+    parser.add_argument("--evaluate-batch-size", type=int, default=8)
     parser.add_argument("--no-action", action="store_true")
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--ar", action="store_true")
