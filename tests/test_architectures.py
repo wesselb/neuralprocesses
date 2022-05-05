@@ -221,8 +221,9 @@ def check_prediction(nps, pred, yt):
         pred._noise = pred._noise + 1e-1 * B.eye(pred._noise)
 
     # Check that the log-pdf at the target data is finite and of the right data type.
-    objective = B.sum(pred.logpdf(yt))
-    assert np.isfinite(B.to_numpy(objective))
+    objective = pred.logpdf(yt)
+    assert B.rank(objective) == 1
+    assert np.isfinite(B.to_numpy(B.sum(objective)))
     assert B.dtype(objective) == nps.dtype
 
     if not isinstance(yt, nps.Aggregate):
