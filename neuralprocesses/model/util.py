@@ -64,10 +64,13 @@ def fix_noise(d, epoch: None):
 def fix_noise(d: MultiOutputNormal, epoch: int):
     # Fix noise to `1e-4` in the first three epochs.
     if epoch < 3:
-        var_diag = d.normal.var_diag
-        with B.on_device(var_diag):
-            var = Diagonal(1e-4 * B.ones(var_diag))
-        d = MultiOutputNormal(Normal(d.normal.mean, var), d.shape)
+        with B.on_device(d.vectorised_normal.var_diag):
+            d = MultiOutputNormal(
+                d._mean,
+                B.zeros(d._var),
+                1e-4 * Diagonal(B.ones(d.vectorised_normal.var_diag)),
+                d.shape,
+            )
     return d
 
 
