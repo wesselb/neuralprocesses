@@ -44,18 +44,65 @@ def cast(dtype: B.DType, agg: Aggregate):
     return Aggregate(*(B.cast(dtype, x) for x in agg))
 
 
-class AggregateInput(Aggregate):
+def _assert_equal_lengths(*elements):
+    if any(len(elements[0]) != len(e) for e in elements[1:]):
+        raise ValueError("Aggregates have unequal lengths.")
+
+
+def _map_f(name):
+    method = getattr(B, name)
+
+    @method.dispatch
+    def f(*args: Aggregate, **kw_args):
+        _assert_equal_lengths(*args)
+        return Aggregate(*(getattr(B, name)(*xs, **kw_args) for xs in zip(*args)))
+
+
+_map_f("add")
+_map_f("subtract")
+_map_f("multiply")
+_map_f("divide")
+
+_map_f("stack")
+_map_f("concat")
+_map_f("squeeze")
+_map_f("mean")
+
+
+@B.dispatch
+def max(a: Aggregate):
+    return B.max(B.stack(*(B.max(ai) for ai in a)))
+
+
+@B.dispatch
+def min(a: Aggregate):
+    return B.min(B.stack(*(B.min(ai) for ai in a)))
+
+
+class AggregateInput:
     """An ordered aggregate of inputs for specific outputs. This allow the user to
     specify different inputs for different outputs.
 
     Args:
         *elements (tuple[object, int]): A tuple of inputs and integers where the integer
             selects the particular output.
+
+    Attributes:
+        elements (tuple[object, int]): Elements in the aggregate input.
     """
 
     @_dispatch
     def __init__(self, *elements: Tuple[object, int]):
-        super().__init__(*elements)
+        self.elements = elements
+
+    def __iter__(self):
+        return iter(self.elements)
+
+    def __len__(self):
+        return len(self.elements)
+
+    def __getitem__(self, item):
+        return self.elements[item]
 
 
 @B.dispatch
