@@ -49,13 +49,27 @@ def _assert_equal_lengths(*elements):
         raise ValueError("Aggregates have unequal lengths.")
 
 
-def _map_f(name):
+def _map_f(name, num_args):
     method = getattr(B, name)
 
-    @method.dispatch
-    def f(*args: Aggregate, **kw_args):
-        _assert_equal_lengths(*args)
-        return Aggregate(*(getattr(B, name)(*xs, **kw_args) for xs in zip(*args)))
+    if num_args == "*":
+
+        @method.dispatch
+        def f(*args: Aggregate, **kw_args):
+            _assert_equal_lengths(*args)
+            return Aggregate(*(getattr(B, name)(*xs, **kw_args) for xs in zip(*args)))
+
+    elif num_args == 2:
+
+        @method.dispatch
+        def f(a: Aggregate, b: Aggregate, **kw_args):
+            _assert_equal_lengths(a, b)
+            return Aggregate(
+                *(getattr(B, name)(ai, bi, **kw_args) for ai, bi in zip(a, b))
+            )
+
+    else:
+        raise ValueError(f"Invalid number of arguments {num_args}.")
 
 
 _map_f("add")
