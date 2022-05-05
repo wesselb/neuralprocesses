@@ -1,3 +1,5 @@
+import argparse
+
 import lab as B
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +13,12 @@ from wbml.plot import tweak, tex, pdfcrop
 import neuralprocesses.torch as nps
 from train import main
 
+# Setup script.
+parser = argparse.ArgumentParser()
+parser.add_argument("--model", type=str, required=True)
+parser.add_argument("--ar", action="store_true")
+args = parser.parse_args()
+
 wbml.out.report_time = True
 
 # Load experiment.
@@ -18,7 +26,7 @@ with out.Section("Loading experiment"):
     exp = main(
         # The keyword arguments here must line up with the arguments you provide on the
         # command line.
-        model="convcnp",
+        model=args.model,
         data="predprey",
         # Point `root` to where the `_experiments` directory is located. In my case,
         # I'm `rsync`ing it to the directory `server`.
@@ -31,7 +39,7 @@ with out.Section("Loading experiment"):
     )
 
 # Setup another working directory to save output of the evaluation in.
-wd = WorkingDirectory("_experiments", "eval", "predprey")
+wd = WorkingDirectory("_experiments", "eval", "predprey", args.model)
 tex()
 
 # Increase regularisation.
@@ -75,13 +83,15 @@ with torch.no_grad():
         "Logpdf",
         nps.loglik(model, contexts, xt_eval, yt_eval, normalise=True),
     )
-    out.kv(
-        "Logpdf (AR)",
-        nps.ar_loglik(model, contexts, xt_eval, yt_eval, normalise=True),
-    )
+    if args.ar:
+        out.kv(
+            "Logpdf (AR)",
+            nps.ar_loglik(model, contexts, xt_eval, yt_eval, normalise=True),
+        )
 
     # Make predictions.
-    mean, _, noiseless_samples, noisy_samples = nps.ar_predict(
+    predict = nps.ar_predict if args.ar else nps.predict
+    mean, _, noiseless_samples, noisy_samples = predict(
         model,
         contexts,
         nps.AggregateInput((xt, 0), (xt, 1)),
