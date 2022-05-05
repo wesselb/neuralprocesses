@@ -38,14 +38,16 @@ def visualise_1d(model, gen, *, path, config, predict):
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
-        x = B.linspace(B.dtype(batch["xt"]), *plot_config["range"], 500)
+        x = B.linspace(B.dtype(batch["xt"]), *plot_config["range"], 200)
 
-    # Predict with model and produce five noiseless samples.
+    # Predict with model.
     with torch.no_grad():
-        mean, var, samples = predict(
+        mean, var, samples, _ = predict(
             model,
             batch["contexts"],
-            x[None, None, :],
+            nps.AggregateInput(
+                *((x[None, None, :], i) for i in range(config["dim_y"]))
+            ),
         )
 
     plt.figure(figsize=(8, 6 * config["dim_y"]))
@@ -70,22 +72,22 @@ def visualise_1d(model, gen, *, path, config, predict):
         )
 
         # Plot prediction.
-        err = 1.96 * B.sqrt(var)
+        err = 1.96 * B.sqrt(var[i][0])
         plt.plot(
             x,
-            mean[0, i],
+            mean[i][0],
             label="Prediction",
             style="pred",
         )
         plt.fill_between(
             x,
-            mean[0, i] - err[0, i],
-            mean[0, i] + err[0, i],
+            mean[i][0] - err,
+            mean[i][0] + err,
             style="pred",
         )
         plt.plot(
             x,
-            samples[:, 0, i].T,
+            samples[i][:10, 0].T,
             style="pred",
             ls="-",
             lw=0.5,
@@ -123,47 +125,33 @@ def visualise_2d(model, gen, *, path, config, predict):
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
-        x = B.linspace(B.dtype(batch["xt"]), *plot_config["range"], 100)
-        x = x[None, None, :]
+        # For now we use list form, because not all components yet support tuple
+        # specification.
+        # TODO: Use tuple specification when it is supported everywhere.
+        n = 100
+        x = B.linspace(B.dtype(batch["xt"]), *plot_config["range"], n)
+        x0 = B.flatten(B.broadcast_to(x[:, None], n, n))
+        x1 = B.flatten(B.broadcast_to(x[None, :], n, n))
+        x_list = B.stack(x0, x1)
 
     # Predict with model and produce five noiseless samples.
     with torch.no_grad():
-        try:
-            mean, _, samples = predict(
-                model,
-                batch["contexts"],
-                (x, x),
-                num_samples=5,
-            )
-        except:
-            # The model probably doesn't suppose the tuple shorthand for grids. Do it
-            # in a different way.
-            with B.on_device(x):
-                x0 = x[..., :, None]
-                x1 = x[..., None, :]
-                # Perform broadcasting.
-                x0 = x0 * B.ones(x1)
-                x1 = x1 * B.ones(x0)
-                # Reshape into lists.
-                x0 = B.reshape(x0, *B.shape(x0)[:-2], -1)
-                x1 = B.reshape(x1, *B.shape(x1)[:-2], -1)
-                # Run model on whole list.
-                mean, _, samples = nps.predict(
-                    model,
-                    batch["contexts"],
-                    B.concat(x0, x1, axis=-2),
-                    num_samples=5,
-                )
-                # Reshape the results back to images.
-                mean = B.reshape(mean, *B.shape(mean)[:-1], 100, 100)
-                samples = B.reshape(samples, *B.shape(samples)[:-1], 100, 100)
+        mean, _, samples, _ = predict(
+            model,
+            batch["contexts"],
+            nps.AggregateInput(
+                *((x_list[None, :, :], i) for i in range(config["dim_y"]))
+            ),
+            num_samples=2,
+        )
 
     vmin = max(B.max(mean), B.max(samples))
     vmax = min(B.min(mean), B.min(samples))
 
     def plot_imshow(image, i, label):
+        image = B.reshape(image, n, n)
         plt.imshow(
-            image.T,
+            B.transpose(image),
             cmap="viridis",
             vmin=vmax,
             vmax=vmin,
@@ -207,21 +195,21 @@ def visualise_2d(model, gen, *, path, config, predict):
         plt.subplot(config["dim_y"], 3, 1 + i * 3)
         if i == 0:
             plt.title("Mean")
-        plot_imshow(mean[0, i], i, label="Mean")
+        plot_imshow(mean[i][0, 0], i, label="Mean")
         tweak(grid=False)
 
         # Plot first sample.
         plt.subplot(config["dim_y"], 3, 2 + i * 3)
         if i == 0:
-            plt.title("Sample")
-        plot_imshow(samples[0, 0, i], i, label="Sample 1")
+            plt.title("Sample 1")
+        plot_imshow(samples[i][0, 0, 0], i, label="Sample")
         tweak(grid=False)
 
         # Plot second sample.
         plt.subplot(config["dim_y"], 3, 3 + i * 3)
         if i == 0:
-            plt.title("Sample")
-        plot_imshow(samples[1, 0, i], i, label="Sample 2")
+            plt.title("Sample 2")
+        plot_imshow(samples[i][1, 0, 0], i, label="Sample")
         tweak(grid=False)
 
     plt.savefig(path)
