@@ -56,10 +56,10 @@ def construct_gnp(
         dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
             `"het"` or `"dense"`. Defaults to `"het"`.
-        transform (str or tuple[float, float], optional): Bijection applied to the
+        transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
-            Must be either `"positive"` for positive data or `(lower, upper)` for data
-            in this open interval.
+            Must be either `"positive"`, `"exp"`, or `"softplus"` for positive data or
+            `(lower, upper)` for data in this open interval.
         dtype (dtype, optional): Data type.
 
     Returns:

@@ -1,5 +1,3 @@
-import lab as B
-
 import neuralprocesses as nps  # This fixes inspection below.
 
 __all__ = [
@@ -62,14 +60,16 @@ def parse_transform(nps=nps, *, transform):
         nps (module): Appropriate backend-specific module.
         transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
-            Must be either `"positive"` for positive data or `(lower, upper)` for data
-            in this open interval.
+            Must be either `"positive"`, `"exp"`, or `"softplus"` for positive data or
+            `(lower, upper)` for data in this open interval.
 
     Returns:
         coder: Transform.
     """
-    if isinstance(transform, str) and transform.lower() == "positive":
-        transform = nps.Transform.positive()
+    if isinstance(transform, str) and transform.lower() in {"positive", "exp"}:
+        transform = nps.Transform.exp()
+    elif isinstance(transform, str) and transform.lower() == "softplus":
+        transform = nps.Transform.softplus()
     elif isinstance(transform, tuple):
         lower, upper = transform
         transform = nps.Transform.bounded(lower, upper)

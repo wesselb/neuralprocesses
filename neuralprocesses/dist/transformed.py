@@ -48,7 +48,7 @@ class Transform:
         return TransformedMultiOutputDistribution(dist, self)
 
     @classmethod
-    def positive(cls):
+    def exp(cls):
         """Construct the `exp` transform."""
 
         def transform(x):
@@ -57,11 +57,34 @@ class Transform:
         def transform_deriv(x):
             return B.exp(x)
 
-        def untransform(x):
-            return B.log(x)
+        def untransform(y):
+            return B.log(y)
 
-        def untransform_logdet(x):
-            return -B.log(x)
+        def untransform_logdet(y):
+            return -B.log(y)
+
+        return cls(
+            transform=transform,
+            transform_deriv=transform_deriv,
+            untransform=untransform,
+            untransform_logdet=untransform_logdet,
+        )
+
+    @classmethod
+    def softplus(cls):
+        """Construct the `softplus` transform."""
+
+        def transform(x):
+            return B.log(1 + B.exp(x))
+
+        def transform_deriv(x):
+            return B.exp(x) / (1 + B.exp(x))
+
+        def untransform(y):
+            return B.log(B.exp(y) - 1)
+
+        def untransform_logdet(y):
+            return B.exp(y) / (B.exp(y) - 1)
 
         return cls(
             transform=transform,
@@ -86,11 +109,11 @@ class Transform:
             denom = 1 + B.exp(-x)
             return (upper - lower) * B.exp(-x) / (denom * denom)
 
-        def untransform(x):
-            return B.log(x - lower) - B.log(upper - x)
+        def untransform(y):
+            return B.log(y - lower) - B.log(upper - y)
 
-        def untransform_logdet(x):
-            return B.log(1 / (x - lower) + 1 / (upper - x))
+        def untransform_logdet(y):
+            return B.log(1 / (y - lower) + 1 / (upper - y))
 
         return cls(
             transform=transform,

@@ -14,7 +14,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["points_per_unit"] = 4
     config["margin"] = 1
     config["dws_receptive_field"] = 100
-    config["transform"] = "positive"
+    config["transform"] = "softplus"
 
     # Other settings specific to the predator-prey experiments:
     config["plot"] = {1: {"range": (0, 100), "axvline": []}}
