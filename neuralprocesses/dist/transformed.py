@@ -131,6 +131,12 @@ class TransformedMultiOutputDistribution(AbstractMultiOutputDistribution):
         )
 
     @property
+    def noiseless(self):
+        """:class:`.TransformedMultiOutputNormal`: Noiseless version of the
+        distribution."""
+        return TransformedMultiOutputDistribution(self.dist.noiseless, self.transform)
+
+    @property
     def mean(self):
         return _map_aggregate(self.transform.transform, self.dist.mean)
 
@@ -168,6 +174,11 @@ def dtype(dist: TransformedMultiOutputDistribution):
 @B.dispatch
 def cast(dtype: B.DType, dist: TransformedMultiOutputDistribution):
     return TransformedMultiOutputDistribution(B.cast(dtype, dist.dist), dist.transform)
+
+
+@B.dispatch
+def shape_batch(dist: TransformedMultiOutputDistribution):
+    return B.shape_batch(dist.dist)
 
 
 @_dispatch

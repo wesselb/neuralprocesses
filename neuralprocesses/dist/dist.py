@@ -1,7 +1,5 @@
 import abc
 
-import lab as B
-
 __all__ = ["AbstractMultiOutputDistribution", "AbstractDistribution"]
 
 
