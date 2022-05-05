@@ -113,7 +113,7 @@ plt.scatter(
 )
 plt.scatter(x[0, 0, ~mask_hare], y[0, 0, ~mask_hare], marker="o", style="test", s=20)
 plt.plot(xt[0, 0], mean[0][0, 0, :], style="pred")
-plt.plot(xt[0, 0], noiseless_samples[0][:5, 0, 0, :].T, style="pred", ls="-", lw=0.5)
+plt.plot(xt[0, 0], noiseless_samples[0][:10, 0, 0, :].T, style="pred", ls="-", lw=0.5)
 plt.fill_between(
     xt[0, 0],
     B.quantile(noisy_samples[0][:, 0, 0, :], 2.5 / 100, axis=0),
@@ -134,7 +134,7 @@ plt.scatter(
 )
 plt.scatter(x[0, 0, ~mask_lynx], y[0, 1, ~mask_lynx], marker="o", style="test", s=20)
 plt.plot(xt[0, 0], mean[1][0, 0, :], style="pred")
-plt.plot(xt[0, 0], noiseless_samples[1][:5, 0, 0, :].T, style="pred", ls="-", lw=0.5)
+plt.plot(xt[0, 0], noiseless_samples[1][:10, 0, 0, :].T, style="pred", ls="-", lw=0.5)
 plt.fill_between(
     xt[0, 0],
     B.quantile(noisy_samples[1][:, 0, 0, :], 2.5 / 100, axis=0),
