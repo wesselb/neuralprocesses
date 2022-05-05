@@ -1,8 +1,8 @@
 import lab as B
 import numpy as np
 
-from .model import Model, compress_contexts
-from .util import sample, fix_noise
+from .model import Model
+from .util import sample, fix_noise, compress_contexts
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
 from ..coding import code, code_track, recode_stochastic

@@ -217,18 +217,8 @@ def model_sample(request, nps, config):
 def check_prediction(nps, pred, yt):
     # Stabilise the matrix inversion lemma by ensuring that the model didn't output
     # too small noise variances.
-
-    try:
-        if isinstance(pred.normal.var, Woodbury):
-            pred = nps.MultiOutputNormal(
-                Normal(
-                    pred.normal.mean,
-                    Diagonal(1e-2 + B.diag(pred.normal.var.diag)) + pred.normal.var.lr,
-                ),
-                pred.shape,
-            )
-    except AttributeError:
-        pass  # Probably `pred.normal.var` failed. That's fine.
+    if hasattr(pred, "_noise"):
+        pred._noise = pred._noise + 1e-1 * B.eye(pred._noise)
 
     # Check that the log-pdf at the target data is finite and of the right data type.
     objective = B.sum(pred.logpdf(yt))
@@ -240,6 +230,7 @@ def check_prediction(nps, pred, yt):
         assert B.shape(pred.mean) == B.shape(yt)
         assert B.shape(pred.var) == B.shape(yt)
         assert B.shape(pred.sample()) == B.shape(yt)
+        assert B.shape(pred.sample(1)) == (1,) + B.shape(yt)
         assert B.shape(pred.sample(2)) == (2,) + B.shape(yt)
 
 
@@ -275,17 +266,18 @@ def test_predict(nps, model_sample):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-    mean, var, samples = nps.predict(
+    mean, var, samples, noisy_samples = nps.predict(
         model,
         xc,
         yc,
         xt,
-        num_samples=2,
-        pred_num_samples=2,
+        num_samples=3,
+        batch_size=2,
     )
     assert B.shape(mean) == B.shape(yt)
     assert B.shape(var) == B.shape(yt)
-    assert B.shape(samples) == (2,) + B.shape(yt)
+    assert B.shape(samples) == (3,) + B.shape(yt)
+    assert B.shape(noisy_samples) == (3,) + B.shape(yt)
 
 
 @pytest.mark.flaky(reruns=3)

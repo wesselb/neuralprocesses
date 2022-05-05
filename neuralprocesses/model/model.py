@@ -2,15 +2,14 @@ import lab as B
 from matrix.util import indent
 from plum import List, Tuple, Union
 
-from .util import sample
+from .util import sample, compress_contexts
 from .. import _dispatch
 from ..augment import AugmentedInput
 from ..coding import code
 from ..mask import Masked
-from ..parallel import Parallel
 from ..util import register_module
 
-__all__ = ["Model", "compress_contexts"]
+__all__ = ["Model"]
 
 
 @register_module
@@ -38,7 +37,7 @@ class Model:
         yc,
         xt,
         *,
-        num_samples=1,
+        num_samples=None,
         aux_t=None,
         dtype_enc_sample=None,
         **kw_args,
@@ -50,8 +49,7 @@ class Model:
             xc (input): Context inputs.
             yc (tensor): Context outputs.
             xt (input): Target inputs.
-            num_samples (int, optional): Number of samples, if applicable. Defaults
-                to 1.
+            num_samples (int, optional): Number of samples, if applicable.
             aux_t (tensor, optional): Target-specific auxiliary input, if applicable.
             dtype_enc_sample (dtype, optional): Data type to convert the sampled
                 encoding to.
@@ -131,25 +129,4 @@ class Model:
             + ",\n"
             + indent(repr(self.decoder), " " * 4)
             + "\n)"
-        )
-
-
-@_dispatch
-def compress_contexts(contexts: list):
-    """Compress multiple context sets into a single `(x, y)` pair.
-
-    Args:
-        contexts (list): Context sets.
-
-    Returns:
-        input: Context inputs.
-        object: Context outputs.
-    """
-    # Don't unnecessarily wrap things in a `Parallel`.
-    if len(contexts) == 1:
-        return contexts[0]
-    else:
-        return (
-            Parallel(*(c[0] for c in contexts)),
-            Parallel(*(c[1] for c in contexts)),
         )

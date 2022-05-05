@@ -71,11 +71,13 @@ def loglik(
         this_logpdfs = pred.logpdf(B.cast(float64, yt))
 
         # If the number of samples is equal to one but `num_samples > 1`, then the
-        # likelihood was a `Dirac`, so we can stop batching. Also, set `num_samples = 1`
-        # because we only have one sample now.
+        # encoding was a `Dirac`, so we can stop batching. Also, set `num_samples = 1`
+        # because we only have one sample now. We also don't need to do the
+        # `logsumexp` anymore.
         if num_samples > 1 and B.shape(this_logpdfs, 0) == 1:
             logpdfs = this_logpdfs
             num_samples = 1
+            do_logsumexp = False
             break
 
         # Record current samples.

@@ -2,11 +2,11 @@ import lab as B
 from lab.util import resolve_axis
 
 from . import _dispatch
+from .aggregate import AggregateInput, Aggregate
 from .datadims import data_dims
 from .dist import MultiOutputNormal, Dirac
 from .parallel import Parallel
-from .util import register_module, split, split_dimension, select
-from .aggregate import AggregateInput, Aggregate
+from .util import register_module, split, split_dimension
 
 __all__ = [
     "DeterministicLikelihood",
@@ -97,7 +97,6 @@ def code(
     x,
     *,
     dtype_lik=None,
-    noiseless=False,
     **kw_args,
 ):
     mean, noise, shape = _code_het(coder, xz, z)
@@ -106,12 +105,6 @@ def code(
     if dtype_lik:
         mean = B.cast(dtype_lik, mean)
         noise = B.cast(dtype_lik, noise)
-
-    # Make a noiseless prediction.
-    if noiseless:
-        with B.on_device(noise):
-            noise = B.zeros(noise)
-
     return xz, MultiOutputNormal.diagonal(mean, noise, shape)
 
 
@@ -183,40 +176,34 @@ def code(
     z,
     x,
     *,
-    noiseless=False,
     dtype_lik=None,
     **kw_args,
 ):
 
-    mean, noise, var_factor, shape = _lowrank(coder, xz, z)
+    mean, var_factor, noise, shape = _lowrank(coder, xz, z)
 
     # Cast the parameters before constructing the distribution.
     if dtype_lik:
         mean = B.cast(dtype_lik, mean)
-        noise = B.cast(dtype_lik, noise)
         var_factor = B.cast(dtype_lik, var_factor)
+        noise = B.cast(dtype_lik, noise)
 
-    # Make a noiseless prediction.
-    if noiseless:
-        with B.on_device(noise):
-            noise = B.zeros(noise)
-
-    return xz, MultiOutputNormal.lowrank(mean, noise, var_factor, shape)
+    return xz, MultiOutputNormal.lowrank(mean, var_factor, noise, shape)
 
 
 @_dispatch
 def _lowrank(coder: LowRankGaussianLikelihood, xz: AggregateInput, z: Aggregate):
-    means, noises, var_factors, shapes = zip(
+    means, var_factors, noises, shapes = zip(
         *[_lowrank(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
     )
 
     # Concatenate into one big Gaussian.
     mean = B.concat(*means, axis=-1)
-    noise = B.concat(*noises, axis=-1)
     var_factor = B.concat(*var_factors, axis=-2)
+    noise = B.concat(*noises, axis=-1)
     shape = Aggregate(*shapes)
 
-    return mean, noise, var_factor, shape
+    return mean, var_factor, noise, shape
 
 
 @_dispatch
@@ -226,14 +213,14 @@ def _lowrank(coder: LowRankGaussianLikelihood, xz, z: B.Numeric):
     dim_y = B.shape(z, -d - 1) // (2 + coder.rank)
     dim_inner = B.shape(z, -d - 1) - 2 * dim_y
 
-    z_mean, z_noise, z_var_factor = split(z, (dim_y, dim_y, coder.rank * dim_y), -d - 1)
+    z_mean, z_var_factor, z_noise = split(z, (dim_y, coder.rank * dim_y, dim_y), -d - 1)
     # Split of the ranks of the factor.
     z_var_factor = split_dimension(z_var_factor, -d - 1, (coder.rank, dim_y))
 
     # Vectorise the data. Record the shape!
     z_mean, shape = _vectorise(z_mean, d + 1)
-    z_noise, _ = _vectorise(z_noise, d + 1)
     z_var_factor, _ = _vectorise(z_var_factor, d + 1)
+    z_noise, _ = _vectorise(z_noise, d + 1)
 
     # Put the dimensions of the factor last, because that it what the constructor
     # assumes.
@@ -241,13 +228,13 @@ def _lowrank(coder: LowRankGaussianLikelihood, xz, z: B.Numeric):
 
     # Transform into parameters.
     mean = z_mean
-    noise = coder.epsilon + B.softplus(z_noise)
     # Intuitively, roughly `var_factor ** 2` summed along the columns will determine the
     # output variances. We divide by the square root of the number of columns to
     # stabilise this.
     var_factor = z_var_factor / B.shape(z_var_factor, -1)
+    noise = coder.epsilon + B.softplus(z_noise)
 
-    return mean, noise, var_factor, shape
+    return mean, var_factor, noise, shape
 
 
 @register_module
@@ -282,30 +269,24 @@ def code(
     x,
     *,
     dtype_lik=None,
-    noiseless=False,
     **kw_args,
 ):
 
     z_mean_noise, z_var = z
 
-    mean, noise, var, shape = _dense(coder, *xz, *z)
+    mean, var, noise, shape = _dense(coder, *xz, *z)
 
     # Cast parameters to the right data type.
     if dtype_lik:
         mean = B.cast(dtype_lik, mean)
-        noise = B.cast(dtype_lik, noise)
         var = B.cast(dtype_lik, var)
-
-    # Make a noiseless prediction.
-    if noiseless:
-        with B.on_device(noise):
-            noise = B.zeros(noise)
+        noise = B.cast(dtype_lik, noise)
 
     # Return the inputs for the mean. The inputs for the variance will have been
     # duplicated.
     xz = xz[0]
 
-    return xz, MultiOutputNormal.dense(mean, noise, var, shape)
+    return xz, MultiOutputNormal.dense(mean, var, noise, shape)
 
 
 @_dispatch
@@ -318,7 +299,7 @@ def _dense(
 ):
     mean, noise, shape = _dense_mean(coder, xz_mean, z_mean)
     var = _dense_var(coder, xz_var, z_var)
-    return mean, noise, var, shape
+    return mean, var, noise, shape
 
 
 @_dispatch
@@ -339,11 +320,11 @@ def _dense(
 
     # Concatenate everything into one big Gaussian.
     mean = B.concat(*means, axis=-1)
-    noise = B.concat(*noises, axis=-1)
     var = B.concat2d(*vars)
+    noise = B.concat(*noises, axis=-1)
     shape = Aggregate(*shapes)
 
-    return mean, noise, var, shape
+    return mean, var, noise, shape
 
 
 @_dispatch

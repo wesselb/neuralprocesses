@@ -3,8 +3,8 @@ from wbml.util import indented_kv
 
 from .dist import AbstractMultiOutputDistribution
 from .. import _dispatch
-from ..util import batch
 from ..aggregate import Aggregate
+from ..util import batch
 
 __all__ = ["Dirac"]
 
@@ -68,19 +68,18 @@ class Dirac(AbstractMultiOutputDistribution):
         return Dirac._logpdf(x[0], d[0])
 
     @_dispatch
-    def sample(self, num=1):
+    def sample(self, num=None):
         return self._sample(self.x, num=num)
 
     @_dispatch
-    def sample(self, state: B.RandomState, num=1):
+    def sample(self, state: B.RandomState, num=None):
         return state, self.sample(num=num)
 
     @staticmethod
     @_dispatch
     def _sample(x: B.Numeric, *, num):
-        # If there is only one sample, squeeze the sample dimension, which happens
-        # here by not adding it.
-        if num == 1:
+        # If no number of samples was specified, don't add a sample dimension.
+        if num is None:
             return x
         else:
             # Don't tile. This way is more efficient.
