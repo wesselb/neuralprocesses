@@ -488,7 +488,7 @@ def main(**kw_args):
                             state, _ = eval(state, model, objective_eval, gen)
 
         # Always run AR evaluation for the conditional models.
-        if model in {"cnp", "acnp", "convcnp"} or args.ar:
+        if args.model in {"cnp", "acnp", "convcnp"} or args.ar:
             # Make some plots.
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
