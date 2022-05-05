@@ -77,7 +77,7 @@ def main(**kw_args):
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--dim-x", type=int, default=1)
     parser.add_argument("--dim-y", type=int, default=1)
-    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--rate", type=float, default=3e-4)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument(
@@ -110,7 +110,7 @@ def main(**kw_args):
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--evaluate-fast", action="store_true")
-    parser.add_argument("--evaluate-plot-num-samples", type=int, default=10)
+    parser.add_argument("--evaluate-num-plots", type=int, default=10)
     parser.add_argument(
         "--evaluate-objective",
         choices=["loglik", "elbo"],
@@ -120,7 +120,6 @@ def main(**kw_args):
     parser.add_argument("--evaluate-batch-size", type=int, default=16)
     parser.add_argument("--no-action", action="store_true")
     parser.add_argument("--load", action="store_true")
-    parser.add_argument("--ar", action="store_true")
     parser.add_argument("--only-ar", action="store_true")
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -216,9 +215,9 @@ def main(**kw_args):
     gen_train, gen_cv, gens_eval = exp.data[args.data]["setup"](
         args,
         config,
-        num_tasks_train=2**6 if args.train_test else 2**14,
-        num_tasks_cv=2**6 if args.train_test else 2**12,
-        num_tasks_eval=2**6 if args.evaluate_fast else 2**14,
+        num_tasks_train=2**6 if args.train_fast else 2**14,
+        num_tasks_cv=2**6 if args.train_fast else 2**12,
+        num_tasks_eval=2**6 if args.evaluate_fast else 2**12,
         device=device,
     )
 
@@ -471,9 +470,9 @@ def main(**kw_args):
             name = "model-best.torch"
         model.load_state_dict(torch.load(wd.file(name), map_location=device)["weights"])
 
-        if not args.only_ar:
+        if not args.ar:
             # Make some plots.
-            for i in range(args.evaluate_plot_num_samples):
+            for i in range(args.evaluate_num_plots):
                 exp.visualise(
                     model,
                     gen_cv,
@@ -488,9 +487,10 @@ def main(**kw_args):
                         with out.Section(gen_name.capitalize()):
                             state, _ = eval(state, model, objective_eval, gen)
 
-        if args.ar or args.only_ar:
+        # Always run AR evaluation for the conditional models.
+        if model in {"cnp", "acnp", "convcnp"} or args.ar:
             # Make some plots.
-            for i in range(args.evaluate_plot_num_samples):
+            for i in range(args.evaluate_num_plots):
                 exp.visualise(
                     model,
                     gen_cv,
