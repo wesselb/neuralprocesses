@@ -121,6 +121,7 @@ def main(**kw_args):
     parser.add_argument("--no-action", action="store_true")
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--ar", action="store_true")
+    parser.add_argument("--only-ar", action="store_true")
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
         # Carefully convert these to command line arguments.
@@ -468,9 +469,9 @@ def main(**kw_args):
             name = "model-last.torch"
         else:
             name = "model-best.torch"
-        model.load_state_dict(torch.load(wd.file(name)["weights"], map_location=device))
+        model.load_state_dict(torch.load(wd.file(name), map_location=device)["weights"])
 
-        if not args.ar:
+        if not args.only_ar:
             # Make some plots.
             for i in range(args.evaluate_plot_num_samples):
                 exp.visualise(
@@ -487,8 +488,7 @@ def main(**kw_args):
                         with out.Section(gen_name.capitalize()):
                             state, _ = eval(state, model, objective_eval, gen)
 
-        # Do AR evaluation, but only for the conditional models.
-        if args.model in {"cnp", "acnp", "convcnp"}:
+        if args.ar or args.only_ar:
             # Make some plots.
             for i in range(args.evaluate_plot_num_samples):
                 exp.visualise(
@@ -499,17 +499,15 @@ def main(**kw_args):
                     predict=nps.ar_predict,
                 )
 
-            # For both random and left-to-right ordering, do AR testing.
-            for order in ["random", "left-to-right"]:
-                with out.Section(order.capitalize()):
-                    for name, gen in gens_eval():
-                        with out.Section(name.capitalize()):
-                            state, _ = eval(
-                                state,
-                                model,
-                                partial(nps.ar_loglik, order=order, normalise=True),
-                                gen,
-                            )
+            with out.Section("AR"):
+                for name, gen in gens_eval():
+                    with out.Section(name.capitalize()):
+                        state, _ = eval(
+                            state,
+                            model,
+                            partial(nps.ar_loglik, order="random", normalise=True),
+                            gen,
+                        )
     else:
         # Perform training. First, check if we want to resume training.
         start = 0
