@@ -52,12 +52,11 @@ def _assert_equal_lengths(*elements):
 def _map_f(name, num_args):
     method = getattr(B, name)
 
-    if num_args == "*":
+    if num_args == 1:
 
         @method.dispatch
-        def f(*args: Aggregate, **kw_args):
-            _assert_equal_lengths(*args)
-            return Aggregate(*(getattr(B, name)(*xs, **kw_args) for xs in zip(*args)))
+        def f(a: Aggregate, **kw_args):
+            return Aggregate(*(getattr(B, name)(ai, **kw_args) for ai in a))
 
     elif num_args == 2:
 
@@ -68,19 +67,28 @@ def _map_f(name, num_args):
                 *(getattr(B, name)(ai, bi, **kw_args) for ai, bi in zip(a, b))
             )
 
+    elif num_args == "*":
+
+        @method.dispatch
+        def f(*args: Aggregate, **kw_args):
+            _assert_equal_lengths(*args)
+            return Aggregate(*(getattr(B, name)(*xs, **kw_args) for xs in zip(*args)))
+
     else:
         raise ValueError(f"Invalid number of arguments {num_args}.")
 
 
-_map_f("add")
-_map_f("subtract")
-_map_f("multiply")
-_map_f("divide")
+_map_f("mean", 1)
 
-_map_f("stack")
-_map_f("concat")
-_map_f("squeeze")
-_map_f("mean")
+_map_f("add", 2)
+_map_f("subtract", 2)
+_map_f("multiply", 2)
+_map_f("divide", 2)
+
+
+_map_f("stack", "*")
+_map_f("concat", "*")
+_map_f("squeeze", "*")
 
 
 @B.dispatch
