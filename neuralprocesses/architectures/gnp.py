@@ -146,7 +146,7 @@ def construct_gnp(
                 in_dim=dim_embedding * len(dim_yc),
                 out_dim=lv_mlp_out_channels,
                 num_layers=num_enc_layers,
-                width=width,
+                width=width * len(dim_yc),
                 dtype=dtype,
             ),
             lv_likelihood,
