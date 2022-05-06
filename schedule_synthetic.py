@@ -167,7 +167,14 @@ async def main():
         required=True,
     )
     parser.add_argument("--dim-y", type=int, required=True)
-    parser.add_argument("--latent-variable", action="store_true")
+    parser.add_argument(
+        "--mode",
+        choices=[
+            "conditional",
+            "latent-variable",
+        ],
+        required=True,
+    )
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--memory", type=int, default=11_019)
     parser.add_argument("--test", action="store_true")
