@@ -286,8 +286,8 @@ async def main():
             if stats["memory"] + 1.10 * benchmark[c]["memory"] > 0.9 * args.memory:
                 # Takes too much memory.
                 continue
-            if stats["utilisation"] + benchmark[c]["utilisation"] > 120:
-                # Fine to max out the GPU, but not much more than that.
+            if stats["utilisation"] + benchmark[c]["utilisation"] > 100:
+                # Don't more than max out the GPU.
                 continue
             eligible_commands.append(c)
 
