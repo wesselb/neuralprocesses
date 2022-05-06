@@ -187,7 +187,7 @@ async def main():
     out.report_time = True
 
     # Determine the suite of experiments to run.
-    if not args.latent_variable:
+    if args.mode == "conditional":
         # Conditional models:
         commands = [
             f"python train_gp.py"
@@ -207,7 +207,7 @@ async def main():
             ]
             if not (dim_x == 2 and model == "fullconvgnp")
         ]
-    else:
+    elif args.mode == "latent-variable":
         # Latent-variable models:
         commands = (
             [
@@ -240,6 +240,8 @@ async def main():
                 ]
             ]
         )
+    else:
+        raise RuntimeError(f'Bad mode "{args.mode}".')
 
     # If we're evaluating, simply append `--evaluate`, which runs both normal evaluation
     # and AR evaluation.
