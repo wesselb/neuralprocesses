@@ -1,3 +1,4 @@
+from functools import wraps
 import lab as B
 import numpy as np
 from lab.util import resolve_axis
@@ -7,14 +8,20 @@ __all__ = [
     "register_module",
     "models",
     "register_model",
+    "composite_coders",
+    "register_composite_coder",
+    "is_composite_coder",
+    "wrapped_partial",
     "is_nonempty",
     "batch",
     "compress_batch_dimensions",
     "split",
-    "split_channels",
+    "split_dimension",
+    "merge_dimensions",
+    "select",
 ]
 
-modules = []  #: Registered modules.
+modules = []  #: Registered modules
 
 
 def register_module(module):
@@ -23,13 +30,53 @@ def register_module(module):
     return module
 
 
-models = []  #: Registered models.
+models = []  #: Registered models
 
 
 def register_model(model):
     """Decorator to register a new model."""
     models.append(model)
     return model
+
+
+composite_coders = []  #: Composite coders
+
+
+def register_composite_coder(coder):
+    """Decorator to register a composite coder."""
+    composite_coders.append(coder)
+    return coder
+
+
+def is_composite_coder(coder):
+    """Check if a coder is composite.
+
+    Args:
+        coder (coder): Coder.
+
+    Returns:
+        bool: Coder is composite.
+    """
+    return any([isinstance(coder, c) for c in composite_coders])
+
+
+def wrapped_partial(f, *partial_args, **partial_kw_args):
+    """Like :func:`functools.partial`, but preserves the docstring.
+
+    Args:
+        f (function): Function to wrap.
+        *partial_args: Partial arguments.
+        **partial_kw_args: Partial keyword arguments.
+
+    Returns:
+        function: Version of `f` with some arguments and keyword arguments already set.
+    """
+
+    @wraps(f)
+    def wrapped_f(*args, **kw_args):
+        return f(*partial_args, *args, **partial_kw_args, **kw_args)
+
+    return wrapped_f
 
 
 def is_nonempty(x):
@@ -104,15 +151,58 @@ def split(z, sizes, axis):
     return components
 
 
-def split_channels(z, sizes, d):
-    """Split a tensor at the channels dimension.
+def split_dimension(z, axis, sizes):
+    """Split a dimension of a tensor into multiple dimensions.
 
     Args:
         z (tensor): Tensor to split.
-        sizes (iterable[int]): Sizes of the components.
-        d (int): Dimensionality of the inputs.
+        axis (int): Axis to split
+        sizes (iterable[int]): Sizes of new dimensions.
 
     Returns:
-        list[tensor]: Components of the split.
+        tensor: Reshaped version of `z`.
     """
-    return split(z, sizes, -d - 1)
+    shape = B.shape(z)
+    # The indexing below will only be correct for positive `axis`, so resolve the index.
+    axis = resolve_axis(z, axis)
+    return B.reshape(z, *shape[:axis], *sizes, *shape[axis + 1 :])
+
+
+def merge_dimensions(z, axis, sizes):
+    """Merge dimensions of a tensor into one dimension. This operation is the opposite
+    of :func:`split_dimension`.
+
+    Args:
+        z (tensor): Tensor to merge.
+        axis (int): Axis to merge into.
+        sizes (iterable[int]): Sizes of dimensions to merge.
+
+    Returns:
+        tensor: Reshaped version of `z`.
+    """
+    shape = B.shape(z)
+    # The indexing below will only be correct for positive `axis`, so resolve the index.
+    axis = resolve_axis(z, axis)
+    return B.reshape(
+        z,
+        *shape[: axis - len(sizes) + 1],
+        np.prod(sizes),
+        *shape[axis + 1 :],
+    )
+
+
+def select(z, i, axis):
+    """Select a particular index `i` at axis `axis` without squeezing the tensor.
+
+    Args:
+        z (tensor): Tensor to select from.
+        i (int): Index to select.
+        axis (int): Axis to select from.
+
+    Returns:
+        tensor: Selection from `z`.
+    """
+    axis = resolve_axis(z, axis)
+    index = [slice(None, None, None) for _ in range(B.rank(z))]
+    index[axis] = slice(i, i + 1, None)
+    return z[index]

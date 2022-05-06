@@ -46,7 +46,7 @@ def _convgnp_construct_encoder_setconvs(
 ):
     # Initialise scale.
     if encoder_scales is not None:
-        encoder_scales = factor * encoder_scales
+        encoder_scales = init_factor * encoder_scales
     else:
         encoder_scales = 2 / disc.points_per_unit
     # Ensure that there is one for every context set.
@@ -64,7 +64,7 @@ def _convgnp_construct_decoder_setconv(
     init_factor=1,
 ):
     if decoder_scale is not None:
-        decoder_scale = factor * decoder_scale
+        decoder_scale = init_factor * decoder_scale
     else:
         decoder_scale = 2 / disc.points_per_unit
     return nps.SetConv(decoder_scale, dtype=dtype)
@@ -151,7 +151,7 @@ def construct_convgnp(
         dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to `512`.
-        dim_lv (bool, optional): Dimensionality of the latent variable.
+        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
             `"het"` or `"lowrank"`. Defaults to `"het"`.
         encoder_scales (float or tuple[float], optional): Initial value for the length
@@ -166,10 +166,10 @@ def construct_convgnp(
             to `True`.
         epsilon (float, optional): Epsilon added by the set convolutions before
             dividing by the density channel. Defaults to `1e-4`.
-        transform (str or tuple[float, float], optional): Bijection applied to the
+        transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
-            Must be either `"positive"` for positive data or `(lower, upper)` for data
-            in this open interval.
+            Must be either `"positive"`, `"exp"`, or `"softplus"` for positive data or
+            `(lower, upper)` for data in this open interval.
         dtype (dtype, optional): Data type.
 
     Returns:
@@ -180,7 +180,7 @@ def construct_convgnp(
     # Construct likelihood of the encoder, which depends on whether we're using a
     # latent variable or not.
     if dim_lv > 0:
-        lv_likelihood_in_channels, lv_likelihood = construct_likelihood(
+        lv_likelihood_in_channels, _, lv_likelihood = construct_likelihood(
             nps,
             spec=lv_likelihood,
             dim_y=dim_lv,
@@ -192,7 +192,7 @@ def construct_convgnp(
         encoder_likelihood = nps.DeterministicLikelihood()
 
     # Construct likelihood of the decoder.
-    likelihood_in_channels, likelihood = construct_likelihood(
+    likelihood_in_channels, selector, likelihood = construct_likelihood(
         nps,
         spec=likelihood,
         dim_y=dim_yt,
@@ -222,10 +222,22 @@ def construct_convgnp(
                 likelihood,
             )
         )
+        linear_after_set_conv = lambda x: x  # See the `else` clause below.
     else:
         # There is no auxiliary MLP available, so the CNN will have to produce the
-        # right number of channels.
-        conv_out_channels = likelihood_in_channels
+        # right number of channels. In this case, however, it may be more efficient
+        # to produce the right number of channels _after_ the set conv.
+        if conv_out_channels < likelihood_in_channels:
+            # Perform an additional linear layer _after_ the set conv.
+            linear_after_set_conv = nps.Linear(
+                in_channels=conv_out_channels,
+                out_channels=likelihood_in_channels,
+                dtype=dtype,
+            )
+        else:
+            # Not necessary. Just let the CNN produce the right number of channels.
+            conv_out_channels = likelihood_in_channels
+            linear_after_set_conv = lambda x: x
 
     # Construct the core CNN architectures for the encoder, which is only necessary
     # if we're using a latent variable, and for the decoder. First, we determine
@@ -234,10 +246,10 @@ def construct_convgnp(
         lv_in_channels = conv_in_channels
         lv_out_channels = lv_likelihood_in_channels
         in_channels = dim_lv
-        out_channels = conv_out_channels
+        out_channels = conv_out_channels  # These must be equal!
     else:
         in_channels = conv_in_channels
-        out_channels = conv_out_channels
+        out_channels = conv_out_channels  # These must be equal!
     if conv_arch == "unet":
         if dim_lv > 0:
             lv_conv = nps.UNet(
@@ -325,12 +337,14 @@ def construct_convgnp(
         ),
         nps.Chain(
             conv,
-            nps.AggregateTargetsCoder(
-                _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
-                likelihood,
+            nps.RepeatForAggregateInputs(
+                nps.Chain(
+                    _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
+                    linear_after_set_conv,
+                    selector,  # Select the right target output.
+                )
             ),
-            nps.ConcatenateAggregate(),
-            nps.DensifyLowRankVariance(),
+            likelihood,
             parse_transform(nps, transform=transform),
         ),
     )

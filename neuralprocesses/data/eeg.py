@@ -1,10 +1,13 @@
 from lab import B
 from wbml.data.eeg import load_full as load_eeg
 
+<<<<<<< HEAD
 from ..aggregate import Aggregate, AggregateTargets
 
 import numpy as np
 
+=======
+>>>>>>> main
 from .data import DataGenerator
 from ..dist import UniformDiscrete
 
@@ -24,11 +27,19 @@ class EEGGenerator(DataGenerator):
         split,
         dtype,
         split_seed,
+<<<<<<< HEAD
         num_tasks,
         batch_size,
         device,
         shuffle_seed=0,
         num_targets=UniformDiscrete(100, 256),
+=======
+        shuffle_seed,
+        num_tasks,
+        batch_size,
+        device,
+        num_target=UniformDiscrete(1, 256),
+>>>>>>> main
     ):
 
         super().__init__(
@@ -39,8 +50,11 @@ class EEGGenerator(DataGenerator):
             device=device,
         )
 
+<<<<<<< HEAD
         self.num_targets = num_targets
 
+=======
+>>>>>>> main
         all_subjects = [
             337,
             338,
@@ -155,8 +169,13 @@ class EEGGenerator(DataGenerator):
         self.shuffle_state = B.create_random_state(np.float32, shuffle_seed)
 
         # Shuffle subjects
+<<<<<<< HEAD
         self.split_state, idx = B.randperm(self.split_state, np.int64, len(all_subjects))
         all_subjects = np.array(all_subjects)[idx]
+=======
+        self.split_state, idx = B.randperm(self.split_state, int, len(all_subjects))
+        all_subjects = B.array(all_subjects)[idx]
+>>>>>>> main
         all_subjects = list(all_subjects)
 
         # Split into training validation and test data
@@ -218,16 +237,29 @@ class EEGGenerator(DataGenerator):
             self.i += 1
 
         x = np.repeat(
+<<<<<<< HEAD
             np.array(batch_trials[0].index)[None, None, :],
+=======
+            np.array(batch_trials[0].index)[None, :, None],
+>>>>>>> main
             self.batch_size,
             axis=0,
         )
 
         # Carefully order the outputs
+<<<<<<< HEAD
         y = np.transpose(np.stack(batch_trials, axis=0), (0, 2, 1)) / 10
 
         contexts = [(x, y[:, i : i + 1, :]) for i in range(7)]
 
+=======
+        y = np.transpose(np.stack(batch_trials, axis=0), (0, 2, 1))
+
+        contexts = [(x, y[:, i : i + 1, :]) for i in range(7)]
+
+        n = self.shuffle_state.randint(low=0, high=6)
+
+>>>>>>> main
         contexts = []
         xt = []
         yt = []
@@ -236,6 +268,7 @@ class EEGGenerator(DataGenerator):
 
             ctx = (x, y[:, i : i + 1, :])
 
+<<<<<<< HEAD
             self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
             idx = self.shuffle_state.permutation(256)
 
@@ -272,3 +305,45 @@ class EEGGenerator(DataGenerator):
         }
 
         return batch
+=======
+            if i == n:
+                self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, int)
+                idx = self.shuffle_state.permutation(256)
+
+                c_idx = idx[:k]
+                t_idx = idx[k:]
+
+                contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
+
+                xt.append(x[:, :, t_idx])
+                yt.append(y[:, i : i + 1, t_idx])
+
+            else:
+                contexts.append((x[:, :, :], y[:, i : i + 1, :]))
+
+    with B.on_device(self.device):
+        contexts = [
+            (
+                B.to_active_device(B.cast(self.dtype, x)),
+                B.to_active_device(B.cast(self.dtype, y)),
+            )
+            for x, y in context
+        ]
+
+        xt = nps.AggregateTargets(
+            *[
+                (B.to_active_device(B.cast(self.dtype, _xt)), i)
+                for i, _xt in enumerate(xt)
+            ]
+        )
+
+        yt = nps.Aggregate(*[B.to_active_device(B.cast(self.dtype, _yt)) for _yt in yt])
+
+    batch = {
+        "contexts": contexts,
+        "xt": xt,
+        "yt": yt,
+    }
+
+    return batch
+>>>>>>> main

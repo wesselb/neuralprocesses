@@ -1,8 +1,10 @@
 import matrix  # noqa
+from plum import ptype, Signature
 
 from . import _dispatch
 from .dist import Dirac, AbstractMultiOutputDistribution
 from .parallel import Parallel
+from .util import is_composite_coder
 
 __all__ = [
     "code",
@@ -27,6 +29,14 @@ def code(coder, xz, z, x, **kw_args):
     Returns:
         tuple[input, tensor]: New encoding.
     """
+    if any(
+        [ptype(type(coder)) <= s.base[0] < ptype(object) for s in code.methods.keys()]
+    ):
+        raise RuntimeError(
+            f"Dispatched to fallback implementation for `code`, but specialised "
+            f"implementation are available. (The signature of the arguments is "
+            f"{Signature(type(coder), type(xz), type(z), type(x))}.)"
+        )
     return xz, coder(z)
 
 
@@ -52,6 +62,11 @@ def code_track(coder, xz, z, x, **kw_args):
 
 @_dispatch
 def code_track(coder, xz, z, x, h, **kw_args):
+    if is_composite_coder(coder):
+        raise RuntimeError(
+            f"Dispatched to fallback implementation of `code_track` for "
+            f"`{ptype(type(coder))}`, but the coder is composite."
+        )
     xz, z = code(coder, xz, z, x, **kw_args)
     return xz, z, h + [x]
 
@@ -72,14 +87,13 @@ def recode(coder, xz, z, h, **kw_args):
         tensor: Encoding.
         list: Remainder of the target history.
     """
+    if is_composite_coder(coder):
+        raise RuntimeError(
+            f"Dispatched to fallback implementation of `recode` for "
+            f"`{ptype(type(coder))}`, but the coder is composite."
+        )
     xz, z = code(coder, xz, z, h[0], **kw_args)
     return xz, z, h[1:]
-
-
-@_dispatch
-def code_track(coder, xz, z, x, h, **kw_args):
-    xz, z = code(coder, xz, z, x, **kw_args)
-    return xz, z, h + [x]
 
 
 @_dispatch

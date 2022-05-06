@@ -2,7 +2,7 @@ import lab as B
 import matrix  # noqa
 
 from .. import _dispatch
-from ..aggregate import Aggregate, AggregateTargets
+from ..aggregate import Aggregate, AggregateInput
 from ..util import register_module
 
 __all__ = ["InputsCoder"]
@@ -19,5 +19,5 @@ def code(coder: InputsCoder, xz, z, x: B.Numeric, **kw_args):
 
 
 @_dispatch
-def code(coder: InputsCoder, xz, z, x: AggregateTargets, **kw_args):
+def code(coder: InputsCoder, xz, z, x: AggregateInput, **kw_args):
     return x, Aggregate(*(xi for xi, i in x))

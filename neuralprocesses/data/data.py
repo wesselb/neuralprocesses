@@ -4,15 +4,19 @@ import lab as B
 import numpy as np
 from plum import convert
 
+from ..aggregate import Aggregate, AggregateInput
 from ..dist import UniformDiscrete, UniformContinuous, AbstractDistribution
-from ..aggregate import Aggregate, AggregateTargets
 from ..util import split
 
-__all__ = ["AbstractGenerator", "DataGenerator", "SyntheticGenerator"]
+__all__ = ["AbstractGenerator", "DataGenerator", "SyntheticGenerator", "new_batch"]
 
 
 class AbstractGenerator(metaclass=abc.ABCMeta):
-    """Abstract generator."""
+    """Abstract generator.
+
+    Attributes:
+        num_batches (int): Number of batches in an epoch.
+    """
 
     @abc.abstractmethod
     def generate_batch(self):
@@ -47,6 +51,8 @@ class DataGenerator(AbstractGenerator):
 
     Attributes:
         dtype (dtype): Data type.
+        float64 (dtype): Floating point version of the data type with 64 bytes.
+        int64 (dtype): Integral version of the data type with 64 bytes.
         seed (int): Seed.
         batch_size (int): Number of tasks per batch.
         num_batches (int): Number of batches in an epoch.
@@ -82,7 +88,7 @@ class SyntheticGenerator(DataGenerator):
         dtype (dtype): Data type to generate.
         noise (float, optional): Observation noise. Defaults to `5e-2`.
         seed (int, optional): Seed. Defaults to 0.
-        seed_params (int, optional): Seed for the model parameters. Defaults to 19.
+        seed_params (int, optional): Seed for the model parameters. Defaults to 99.
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
         batch_size (int, optional): Batch size. Defaults to 16.
@@ -132,7 +138,7 @@ class SyntheticGenerator(DataGenerator):
         self,
         dtype,
         seed=0,
-        seed_params=19,
+        seed_params=99,
         noise=0.05**2,
         num_tasks=2**14,
         batch_size=16,
@@ -152,14 +158,14 @@ class SyntheticGenerator(DataGenerator):
         self.num_context = convert(num_context, AbstractDistribution)
         self.num_target = convert(num_target, AbstractDistribution)
 
-        with B.on_device(self.device):
-            self.noise = B.to_active_device(B.cast(self.float64, noise))
-
-            # Use a separate random state for the parameters.
+        # Use a separate random state for the parameters. This random must be created
+        # on the CPU, because the particular random sequence can depend on the device.
+        with B.on_device("cpu"):
             state_params = B.create_random_state(dtype, seed_params)
 
             self.dim_y = dim_y
             self.dim_y_latent = dim_y_latent or dim_y
+
             if self.dim_y > 1 or self.dim_y_latent > 1:
                 # Draw a random mixing matrix.
                 state_params, self.h = B.randn(
@@ -171,103 +177,112 @@ class SyntheticGenerator(DataGenerator):
             else:
                 self.h = None
 
-    def _new_batch(self, fix_x_across_batch=False, batch_size=None):
-        """Sample inputs for a new batch. The sampled inputs and assumed outputs
-        are all in `(*b, n, c)` format for easier simulation.
+        # Move things to the right device.
+        with B.on_device(self.device):
+            self.noise = B.to_active_device(B.cast(self.float64, noise))
+            if self.h is not None:
+                self.h = B.to_active_device(self.h)
+
+
+def new_batch(gen, dim_y, *, fix_x_across_batch=False, batch_size=None):
+    """Sample inputs for a new batch. The sampled inputs and assumed outputs
+    are all in `(*b, n, c)` format for easier simulation.
+
+    Args:
+        gen (:class:`.DataGenerator`): Data generator.
+        dim_y (int): Number of outputs.
+        fix_x_across_batch (bool): Fix the inputs across the batch. This can help
+            with easier simulation. Defaults to `False`.
+        batch_size (int, optional): Batch size. Defaults to `gen.batch_size`.
+
+    Returns:
+        function: A function which takes in a batch dictionary, `yc`, and `yt`, and
+            which appropriately fill the dictionary with the samples. This function
+            also accepts a keyword argument `transpose` which you can set to
+            `False` if the outputs are already in `(*b, c, n)` format.
+        list[tensor]: The context inputs per output.
+        tensor: The context inputs for all outputs concatenated.
+        int: The number of context inputs.
+        list[tensor]: The target inputs per output.
+        tensor: The target inputs for all outputs concatenated.
+        int: The number of target inputs.
+    """
+    # Set the default for `batch_size`.
+    batch_size = batch_size or gen.batch_size
+
+    def _sample(dist_num, dist_x):
+        ns, xs = [], []
+        for _ in range(dim_y):
+            gen.state, n = dist_num.sample(gen.state, gen.int64)
+            if fix_x_across_batch:
+                # Set batch dimension to one and then tile.
+                gen.state, x = dist_x.sample(
+                    gen.state,
+                    gen.float64,
+                    1,
+                    n,
+                )
+                x = B.tile(x, batch_size, 1, 1)
+            else:
+                gen.state, x = dist_x.sample(
+                    gen.state,
+                    gen.float64,
+                    batch_size,
+                    n,
+                )
+            ns.append(n)
+            xs.append(x)
+        return xs, B.concat(*xs, axis=1), ns, sum(ns)
+
+    # For every output, sample the context and inputs.
+    xcs, xc, ncs, nc = _sample(gen.num_context, gen.dist_x_context)
+    xts, xt, nts, nt = _sample(gen.num_target, gen.dist_x_target)
+
+    def set_batch(batch, yc, yt, transpose=True):
+        """Fill a batch dictionary `batch`.
 
         Args:
-            fix_x_across_batch (bool): Fix the inputs across the batch. This can help
-                with easier simulation. Defaults to `False`.
-            batch_size (int, optional): Batch size. Defaults to `self.batch_size`.
-
-        Returns:
-            function: A function which takes in a batch dictionary, `yc`, and `yt`, and
-                which appropriately fill the dictionary with the samples. This function
-                also accepts a keyword argument `transpose` which you can set to
-                `False` if the outputs are already in `(*b, c, n)` format.
-            list[tensor]: The context inputs per output.
-            tensor: The context inputs for all outputs concatenated.
-            int: The number of context inputs.
-            list[tensor]: The target inputs per output.
-            tensor: The target inputs for all outputs concatenated.
-            int: The number of target inputs.
+            batch (dict): Batch dictionary to fill.
+            yc (tensor): Context outputs with shape `(*b, n, c)` with possibly
+                `c = 1`.
+            yt (tensor): Target outputs with shape `(*b, n, c)` with possibly
+                `c = 1`.
+            transpose (bool, optional): Set to `False` if `yc` and `yt` already have
+                shape `(*b, c, n)`.
         """
-        # Set the default for `batch_size`.
-        batch_size = batch_size or self.batch_size
+        if transpose:
+            yc = B.transpose(yc)
+            yt = B.transpose(yt)
 
-        def _sample(dist_num, dist_x):
-            ns, xs = [], []
-            for _ in range(self.dim_y):
-                self.state, n = dist_num.sample(self.state, self.int64)
-                if fix_x_across_batch:
-                    # Set batch dimension to one and then tile.
-                    self.state, x = dist_x.sample(
-                        self.state,
-                        self.float64,
-                        1,
-                        n,
-                    )
-                    x = B.tile(x, batch_size, 1, 1)
-                else:
-                    self.state, x = dist_x.sample(
-                        self.state,
-                        self.float64,
-                        batch_size,
-                        n,
-                    )
-                ns.append(n)
-                xs.append(x)
-            return xs, B.concat(*xs, axis=1), ns, sum(ns)
+        # Split up along the data dimension.
+        ycs = split(yc, ncs, axis=2)
+        yts = split(yt, nts, axis=2)
 
-        # For every output, sample the context and inputs.
-        xcs, xc, ncs, nc = _sample(self.num_context, self.dist_x_context)
-        xts, xt, nts, nt = _sample(self.num_target, self.dist_x_target)
+        # If the right outputs haven't yet been selected, do so.
+        ycs = [
+            yci[:, i : i + 1, :] if B.shape(yci, 1) > 1 else yci
+            for i, yci in enumerate(ycs)
+        ]
+        yts = [
+            yti[:, i : i + 1, :] if B.shape(yti, 1) > 1 else yti
+            for i, yti in enumerate(yts)
+        ]
 
-        def set_batch(batch, yc, yt, transpose=True):
-            """Fill a batch dictionary `batch`.
+        # Convert to the right data type and channels first format, and save. Note
+        # that all inputs still have to be transposed. The outputs, however, are
+        # already transposed.
+        _t = B.transpose
+        _c = lambda x: B.cast(gen.dtype, x)
+        batch["contexts"] = [(_c(_t(xci)), _c(yci)) for xci, yci in zip(xcs, ycs)]
+        if len(xts) > 1:
+            # Need to aggregate them together.
+            batch["xt"] = AggregateInput(
+                *((_c(_t(xti)), i) for i, xti in enumerate(xts))
+            )
+            batch["yt"] = Aggregate(*(_c(yti) for yti in yts))
+        else:
+            # No need for aggregation.
+            batch["xt"] = _c(_t(xts[0]))
+            batch["yt"] = _c(yts[0])
 
-            Args:
-                batch (dict): Batch dictionary to fill.
-                yc (tensor): Context outputs with shape `(*b, n, c)` with possibly
-                    `c = 1`.
-                yt (tensor): Target outputs with shape `(*b, n, c)` with possibly
-                    `c = 1`.
-                transpose (bool, optional): Set to `False` if `yc` and `yt` already have
-                    shape `(*b, c, n)`.
-            """
-            if transpose:
-                yc = B.transpose(yc)
-                yt = B.transpose(yt)
-
-            # Split up along the data dimension.
-            ycs = split(yc, ncs, axis=2)
-            yts = split(yt, nts, axis=2)
-
-            # If the right outputs haven't yet been selected, do so.
-            ycs = [
-                yci[:, i : i + 1, :] if B.shape(yci, 1) > 1 else yci
-                for i, yci in enumerate(ycs)
-            ]
-            yts = [
-                yti[:, i : i + 1, :] if B.shape(yti, 1) > 1 else yti
-                for i, yti in enumerate(yts)
-            ]
-
-            # Convert to the right data type and channels first format, and save. Note
-            # that all inputs still have to be transposed. The outputs, however, are
-            # already transposed.
-            _t = B.transpose
-            _c = lambda x: B.cast(self.dtype, x)
-            batch["contexts"] = [(_c(_t(xci)), _c(yci)) for xci, yci in zip(xcs, ycs)]
-            if len(xts) > 1:
-                # Need to aggregate them together.
-                batch["xt"] = AggregateTargets(
-                    *((_c(_t(xti)), i) for i, xti in enumerate(xts))
-                )
-                batch["yt"] = Aggregate(*(_c(yti) for yti in yts))
-            else:
-                # No need for aggregation.
-                batch["xt"] = _c(_t(xts[0]))
-                batch["yt"] = _c(yts[0])
-
-        return set_batch, xcs, xc, nc, xts, xt, nt
+    return set_batch, xcs, xc, nc, xts, xt, nt

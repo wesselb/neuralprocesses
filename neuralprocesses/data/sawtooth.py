@@ -1,6 +1,6 @@
 import lab as B
 
-from .data import SyntheticGenerator
+from .data import SyntheticGenerator, new_batch
 from ..dist import UniformContinuous
 
 __all__ = ["SawtoothGenerator"]
@@ -29,7 +29,7 @@ class SawtoothGenerator(SyntheticGenerator):
 
     def generate_batch(self):
         with B.on_device(self.device):
-            set_batch, xcs, xc, nc, xts, xt, nt = self._new_batch()
+            set_batch, xcs, xc, nc, xts, xt, nt = new_batch(self, self.dim_y)
             x = B.concat(xc, xt, axis=1)
 
             # Sample a frequency.

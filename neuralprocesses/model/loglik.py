@@ -4,6 +4,7 @@ import numpy as np
 from .model import Model
 from .util import fix_noise
 from .. import _dispatch
+from ..numdata import num_data
 
 __all__ = ["loglik"]
 
@@ -27,9 +28,9 @@ def loglik(
     Args:
         state (random state, optional): Random state.
         model (:class:`.Model`): Model.
-        xc (tensor): Inputs of the context set.
+        xc (input): Inputs of the context set.
         yc (tensor): Output of the context set.
-        xt (tensor): Inputs of the target set.
+        xt (input): Inputs of the target set.
         yt (tensor): Outputs of the target set.
         num_samples (int, optional): Number of samples. Defaults to 1.
         batch_size (int, optional): Batch size to use for sampling. Defaults to 16.
@@ -44,10 +45,6 @@ def loglik(
     """
     float = B.dtype_float(yt)
     float64 = B.promote_dtypes(float, np.float64)
-
-    # If `num_samples = 1`, then there will not be a sample dimension, so we can
-    # avoid the `logsumexp`.
-    do_logsumexp = num_samples > 1
 
     # Sample in batches to alleviate memory requirements.
     logpdfs = None
@@ -70,8 +67,9 @@ def loglik(
         this_logpdfs = pred.logpdf(B.cast(float64, yt))
 
         # If the number of samples is equal to one but `num_samples > 1`, then the
-        # likelihood was a `Dirac`, so we can stop batching. Also, set `num_samples = 1`
-        # because we only have one sample now.
+        # encoding was a `Dirac`, so we can stop batching. Also, set `num_samples = 1`
+        # because we only have one sample now. We also don't need to do the
+        # `logsumexp` anymore.
         if num_samples > 1 and B.shape(this_logpdfs, 0) == 1:
             logpdfs = this_logpdfs
             num_samples = 1
@@ -87,14 +85,12 @@ def loglik(
         # Increase the counter.
         done_num_samples += this_num_samples
 
-    # Average over samples.
-    if do_logsumexp:
-        # Sample dimension should always be the first.
-        logpdfs = B.logsumexp(logpdfs, axis=0) - B.log(num_samples)
+    # Average over samples. Sample dimension should always be the first.
+    logpdfs = B.logsumexp(logpdfs, axis=0) - B.log(num_samples)
 
     if normalise:
         # Normalise by the number of targets.
-        logpdfs = logpdfs / B.shape(xt, -1)
+        logpdfs = logpdfs / num_data(xt, yt)
 
     return state, logpdfs
 

@@ -2,12 +2,11 @@ import lab as B
 from matrix.util import indent
 from plum import List, Tuple, Union
 
-from .util import sample
+from .util import sample, compress_contexts
 from .. import _dispatch
 from ..augment import AugmentedInput
 from ..coding import code
 from ..mask import Masked
-from ..parallel import Parallel
 from ..util import register_module
 
 __all__ = ["Model"]
@@ -38,7 +37,7 @@ class Model:
         yc,
         xt,
         *,
-        num_samples=1,
+        num_samples=None,
         aux_t=None,
         dtype_enc_sample=None,
         **kw_args,
@@ -50,8 +49,7 @@ class Model:
             xc (input): Context inputs.
             yc (tensor): Context outputs.
             xt (input): Target inputs.
-            num_samples (int, optional): Number of samples, if applicable. Defaults
-                to 1.
+            num_samples (int, optional): Number of samples, if applicable.
             aux_t (tensor, optional): Target-specific auxiliary input, if applicable.
             dtype_enc_sample (dtype, optional): Data type to convert the sampled
                 encoding to.
@@ -96,17 +94,12 @@ class Model:
         xt,
         **kw_args,
     ):
-        # Don't unnecessarily wrap things in a `Parallel`.
-        if len(contexts) == 1:
-            return self(state, contexts[0][0], contexts[0][1], xt, **kw_args)
-        else:
-            return self(
-                state,
-                Parallel(*(c[0] for c in contexts)),
-                Parallel(*(c[1] for c in contexts)),
-                xt,
-                **kw_args,
-            )
+        return self(
+            state,
+            *compress_contexts(contexts),
+            xt,
+            **kw_args,
+        )
 
     @_dispatch
     def __call__(

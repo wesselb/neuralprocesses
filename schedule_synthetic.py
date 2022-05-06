@@ -154,7 +154,7 @@ def test_success(command):
 async def main():
     # Parse arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--gpu", type=int, required=True)
+    parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument(
         "--data",
         choices=[
@@ -166,8 +166,18 @@ async def main():
         ],
         required=True,
     )
+    parser.add_argument("--dim-y", type=int, required=True)
+    parser.add_argument(
+        "--mode",
+        choices=[
+            "conditional",
+            "latent-variable",
+        ],
+        required=True,
+    )
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--memory", type=int, default=11_019)
+    parser.add_argument("--test", action="store_true")
     args = parser.parse_args()
 
     def with_gpu(c):
@@ -177,86 +187,73 @@ async def main():
     out.report_time = True
 
     # Determine the suite of experiments to run.
-    commands = (
+    if args.mode == "conditional":
         # Conditional models:
-        [
+        commands = [
             f"python train_gp.py"
             f" --model {model}"
             f" --data {args.data}"
             f" --dim-x {dim_x}"
-            f" --dim-y {dim_y}"
-            f" --epochs 100"
-            f" --batch-size 16"
-            f" --rate 3e-4"
+            f" --dim-y {args.dim_y}"
             for dim_x in [1, 2]
-            for dim_y in [1, 2]
-            for model in ["cnp", "acnp", "convcnp", "gnp", "agnp", "convgnp"]
-            if not (model == "convgnp" and dim_x == dim_y == 2)
+            for model in [
+                "cnp",
+                "acnp",
+                "convcnp",
+                "fullconvgnp",
+                "gnp",
+                "agnp",
+                "convgnp",
+            ]
+            if not (dim_x == 2 and model == "fullconvgnp")
         ]
-        # The ConvGNP for 2D inputs and 2D outputs just doesn't fit in memory. Reduce
-        # the batch size and learning rate by a factor two.
-        + [
-            f"python train_gp.py"
-            f" --model convgnp"
-            f" --data {args.data}"
-            f" --dim-x 2"
-            f" --dim-y 2"
-            f" --epochs 100"
-            f" --batch-size 8"
-            f" --rate 1.5e-4"
-        ]
-        # FullConvGNP:
-        + [
-            f"python train_gp.py"
-            f" --model fullconvgnp"
-            f" --data {args.data}"
-            f" --dim-x 1"
-            f" --dim-y 1"
-            f" --epochs 100"
-            f" --batch-size 16"
-            f" --rate 3e-4"
-        ]
+    elif args.mode == "latent-variable":
         # Latent-variable models:
-        + [
-            f"python train_gp.py"
-            f" --model {model}"
-            f" --objective {objective}"
-            f" --data {args.data}"
-            f" --dim-x {dim_x}"
-            f" --dim-y {dim_y}"
-            f" --epochs 100"
-            f" --batch-size 16"
-            f" --rate 3e-4"
-            for dim_x in [1, 2]
-            for dim_y in [1, 2]
-            for model in ["np", "anp", "convnp"]
-            if not (model == "convnp" and dim_x == 2)
-            for objective in [
-                f"loglik --num-samples 20",
-                f"elbo --num-samples 5",
+        commands = (
+            [
+                f"python train_gp.py"
+                f" --model {model}"
+                f" --objective {objective}"
+                f" --data {args.data}"
+                f" --dim-x {dim_x}"
+                f" --dim-y {args.dim_y}"
+                for dim_x in [1, 2]
+                for model in ["np", "anp", "convnp"]
+                if not (model == "convnp" and dim_x == 2)
+                for objective in [
+                    f"loglik --num-samples 20",
+                    f"elbo --num-samples 5",
+                ]
             ]
-        ]
-        # The ConvNP for 2D inputs is too expensive and doesn't fit in memory. We reduce
-        # the numbers of samples to keep the memory and runtime in check.
-        + [
-            f"python train_gp.py"
-            f" --model convnp"
-            f" --objective {objective}"
-            f" --data {args.data}"
-            f" --dim-x 2"
-            f" --dim-y {dim_y}"
-            f" --epochs 100"
-            f" --batch-size 16"
-            f" --rate 3e-4"
-            for dim_y in [1, 2]
-            for objective in [
-                f"loglik --num-samples 5",
-                f"elbo --num-samples 1",
+            # The ConvNP for 2D inputs is expensive. We reduce the number of samples to
+            # keep the memory and runtime in check.
+            + [
+                f"python train_gp.py"
+                f" --model convnp"
+                f" --objective {objective}"
+                f" --data {args.data}"
+                f" --dim-x 2"
+                f" --dim-y {args.dim_y}"
+                for objective in [
+                    f"loglik --num-samples 5",
+                    f"elbo --num-samples 1",
+                ]
             ]
-        ]
-    )
+        )
+    else:
+        raise RuntimeError(f'Bad mode "{args.mode}".')
+
+    # If we're evaluating, simply append `--evaluate`, which runs both normal evaluation
+    # and AR evaluation.
     if args.evaluate:
         commands = [c + " --evaluate" for c in commands]
+
+    # If we're testing, just list the commands and exit.
+    if args.test:
+        with out.Section("Commands"):
+            for c in commands:
+                out.out(c)
+        exit()
 
     if not args.evaluate:
         # Run through the commands and eject the ones that have already completed.

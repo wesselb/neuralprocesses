@@ -88,7 +88,7 @@ def construct_predefined_gens(
         **config,
     )
     # Be sure to use different seeds in the mixture components. We also use the high
-    # number of context and target points for the mixture data in all components.
+    # number of context and target points in all components.
     gens["mixture"] = MixtureGenerator(
         *(
             GPGenerator(

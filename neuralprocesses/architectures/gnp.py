@@ -17,7 +17,7 @@ def construct_gnp(
     dim_embedding=256,
     attention=False,
     attention_num_heads=8,
-    num_enc_layers=6,
+    num_enc_layers=3,
     num_dec_layers=6,
     width=512,
     likelihood="lowrank",
@@ -46,20 +46,20 @@ def construct_gnp(
         attention (bool, optional): Use attention for the deterministic encoder.
             Defaults to `False`.
         attention_num_heads (int, optional): Number of heads. Defaults to `8`.
-        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 6.
+        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 3.
         num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
             Defaults to `"lowrank"`.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to 512.
-        dim_lv (bool, optional): Dimensionality of the latent variable.
+        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
             `"het"` or `"dense"`. Defaults to `"het"`.
-        transform (str or tuple[float, float], optional): Bijection applied to the
+        transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
-            Must be either `"positive"` for positive data or `(lower, upper)` for data
-            in this open interval.
+            Must be either `"positive"`, `"exp"`, or `"softplus"` for positive data or
+            `(lower, upper)` for data in this open interval.
         dtype (dtype, optional): Data type.
 
     Returns:
@@ -70,7 +70,7 @@ def construct_gnp(
     # Make sure that `dim_yt` is initialised.
     dim_yt = dim_yt or dim_y
 
-    mlp_out_channels, likelihood = construct_likelihood(
+    mlp_out_channels, selector, likelihood = construct_likelihood(
         nps,
         spec=likelihood,
         dim_y=dim_yt,
@@ -83,7 +83,7 @@ def construct_gnp(
         det_encoder = nps.Parallel(
             *(
                 nps.Chain(
-                    nps.AggregateTargetsCoder(
+                    nps.RepeatForAggregateInputs(
                         nps.Attention(
                             dim_x=dim_x,
                             dim_y=dim_yci,
@@ -92,9 +92,8 @@ def construct_gnp(
                             num_enc_layers=num_enc_layers,
                             dtype=dtype,
                         ),
-                        nps.DeterministicLikelihood(),
                     ),
-                    nps.ConcatenateAggregate(),
+                    nps.DeterministicLikelihood(),
                 )
                 for dim_yci in dim_yc
             ),
@@ -120,7 +119,7 @@ def construct_gnp(
 
     # Possibly construct the stochastic encoder.
     if dim_lv > 0:
-        lv_mlp_out_channels, lv_likelihood = construct_likelihood(
+        lv_mlp_out_channels, _, lv_likelihood = construct_likelihood(
             nps,
             spec=lv_likelihood,
             dim_y=dim_lv,
@@ -159,13 +158,10 @@ def construct_gnp(
         nps.Copy(2 + (dim_lv > 0)),
         nps.Parallel(
             nps.Chain(
-                nps.AggregateTargetsCoder(
-                    nps.Chain(
-                        nps.InputsCoder(),
-                        nps.DeterministicLikelihood(),
-                    )
+                nps.RepeatForAggregateInputs(
+                    nps.InputsCoder(),
                 ),
-                nps.ConcatenateAggregate(),
+                nps.DeterministicLikelihood(),
             ),
             det_encoder,
             *((lv_encoder,) if dim_lv > 0 else ()),
@@ -173,18 +169,19 @@ def construct_gnp(
     )
     decoder = nps.Chain(
         nps.Materialise(),
-        nps.AggregateTargetsCoder(
-            nps.MLP(
-                in_dim=dim_x + dim_embedding * len(dim_yc) + dim_lv,
-                out_dim=mlp_out_channels,
-                num_layers=num_dec_layers,
-                width=width,
-                dtype=dtype,
-            ),
-            likelihood,
+        nps.RepeatForAggregateInputs(
+            nps.Chain(
+                nps.MLP(
+                    in_dim=dim_x + dim_embedding * len(dim_yc) + dim_lv,
+                    out_dim=mlp_out_channels,
+                    num_layers=num_dec_layers,
+                    width=width * len(dim_yc),
+                    dtype=dtype,
+                ),
+                selector,  # Select the right target output.
+            )
         ),
-        nps.ConcatenateAggregate(),
-        nps.DensifyLowRankVariance(),
+        likelihood,
         parse_transform(nps, transform=transform),
     )
     return nps.Model(encoder, decoder)

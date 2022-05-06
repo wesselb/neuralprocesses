@@ -1,5 +1,3 @@
-import lab as B
-
 import neuralprocesses as nps  # This fixes inspection below.
 
 __all__ = [
@@ -22,30 +20,29 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
 
     Returns:
         int: Number of channels that the likelihood requires.
+        coder: Coder which can select a particular output channel. This coder may be
+            `None`.
         coder: Coder.
     """
     if spec == "het":
         num_channels = 2 * dim_y
+        selector = nps.SelectFromChannels(dim_y, dim_y)
         lik = nps.HeterogeneousGaussianLikelihood()
     elif spec == "lowrank":
         num_channels = (2 + num_basis_functions) * dim_y
+        selector = nps.SelectFromChannels(dim_y, (num_basis_functions, dim_y), dim_y)
         lik = nps.LowRankGaussianLikelihood(num_basis_functions)
     elif spec == "dense":
-        # This will only work for global variables!
+        # This is intended to only work for global variables.
         num_channels = 2 * dim_y + dim_y * dim_y
+        selector = None
         lik = nps.Chain(
             nps.Splitter(2 * dim_y, dim_y * dim_y),
             nps.Parallel(
-                # The split for the mean is alright.
                 lambda x: x,
                 nps.Chain(
-                    # For the variance, first make it positive definite. Assume that
-                    # `n = 1`, so we can ignore the data dimension.
-                    lambda x: B.reshape(x, *B.shape(x)[:-2], dim_y, dim_y),
-                    # Make PD and divide by 100 to stabilise initialisation.
-                    lambda x: B.matmul(x, x, tr_b=True) / 100,
-                    # Make it of the shape `(*b, c, n, c, n)` with `n = 1`.
-                    lambda x: x[..., :, None, :, None],
+                    nps.ToDenseCovariance(),
+                    nps.DenseCovariancePSDTransform(),
                 ),
             ),
             nps.DenseGaussianLikelihood(),
@@ -53,7 +50,7 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
 
     else:
         raise ValueError(f'Incorrect likelihood specification "{spec}".')
-    return num_channels, lik
+    return num_channels, selector, lik
 
 
 def parse_transform(nps=nps, *, transform):
@@ -63,14 +60,16 @@ def parse_transform(nps=nps, *, transform):
         nps (module): Appropriate backend-specific module.
         transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
-            Must be either `"positive"` for positive data or `(lower, upper)` for data
-            in this open interval.
+            Must be either `"positive"`, `"exp"`, or `"softplus"` for positive data or
+            `(lower, upper)` for data in this open interval.
 
     Returns:
         coder: Transform.
     """
-    if isinstance(transform, str) and transform.lower() == "positive":
-        transform = nps.Transform.positive()
+    if isinstance(transform, str) and transform.lower() in {"positive", "exp"}:
+        transform = nps.Transform.exp()
+    elif isinstance(transform, str) and transform.lower() == "softplus":
+        transform = nps.Transform.softplus()
     elif isinstance(transform, tuple):
         lower, upper = transform
         transform = nps.Transform.bounded(lower, upper)

@@ -1,10 +1,8 @@
-from functools import partial
-
 import lab.torch  # noqa
 
 from .nn import *
 from .. import *  # noqa
-from ..util import modules, models
+from ..util import modules, models, wrapped_partial
 
 
 def create_init(module):
@@ -38,4 +36,4 @@ ns = Namespace()
 ns.__dict__.update(globals())
 
 for model in models:
-    globals()[model.__name__] = partial(model, nps=ns)
+    globals()[model.__name__] = wrapped_partial(model, nps=ns)

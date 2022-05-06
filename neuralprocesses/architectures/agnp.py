@@ -23,20 +23,20 @@ def construct_agnp(*args, nps=nps, num_heads=8, **kw_args):
             not equal to the dimensionality of the outputs of the context set.
         dim_embedding (int, optional): Dimensionality of the embedding. Defaults to 128.
         num_heads (int, optional): Number of heads. Defaults to `8`.
-        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 6.
+        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 3.
         num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
             Defaults to `"lowrank"`.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to 512.
-        dim_lv (bool, optional): Dimensionality of the latent variable.
+        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
             `"het"` or `"dense"`. Defaults to `"het"`.
-        transform (str or tuple[float, float], optional): Bijection applied to the
+        transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
-            Must be either `"positive"` for positive data or `(lower, upper)` for data
-            in this open interval.
+            Must be either `"positive"`, `"exp"`, or `"softplus"` for positive data or
+            `(lower, upper)` for data in this open interval.
         dtype (dtype, optional): Data type.
 
     Returns:

@@ -1,16 +1,16 @@
-import lab as B
 from functools import partial
-from wbml.util import indented_kv
 
-from .. import _dispatch
+import lab as B
+from wbml.util import indented_kv
 
 from .dist import AbstractMultiOutputDistribution
 from .normal import _map_sample_output
-from ..util import register_module
+from .. import _dispatch
 from ..aggregate import Aggregate
 from ..datadims import data_dims
+from ..util import register_module
 
-__all__ = ["Transform"]
+__all__ = ["Transform", "TransformedMultiOutputDistribution"]
 
 
 @register_module
@@ -48,7 +48,7 @@ class Transform:
         return TransformedMultiOutputDistribution(dist, self)
 
     @classmethod
-    def positive(cls):
+    def exp(cls):
         """Construct the `exp` transform."""
 
         def transform(x):
@@ -57,11 +57,46 @@ class Transform:
         def transform_deriv(x):
             return B.exp(x)
 
-        def untransform(x):
-            return B.log(x)
+        def untransform(y):
+            return B.log(y)
 
-        def untransform_logdet(x):
-            return -B.log(x)
+        def untransform_logdet(y):
+            return -B.log(y)
+
+        return cls(
+            transform=transform,
+            transform_deriv=transform_deriv,
+            untransform=untransform,
+            untransform_logdet=untransform_logdet,
+        )
+
+    @classmethod
+    def softplus(cls):
+        """Construct the `softplus` transform."""
+
+        def transform(x):
+            return B.softplus(x)
+
+        def transform_deriv(x):
+            u = B.maximum(x, B.zero(x))
+            x = x - u
+            return B.exp(x) / (B.exp(x) + B.exp(-u))
+
+        def untransform(y):
+            # Clip the values to prevent NaNs
+            y_clipped = B.minimum(B.maximum(y, B.exp(-20) * B.one(y)), 20 * B.one(y))
+            # For big values, use an approximation.
+            res = B.where(y > 20, y, B.log(B.exp(y_clipped) - 1))
+            # For small values, also use an approximation.
+            res = B.where(y < B.exp(-20), B.log(y), res)
+            return res
+
+        def untransform_logdet(y):
+            # Use the same approximations as above.
+            y_clipped = B.minimum(B.maximum(y, B.exp(-20) * B.one(y)), 20 * B.one(y))
+            res = B.where(y > 20, B.one(y), B.exp(y_clipped) / (B.exp(y_clipped) - 1))
+            res = B.where(y < B.exp(-20), 1 / y, res)
+            return res
 
         return cls(
             transform=transform,
@@ -86,11 +121,11 @@ class Transform:
             denom = 1 + B.exp(-x)
             return (upper - lower) * B.exp(-x) / (denom * denom)
 
-        def untransform(x):
-            return B.log(x - lower) - B.log(upper - x)
+        def untransform(y):
+            return B.log(y - lower) - B.log(upper - y)
 
-        def untransform_logdet(x):
-            return B.log(1 / (x - lower) + 1 / (upper - x))
+        def untransform_logdet(y):
+            return B.log(1 / (y - lower) + 1 / (upper - y))
 
         return cls(
             transform=transform,
@@ -131,6 +166,12 @@ class TransformedMultiOutputDistribution(AbstractMultiOutputDistribution):
         )
 
     @property
+    def noiseless(self):
+        """:class:`.TransformedMultiOutputNormal`: Noiseless version of the
+        distribution."""
+        return TransformedMultiOutputDistribution(self.dist.noiseless, self.transform)
+
+    @property
     def mean(self):
         return _map_aggregate(self.transform.transform, self.dist.mean)
 
@@ -168,6 +209,11 @@ def dtype(dist: TransformedMultiOutputDistribution):
 @B.dispatch
 def cast(dtype: B.DType, dist: TransformedMultiOutputDistribution):
     return TransformedMultiOutputDistribution(B.cast(dtype, dist.dist), dist.transform)
+
+
+@B.dispatch
+def shape_batch(dist: TransformedMultiOutputDistribution):
+    return B.shape_batch(dist.dist)
 
 
 @_dispatch

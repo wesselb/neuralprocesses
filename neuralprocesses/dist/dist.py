@@ -1,7 +1,5 @@
 import abc
 
-import lab as B
-
 __all__ = ["AbstractMultiOutputDistribution", "AbstractDistribution"]
 
 
@@ -88,15 +86,3 @@ class AbstractDistribution(metaclass=abc.ABCMeta):
             tensor: Sample of dtype `dtype` and shape `(*shape, *d)` where `d`
                 specifies the dimensionality of the sample.
         """
-
-
-@B.dispatch.abstract
-def concat(*ds: AbstractMultiOutputDistribution):
-    """Concatenate distributions into a bigger joint distribution.
-
-    Args:
-        *ds (:class:`.AbstractMultiOutputDistribution`): Distributions.
-
-    Returns:
-        :class:`.AbstractMultiOutputDistribution`: Joint distribution.
-    """

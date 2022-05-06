@@ -133,14 +133,14 @@ def product_kw_args(config, **kw_args):
     )
     # FullConvGNP:
     + generate_conv_arch_variations(
-        [
+        product_kw_args(
             {
                 "constructor": "construct_fullconvgnp",
                 "points_per_unit": 8,
                 "dim_x": 1,
-                "dim_y": 1,
-            }
-        ]
+            },
+            dim_y=[1, 2],
+        )
     ),
     scope="module",
 )
@@ -217,37 +217,22 @@ def model_sample(request, nps, config):
 def check_prediction(nps, pred, yt):
     # Stabilise the matrix inversion lemma by ensuring that the model didn't output
     # too small noise variances.
-
-    try:
-        if isinstance(pred.normal.var, Woodbury):
-            pred = nps.MultiOutputNormal(
-                Normal(
-                    pred.normal.mean,
-                    Diagonal(1e-2 + B.diag(pred.normal.var.diag)) + pred.normal.var.lr,
-                ),
-                pred.shape,
-            )
-    except AttributeError:
-        pass  # Probably `pred.normal.var` failed. That's fine.
+    if hasattr(pred, "_noise"):
+        pred._noise = pred._noise + 1e-1 * B.eye(pred._noise)
 
     # Check that the log-pdf at the target data is finite and of the right data type.
-    objective = B.sum(pred.logpdf(yt))
-    assert np.isfinite(B.to_numpy(objective))
+    objective = pred.logpdf(yt)
+    assert B.rank(objective) == 1
+    assert np.isfinite(B.to_numpy(B.sum(objective)))
     assert B.dtype(objective) == nps.dtype
 
-    def _equal_shape(s1, s2, prepend_s2=()):
-        if isinstance(s1, nps.Aggregate) and isinstance(s2, nps.Aggregate):
-            s1 = tuple(s1)
-            s2 = tuple(prepend_s2 + s for s in s2)
-        else:
-            s2 = prepend_s2 + s2
-        return s1 == s2
-
-    # Check mean, variance, and samples.
-    assert _equal_shape(B.shape(pred.mean), B.shape(yt))
-    assert _equal_shape(B.shape(pred.var), B.shape(yt))
-    assert _equal_shape(B.shape(pred.sample()), B.shape(yt))
-    assert _equal_shape(B.shape(pred.sample(2)), B.shape(yt), prepend_s2=(2,))
+    if not isinstance(yt, nps.Aggregate):
+        # Check mean, variance, and samples.
+        assert B.shape(pred.mean) == B.shape(yt)
+        assert B.shape(pred.var) == B.shape(yt)
+        assert B.shape(pred.sample()) == B.shape(yt)
+        assert B.shape(pred.sample(1)) == (1,) + B.shape(yt)
+        assert B.shape(pred.sample(2)) == (2,) + B.shape(yt)
 
 
 @pytest.mark.flaky(reruns=3)
@@ -255,8 +240,6 @@ def test_forward(nps, model_sample):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-
-    # Check passing in a non-empty context set.
     pred = model(xc, yc, xt, batch_size=2, unused_arg=None)
     check_prediction(nps, pred, yt)
 
@@ -266,8 +249,10 @@ def test_elbo(nps, model_sample):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-    elbo = B.mean(nps.elbo(model, xc, yc, xt, yt, num_samples=2))
-    assert np.isfinite(B.to_numpy(elbo))
+    elbos = nps.elbo(model, xc, yc, xt, yt, num_samples=2)
+    assert B.rank(elbos) == 1
+    assert np.isfinite(B.to_numpy(B.sum(elbos)))
+    assert B.dtype(elbos) == nps.dtype64
 
 
 @pytest.mark.flaky(reruns=3)
@@ -275,8 +260,10 @@ def test_loglik(nps, model_sample):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-    logpdfs = B.mean(nps.loglik(model, xc, yc, xt, yt, num_samples=2))
-    assert np.isfinite(B.to_numpy(logpdfs))
+    logpdfs = nps.loglik(model, xc, yc, xt, yt, num_samples=2)
+    assert B.rank(logpdfs) == 1
+    assert np.isfinite(B.to_numpy(B.sum(logpdfs)))
+    assert B.dtype(logpdfs) == nps.dtype64
 
 
 @pytest.mark.flaky(reruns=3)
@@ -284,17 +271,18 @@ def test_predict(nps, model_sample):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-    mean, var, samples = nps.predict(
+    mean, var, samples, noisy_samples = nps.predict(
         model,
         xc,
         yc,
         xt,
-        num_samples=2,
-        pred_num_samples=2,
+        num_samples=3,
+        batch_size=2,
     )
     assert B.shape(mean) == B.shape(yt)
     assert B.shape(var) == B.shape(yt)
-    assert B.shape(samples) == (2,) + B.shape(yt)
+    assert B.shape(samples) == (3,) + B.shape(yt)
+    assert B.shape(noisy_samples) == (3,) + B.shape(yt)
 
 
 @pytest.mark.flaky(reruns=3)
@@ -368,10 +356,13 @@ def test_recode(nps, model_sample):
         ("construct_gnp", {}),
         ("construct_agnp", {}),
         ("construct_convgnp", {"points_per_unit": 4, "unet_channels": (2,)}),
+        ("construct_fullconvgnp", {"points_per_unit": 4, "unet_channels": (2,)}),
     ],
 )
 @pytest.mark.parametrize("dim_lv", [0, 2])
 def test_data_eq(nps, dim_x, dim_y, constructor, config, dim_lv):
+    if constructor == "construct_fullconvgnp" and (dim_x > 1 or dim_lv > 1):
+        pytest.skip()
     gen = nps.construct_predefined_gens(nps.dtype, dim_x=dim_x, dim_y=dim_y)["eq"]
     model = getattr(nps, constructor)(
         dim_x=dim_x,
