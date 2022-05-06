@@ -190,7 +190,7 @@ async def main():
     if args.mode == "conditional":
         # Conditional models:
         commands = [
-            f"python train_gp.py"
+            f"python train.py"
             f" --model {model}"
             f" --data {args.data}"
             f" --dim-x {dim_x}"
@@ -211,7 +211,7 @@ async def main():
         # Latent-variable models:
         commands = (
             [
-                f"python train_gp.py"
+                f"python train.py"
                 f" --model {model}"
                 f" --objective {objective}"
                 f" --data {args.data}"
@@ -228,7 +228,7 @@ async def main():
             # The ConvNP for 2D inputs is expensive. We reduce the number of samples to
             # keep the memory and runtime in check.
             + [
-                f"python train_gp.py"
+                f"python train.py"
                 f" --model convnp"
                 f" --objective {objective}"
                 f" --data {args.data}"
