@@ -46,12 +46,12 @@ def _predprey_step(state, x_y, t, dt, *, alpha, beta, delta, gamma, sigma):
 def _predprey_rand_params(state, dtype, batch_size=16):
     state, rand = B.rand(state, dtype, 5, batch_size)
 
-    alpha = 0.4807 + 0.1 * (1.0 - 2.0 * rand[0])
-    beta = 0.02482 + 0.01 * (1.0 - 2.0 * rand[1])
-    delta = 0.9272 + 0.1 * (1.0 - 2.0 * rand[2])
-    gamma = 0.02756 + 0.01 * (1.0 - 2.0 * rand[3])
+    alpha = 0.25 + 1.25 * rand[0]
+    beta = 0.01 + 0.04 * rand[1]
+    delta = 0.25 + 1.25 * rand[2]
+    gamma = 0.01 + 0.04 * rand[3]
 
-    sigma = 0.5 + 5.0 * rand[4]
+    sigma = 0.5 + 9.5 * rand[4]
 
     return state, {
         "alpha": alpha,
