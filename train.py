@@ -102,6 +102,7 @@ def main(**kw_args):
         choices=exp.data,
         default="eq",
     )
+    parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
     parser.add_argument("--num-samples", type=int, default=20)
     parser.add_argument("--resume-at-epoch", type=int)
@@ -189,10 +190,15 @@ def main(**kw_args):
         sys.exit(1)
 
     # Use a GPU if one is available.
-    if torch.cuda.is_available():
+    if args.device is not None:
+        device = args.device
+	
+    elif torch.cuda.is_available():
         device = "cuda"
+
     else:
         device = "cpu"
+
     B.set_global_device(device)
     # Maintain an explicit random state through the execution.
     state = B.create_random_state(torch.float32, seed=0)

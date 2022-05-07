@@ -17,7 +17,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["margin"] = 0.1
     config["transform"] = None
     config["unet_channels"] = (32, 64, 128, 256, 512, 1024)
-    config["dws_receptive_field"] = 1.
+    config["dws_receptive_field"] = 0.1
 
     # Other settings specific to the predator-prey experiments:
     config["plot"] = {1: {"range": (0, 1), "axvline": []}}
