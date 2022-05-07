@@ -164,14 +164,15 @@ async def main():
             "sawtooth",
             "mixture",
         ],
-        required=True,
     )
-    parser.add_argument("--dim-y", type=int, required=True)
+    parser.add_argument("--dim-y", type=int)
     parser.add_argument(
         "--mode",
         choices=[
             "conditional",
             "latent-variable",
+            "conditional-predprey",
+            "latent-variable-predprey",
         ],
         required=True,
     )
@@ -240,6 +241,20 @@ async def main():
                 ]
             ]
         )
+    elif args.mode == "conditional-predprey":
+        commands = [
+            f"python train.py --data predprey --model {model}"
+            for model in ["convcnp", "convgnp", "fullconvgnp", "acnp"]
+        ]
+    elif args.mode == "latent-variable-predprey":
+        commands = [
+            f"python train.py --data predprey --model {model} --objective {objective}"
+            for model in ["anp", "convnp"]
+            for objective in [
+                f"loglik --num-samples 20",
+                f"elbo --num-samples 5",
+            ]
+        ]
     else:
         raise RuntimeError(f'Bad mode "{args.mode}".')
 
