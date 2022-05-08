@@ -57,14 +57,14 @@ def visualise_1d(model, gen, *, path, config, predict):
         # Plot context and target.
         plt.scatter(
             nps.batch_xc(batch, i)[0, 0],
-            nps.batch_yc(batch, i)[0, 0],
+            nps.batch_yc(batch, i)[0],
             label="Context",
             style="train",
             s=20,
         )
         plt.scatter(
             nps.batch_xt(batch, i)[0, 0],
-            nps.batch_yt(batch, i)[0, 0],
+            nps.batch_yt(batch, i)[0],
             label="Target",
             style="test",
             s=20,
@@ -98,7 +98,7 @@ def visualise_1d(model, gen, *, path, config, predict):
             # Make sure that everything is of `float64`s and on the GPU.
             noise = B.to_active_device(B.cast(torch.float64, gen.noise))
             xc = B.cast(torch.float64, nps.batch_xc(batch, 0)[0, 0])
-            yc = B.cast(torch.float64, nps.batch_yc(batch, 0)[0, 0])
+            yc = B.cast(torch.float64, nps.batch_yc(batch, 0)[0])
             x = B.cast(torch.float64, x)
             # Compute posterior GP.
             f_post = f | (f(xc, noise), yc)
