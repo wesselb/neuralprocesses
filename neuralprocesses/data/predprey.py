@@ -3,7 +3,6 @@ import wbml.util
 from plum import convert
 from wbml.data.predprey import load
 
-from .batch import batch_index
 from .data import DataGenerator, new_batch
 from ..dist import AbstractDistribution
 from ..dist.uniform import UniformDiscrete, UniformContinuous
@@ -15,28 +14,21 @@ def _predprey_step(state, x_y, t, dt, *, alpha, beta, delta, gamma, sigma):
     x = x_y[..., 0]
     y = x_y[..., 1]
 
-    m = 2500
-
     state, randn = B.randn(state, B.dtype(x), 2, *B.shape(x))
     dw = B.sqrt(dt) * randn
 
-    deriv_x = x * (alpha - beta * y) * (1 - x / m)
-    deriv_y = y * (-delta + gamma * x) * (1 - y / m)
+    deriv_x = x * (alpha - beta * y)
+    deriv_y = y * (-delta + gamma * x)
     # Apply an exponent `1 / 6` to emphasise the noise at lower population levels and
     # prevent the populations from dying out.
-    x = x + deriv_x * dt + (x ** (1 / 6)) * (1 - x / m) * sigma * dw[0]
-    y = y + deriv_y * dt - (y ** (1 / 6)) * (1 - y / m) * sigma * dw[1]
+    x = x + deriv_x * dt + (x ** (1 / 6)) * sigma * dw[0]
+    y = y + deriv_y * dt - (y ** (1 / 6)) * sigma * dw[1]
 
     # Make sure that the populations never become negative. Mathematically, the
     # populations should remain positive. Note that if we were to `max(x, 0)`, then
     # `x` could become zero. We therefore take the absolute value.
     x = B.abs(x)
     y = B.abs(y)
-
-    # Cap the populations by `m`. Mathematically, they should never rise above `m`, but
-    # numerically they can due to the non-zero step size.
-    x = B.minimum(x, m * B.one(x))
-    y = B.minimum(y, m * B.one(y))
 
     t = t + dt
 
@@ -71,20 +63,45 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
     t_target = B.take(t_target, perm)
 
     x_y = 5 + 95 * B.rand(dtype, batch_size, 2)
-    t, traj = t0, [x_y]
+    t, traj = t0, [(t0, x_y)]
 
     while t < t1:
         state, x_y, t = _predprey_step(state, x_y, t, dt, **params)
         while B.shape(t_target, 0) > 0 and t >= t_target[0]:
-            traj.append(x_y)
+            traj.append((t, x_y))
             t_target = t_target[1:]
 
-    traj = B.stack(*traj, axis=-1)
+    # Concatenate trajectory into a tensor.
+    t, traj = zip(*traj)
+    t = B.stack(*t)
+    traj = B.stack(*traj, axis=-2)
 
     # Undo the sorting.
-    traj = B.take(traj, inv_perm, axis=-1)
+    t = B.take(t, inv_perm)
+    traj = B.take(traj, inv_perm, axis=-2)
 
-    return state, traj
+    return state, t, traj
+
+
+def _predprey_select_from_traj(t, y, t_target):
+    y_target = []
+
+    # Sort before walking through it!
+    perm = B.argsort(t_target)
+    inv_perm = wbml.util.inv_perm(perm)
+    t_target = B.take(t_target, perm)
+
+    # Selec the right subset.
+    for i, ti in enumerate(t):
+        while B.shape(t_target, 0) > 0 and ti >= t_target[0]:
+            t_target = t_target[1:]
+            y_target.append(y[i])
+
+    # Concatenate into a tensor and undo the sorting.
+    y_target = B.stack(*y_target, axis=0)
+    y_target = B.take(y_target, inv_perm, axis=0)
+
+    return y_target
 
 
 class PredPreyGenerator(DataGenerator):
@@ -142,7 +159,7 @@ class PredPreyGenerator(DataGenerator):
         noise=0,
         num_tasks=2**14,
         batch_size=16,
-        big_batch_size=256,
+        big_batch_size=2048,
         dist_x=UniformContinuous(0, 100),
         dist_x_context=None,
         dist_x_target=None,
@@ -162,56 +179,60 @@ class PredPreyGenerator(DataGenerator):
         self.num_target = convert(num_target, AbstractDistribution)
 
         self.big_batch_size = big_batch_size
-        self._big_batch = None
+        self._big_batch_t = None
+        self._big_batch_y = None
         self._big_batch_num_left = 0
 
     def generate_batch(self):
-        # Attempt to return a batch from the big batch.
-        if self._big_batch_num_left > 0:
-            n = self.batch_size
-            batch = batch_index(self._big_batch, slice(None, n, None))
-            self._big_batch = batch_index(self._big_batch, slice(n, None, None))
-            self._big_batch_num_left -= 1
-            return batch
-
         with B.on_device(self.device):
-            # For computational efficiency, we will not generate one batch, but
-            # `multiplier` many batches.
-            multiplier = max(self.big_batch_size // self.batch_size, 1)
+            if self._big_batch_num_left > 0:
+                # There is still some available from the big batch. Take that.
+                t, y = self._big_batch_t, self._big_batch_y[: self.batch_size]
+                self._big_batch_y = self._big_batch_y[self.batch_size :]
+            else:
+                # For computational efficiency, we will not generate one batch, but
+                # `multiplier` many batches.
+                multiplier = max(self.big_batch_size // self.batch_size, 1)
 
-            set_batch, xcs, xc, nc, xts, xt, nt = new_batch(
-                self,
-                2,
-                fix_x_across_batch=True,
-                batch_size=multiplier * self.batch_size,
-            )
+                # Simulate the equations.
+                self.state, t, y = _predprey_simulate(
+                    self.state,
+                    self.float64,
+                    0,
+                    100,
+                    # Use a budget of 5000 steps.
+                    100 / 5000,
+                    # Generate observations at an $x$-resolution of `100 / 2000 = 0.05`.
+                    B.linspace(self.float64, 0, 100, 2000),
+                    batch_size=multiplier * self.batch_size,
+                )
 
-            # Simulate the equations.
-            t0 = min(B.min(xc), B.min(xt))
-            t1 = max(B.max(xc), B.max(xt))
-            self.state, y = _predprey_simulate(
-                self.state,
-                self.float64,
-                t0,
-                t1,
-                # Use a budget of 5000 steps.
-                (t1 - t0) / 5000,
-                B.concat(xc, xt, axis=1)[0, :, 0],
-                batch_size=multiplier * self.batch_size,
+                # Save the big batch and rerun generation.
+                self._big_batch_t = t
+                self._big_batch_y = y
+                self._big_batch_num_left = multiplier
+                return self.generate_batch()
+
+            set_batch, xcs, xc, nc, xts, xt, nt = new_batch(self, 2)
+            x = B.concat(xc, xt, axis=-2)
+
+            # Select the right elements from the simulation output.
+            y = B.stack(
+                *(
+                    _predprey_select_from_traj(t, y[i, :, :], x[i, :, 0])
+                    for i in range(self.batch_size)
+                ),
+                axis=0
             )
 
             # Add observation noise.
             self.state, randn = B.randn(self.state, y)
             y = y + B.abs(B.sqrt(self.noise) * randn)
 
-            # Save the big batch.
+            # Generate the batch.
             batch = {}
-            set_batch(batch, y[:, :, :nc], y[:, :, nc:], transpose=False)
-            self._big_batch_num_left = multiplier
-            self._big_batch = batch
-
-            # Call the function again to obtain a batch from the big batch.
-            return self.generate_batch()
+            set_batch(batch, y[:, :nc, :], y[:, nc:, :])
+            return batch
 
 
 class PredPreyRealGenerator(DataGenerator):
