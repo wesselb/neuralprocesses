@@ -63,13 +63,20 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
     t_target = B.take(t_target, perm)
 
     x_y = 5 + 95 * B.rand(dtype, batch_size, 2)
-    t, traj = t0, [(t0, x_y)]
+    t, traj = t0, []
 
-    while t < t1:
-        state, x_y, t = _predprey_step(state, x_y, t, dt, **params)
-        while B.shape(t_target, 0) > 0 and t >= t_target[0]:
+    def collect(t_target, remainder=False):
+        while B.shape(t_target, 0) > 0 and (t >= t_target[0] or remainder):
             traj.append((t, x_y))
             t_target = t_target[1:]
+        return t_target
+
+    # Run the simulation.
+    t_target = collect(t_target)
+    while t < t1:
+        state, x_y, t = _predprey_step(state, x_y, t, dt, **params)
+        t_target = collect(t_target)
+    t_target = collect(t_target, remainder=True)
 
     # Concatenate trajectory into a tensor.
     t, traj = zip(*traj)
