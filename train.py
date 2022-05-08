@@ -37,8 +37,9 @@ def train(state, model, opt, objective, gen, *, epoch):
         val.backward()
         opt.step()
 
-    out.kv("Loglik (T)", exp.with_err(B.concat(*vals)))
-    return state, B.mean(B.concat(*vals))
+    vals = B.concat(*vals)
+    out.kv("Loglik (T)", exp.with_err(vals))
+    return state, B.mean(vals) - 1.96 * B.std(vals)
 
 
 def eval(state, model, objective, gen):
@@ -63,13 +64,14 @@ def eval(state, model, objective, gen):
                 kls_diag.append(B.to_numpy(batch["pred_logpdf_diag"] / n - obj))
 
         # Report numbers.
-        out.kv("Loglik (V)", exp.with_err(B.concat(*vals)))
+        vals = B.concat(*vals)
+        out.kv("Loglik (V)", exp.with_err(vals))
         if kls:
             out.kv("KL (full)", exp.with_err(B.concat(*kls)))
         if kls_diag:
             out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag)))
 
-        return state, B.mean(B.concat(*vals))
+        return state, B.mean(vals) - 1.96 * B.std(vals)
 
 
 def main(**kw_args):
