@@ -91,7 +91,7 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
 
 
 def _predprey_select_from_traj(t, y, t_target):
-    inds = B.sum(t_target[:, None] > t[None, :], axis=1)
+    inds = B.sum(B.cast(B.dtype_int(t), t_target[:, None] > t[None, :]), axis=1)
     return B.take(y, inds, axis=0)
 
 
