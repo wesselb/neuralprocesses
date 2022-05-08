@@ -39,7 +39,7 @@ def train(state, model, opt, objective, gen, *, epoch):
 
     vals = B.concat(*vals)
     out.kv("Loglik (T)", exp.with_err(vals))
-    return state, B.mean(vals) - 1.96 * B.std(vals)
+    return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
 
 
 def eval(state, model, objective, gen):
@@ -71,7 +71,7 @@ def eval(state, model, objective, gen):
         if kls_diag:
             out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag)))
 
-        return state, B.mean(vals) - 1.96 * B.std(vals)
+        return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
 
 
 def main(**kw_args):
