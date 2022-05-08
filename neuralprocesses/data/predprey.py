@@ -177,13 +177,11 @@ class PredPreyGenerator(DataGenerator):
     def generate_batch(self):
         with B.on_device(self.device):
             if self._big_batch_num_left > 0:
-                print("Taking!")
                 # There is still some available from the big batch. Take that.
                 t, y = self._big_batch_t, self._big_batch_y[: self.batch_size]
                 self._big_batch_y = self._big_batch_y[self.batch_size :]
                 self._big_batch_num_left -= 1
             else:
-                print("Generating!")
                 # For computational efficiency, we will not generate one batch, but
                 # `multiplier` many batches.
                 multiplier = max(self.big_batch_size // self.batch_size, 1)
