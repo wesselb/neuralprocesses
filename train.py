@@ -3,6 +3,7 @@ import os
 import sys
 import warnings
 from functools import partial
+import time
 
 import experiment as exp
 import lab as B
@@ -513,6 +514,9 @@ def main(**kw_args):
                             partial(nps.ar_loglik, order="random", normalise=True),
                             gen,
                         )
+
+        # Sleep for twenty seconds before exiting.
+        time.sleep(20)
     else:
         # Perform training. First, check if we want to resume training.
         start = 0
