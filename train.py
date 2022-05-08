@@ -542,7 +542,7 @@ def main(**kw_args):
                 )
 
                 # The epoch is done. Now evaluate.
-                state, val = eval(state, model, objective_cv, gen_cv)
+                state, val = eval(state, model, objective_cv, gen_cv())
 
                 # Save current model.
                 torch.save(
