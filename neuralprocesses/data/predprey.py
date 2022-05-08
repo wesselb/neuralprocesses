@@ -97,6 +97,7 @@ class PredPreyGenerator(DataGenerator):
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
         batch_size (int, optional): Batch size. Defaults to 16.
+        big_batch_size (int, optional): Sizes of the big batch. Defaults to 256.
         dist_x (:class:`neuralprocesses.dist.dist.AbstractDistribution`, optional):
             Distribution of the inputs. Defaults to a uniform distribution over
             $[0, 100]$.
@@ -120,6 +121,7 @@ class PredPreyGenerator(DataGenerator):
         num_tasks (int): Number of tasks to generate per epoch. Is an integer multiple
             of `batch_size`.
         batch_size (int): Batch size.
+        big_batch_size (int): Sizes of the big batch.
         dist_x_context (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
             Distribution of the context inputs.
         dist_x_target (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
@@ -140,6 +142,7 @@ class PredPreyGenerator(DataGenerator):
         noise=0,
         num_tasks=2**14,
         batch_size=16,
+        big_batch_size=256,
         dist_x=UniformContinuous(0, 100),
         dist_x_context=None,
         dist_x_target=None,
@@ -158,6 +161,7 @@ class PredPreyGenerator(DataGenerator):
         self.num_context = convert(num_context, AbstractDistribution)
         self.num_target = convert(num_target, AbstractDistribution)
 
+        self.big_batch_size = big_batch_size
         self._big_batch = None
         self._big_batch_num_left = 0
 
@@ -173,7 +177,7 @@ class PredPreyGenerator(DataGenerator):
         with B.on_device(self.device):
             # For computational efficiency, we will not generate one batch, but
             # `multiplier` many batches.
-            multiplier = max(1024 // self.batch_size, 1)
+            multiplier = max(self.big_batch_size // self.batch_size, 1)
 
             set_batch, xcs, xc, nc, xts, xt, nt = new_batch(
                 self,
