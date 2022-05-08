@@ -80,7 +80,7 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
 
     # Concatenate trajectory into a tensor.
     t, traj = zip(*traj)
-    t = B.stack(*t)
+    t = B.to_active_device(B.cast(dtype, B.stack(*t)))
     traj = B.stack(*traj, axis=-2)
 
     # Undo the sorting.
@@ -91,24 +91,8 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
 
 
 def _predprey_select_from_traj(t, y, t_target):
-    y_target = []
-
-    # Sort before walking through it!
-    perm = B.argsort(t_target)
-    inv_perm = wbml.util.inv_perm(perm)
-    t_target = B.take(t_target, perm)
-
-    # Selec the right subset.
-    for i, ti in enumerate(t):
-        while B.shape(t_target, 0) > 0 and ti >= t_target[0]:
-            t_target = t_target[1:]
-            y_target.append(y[i])
-
-    # Concatenate into a tensor and undo the sorting.
-    y_target = B.stack(*y_target, axis=0)
-    y_target = B.take(y_target, inv_perm, axis=0)
-
-    return y_target
+    inds = B.sum(t_target[:, None] > t[None, :], axis=1)
+    return B.take(y, inds, axis=0)
 
 
 class PredPreyGenerator(DataGenerator):
@@ -193,10 +177,13 @@ class PredPreyGenerator(DataGenerator):
     def generate_batch(self):
         with B.on_device(self.device):
             if self._big_batch_num_left > 0:
+                print("Taking!")
                 # There is still some available from the big batch. Take that.
                 t, y = self._big_batch_t, self._big_batch_y[: self.batch_size]
                 self._big_batch_y = self._big_batch_y[self.batch_size :]
+                self._big_batch_num_left -= 1
             else:
+                print("Generating!")
                 # For computational efficiency, we will not generate one batch, but
                 # `multiplier` many batches.
                 multiplier = max(self.big_batch_size // self.batch_size, 1)
