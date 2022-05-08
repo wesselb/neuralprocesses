@@ -38,7 +38,7 @@ def train(state, model, opt, objective, gen, *, epoch):
         opt.step()
 
     vals = B.concat(*vals)
-    out.kv("Loglik (T)", exp.with_err(vals))
+    out.kv("Loglik (T)", exp.with_err(vals, and_lower=True))
     return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
 
 
@@ -65,11 +65,11 @@ def eval(state, model, objective, gen):
 
         # Report numbers.
         vals = B.concat(*vals)
-        out.kv("Loglik (V)", exp.with_err(vals))
+        out.kv("Loglik (V)", exp.with_err(vals, and_lower=True))
         if kls:
-            out.kv("KL (full)", exp.with_err(B.concat(*kls)))
+            out.kv("KL (full)", exp.with_err(B.concat(*kls), and_upper=True))
         if kls_diag:
-            out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag)))
+            out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag), and_upper=True))
 
         return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
 
