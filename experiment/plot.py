@@ -1,10 +1,9 @@
 import lab as B
 import matplotlib.pyplot as plt
+import neuralprocesses.torch as nps
 import stheno
 import torch
 from wbml.plot import tweak
-
-import neuralprocesses.torch as nps
 
 __all__ = ["visualise"]
 
@@ -58,36 +57,36 @@ def visualise_1d(model, gen, *, path, config, predict):
         # Plot context and target.
         plt.scatter(
             nps.batch_xc(batch, i)[0, 0],
-            nps.batch_yc(batch, i)[0],
+            nps.batch_yc(batch, i)[0, 0],
             label="Context",
             style="train",
             s=20,
         )
         plt.scatter(
             nps.batch_xt(batch, i)[0, 0],
-            nps.batch_yt(batch, i)[0],
+            nps.batch_yt(batch, i)[0, 0],
             label="Target",
             style="test",
             s=20,
         )
 
         # Plot prediction.
-        err = 1.96 * B.sqrt(var[i][0])
+        err = 1.96 * B.sqrt(var[i][0, 0])
         plt.plot(
             x,
-            mean[i][0],
+            mean[i][0, 0],
             label="Prediction",
             style="pred",
         )
         plt.fill_between(
             x,
-            mean[i][0] - err,
-            mean[i][0] + err,
+            mean[i][0, 0] - err,
+            mean[i][0, 0] + err,
             style="pred",
         )
         plt.plot(
             x,
-            samples[i][:10, 0].T,
+            B.transpose(samples[i][:10, 0, 0]),
             style="pred",
             ls="-",
             lw=0.5,
@@ -99,7 +98,7 @@ def visualise_1d(model, gen, *, path, config, predict):
             # Make sure that everything is of `float64`s and on the GPU.
             noise = B.to_active_device(B.cast(torch.float64, gen.noise))
             xc = B.cast(torch.float64, nps.batch_xc(batch, 0)[0, 0])
-            yc = B.cast(torch.float64, nps.batch_yc(batch, 0)[0])
+            yc = B.cast(torch.float64, nps.batch_yc(batch, 0)[0, 0])
             x = B.cast(torch.float64, x)
             # Compute posterior GP.
             f_post = f | (f(xc, noise), yc)
