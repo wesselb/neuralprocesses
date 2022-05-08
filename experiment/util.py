@@ -8,4 +8,4 @@ def with_err(vals):
     vals = B.to_numpy(vals)
     mean = B.mean(vals)
     err = 1.96 * B.std(vals) / B.sqrt(B.length(vals))
-    return f"{mean:8.4f} +- {err:8.4f}"
+    return f"{mean:10.5f} +- {err:10.5f} ({mean - err:10.5f})"
