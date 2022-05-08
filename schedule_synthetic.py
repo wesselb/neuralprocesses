@@ -177,6 +177,7 @@ async def main():
         required=True,
     )
     parser.add_argument("--evaluate", action="store_true")
+    parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--memory", type=int, default=11_019)
     parser.add_argument("--test", action="store_true")
     args = parser.parse_args()
@@ -262,6 +263,8 @@ async def main():
     # and AR evaluation.
     if args.evaluate:
         commands = [c + " --evaluate" for c in commands]
+    if args.evaluate_last:
+        commands = [c + " --evaluate-last" for c in commands]
 
     # If we're testing, just list the commands and exit.
     if args.test:
