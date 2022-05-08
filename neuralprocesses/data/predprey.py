@@ -105,7 +105,7 @@ class PredPreyGenerator(DataGenerator):
         num_tasks (int, optional): Number of tasks to generate per epoch. Must be an
             integer multiple of `batch_size`. Defaults to 2^14.
         batch_size (int, optional): Batch size. Defaults to 16.
-        big_batch_size (int, optional): Sizes of the big batch. Defaults to 256.
+        big_batch_size (int, optional): Size of the big batch. Defaults to 2048.
         dist_x (:class:`neuralprocesses.dist.dist.AbstractDistribution`, optional):
             Distribution of the inputs. Defaults to a uniform distribution over
             $[0, 100]$.
