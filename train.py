@@ -567,13 +567,15 @@ def main(**kw_args):
                         wd.file(f"model-best.torch"),
                     )
 
-                # Visualise a prediction by the model.
-                exp.visualise(
-                    model,
-                    gen_cv,
-                    path=wd.file(f"train-epoch-{i + 1:03d}.pdf"),
-                    config=config,
-                )
+                # Visualise a few predictions by the model.
+                gen = gen_cv()
+                for j in range(5):
+                    exp.visualise(
+                        model,
+                        gen,
+                        path=wd.file(f"train-epoch-{i + 1:03d}-{j + 1}.pdf"),
+                        config=config,
+                    )
 
 
 if __name__ == "__main__":
