@@ -76,20 +76,6 @@ def code(coder: SetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
     return x, B.matmul(z, compute_weights(coder, xz, x))
 
 
-def _standardise_equation(equation):
-    normalisation_map = {}
-    for i, x in enumerate(equation):
-        if x in letters and x not in normalisation_map:
-            normalisation_map[x] = letters[len(normalisation_map)]
-    normalised_equation = ""
-    for x in equation:
-        if x in letters:
-            normalised_equation += normalisation_map[x]
-        else:
-            normalised_equation += x
-    return normalised_equation
-
-
 _setconv_cache_num_tup = {}
 
 
@@ -97,7 +83,7 @@ _setconv_cache_num_tup = {}
 def code(coder: SetConv, xz: B.Numeric, z: B.Numeric, x: tuple, **kw_args):
     ws = [compute_weights(coder, xz[..., i : i + 1, :], xi) for i, xi in enumerate(x)]
 
-    # Use a cache so we don't build and normalise the string every time.
+    # Use a cache so we don't build the equation every time.
     try:
         equation = _setconv_cache_num_tup[len(x)]
     except KeyError:
@@ -109,11 +95,10 @@ def code(coder: SetConv, xz: B.Numeric, z: B.Numeric, x: tuple, **kw_args):
             letters_i += 1
             base += f",...c{let}"
             result += f"{let}"
-        _setconv_cache_num_tup[len(x)] = _standardise_equation(f"{base}->{result}")
-
+        _setconv_cache_num_tup[len(x)] = f"{base}->{result}"
         equation = _setconv_cache_num_tup[len(x)]
 
-    return x, _einsum(equation, z, *ws)
+    return x, B.einsum(equation, z, *ws)
 
 
 _setconv_cache_tup_num = {}
@@ -124,7 +109,7 @@ _setconv_cache_tup_num = {}
 def code(coder: SetConv, xz: tuple, z: B.Numeric, x: B.Numeric, **kw_args):
     ws = [compute_weights(coder, xzi, x[..., i : i + 1, :]) for i, xzi in enumerate(xz)]
 
-    # Use a cache so we don't build and normalise the string every time.
+    # Use a cache so we don't build the equation every time.
     try:
         equation = _setconv_cache_tup_num[len(xz)]
     except KeyError:
@@ -136,13 +121,10 @@ def code(coder: SetConv, xz: tuple, z: B.Numeric, x: B.Numeric, **kw_args):
             letters_i += 1
             base_base += f"{let}"
             base_els += f",...{let}c"
-        _setconv_cache_tup_num[len(xz)] = _standardise_equation(
-            f"{base_base}{base_els}->...bc"
-        )
-
+        _setconv_cache_tup_num[len(xz)] = f"{base_base}{base_els}->...bc"
         equation = _setconv_cache_tup_num[len(xz)]
 
-    return x, _einsum(equation, z, *ws)
+    return x, B.einsum(equation, z, *ws)
 
 
 _setconv_cache_tup_tup = {}
@@ -152,7 +134,7 @@ _setconv_cache_tup_tup = {}
 def code(coder: SetConv, xz: tuple, z: B.Numeric, x: tuple, **kw_args):
     ws = [compute_weights(coder, xzi, xi) for xzi, xi in zip(xz, x)]
 
-    # Use a cache so we don't build and normalise the string every time.
+    # Use a cache so we don't build the equation every time.
     try:
         equation = _setconv_cache_tup_tup[len(x)]
     except KeyError:
@@ -168,13 +150,10 @@ def code(coder: SetConv, xz: tuple, z: B.Numeric, x: tuple, **kw_args):
             base_base += f"{let1}"
             base_els += f",...{let1}{let2}"
             result += f"{let2}"
-        _setconv_cache_tup_tup[len(x)] = _standardise_equation(
-            f"{base_base}{base_els}->{result}"
-        )
-
+        _setconv_cache_tup_tup[len(x)] = f"{base_base}{base_els}->{result}"
         equation = _setconv_cache_tup_tup[len(x)]
 
-    return x, _einsum(equation, z, *ws)
+    return x, B.einsum(equation, z, *ws)
 
 
 broadcast_coder_over_parallel(SetConv)
@@ -184,45 +163,3 @@ broadcast_coder_over_parallel(SetConv)
 def code(coder: SetConv, xz, z, x: AugmentedInput, **kw_args):
     xz, z = code(coder, xz, z, x.x, **kw_args)
     return AugmentedInput(xz, x.augmentation), z
-
-
-_einsum_allowed_fallback = True
-"""bool: Set this to `False` if you wish to avoid a backend implementation of
-`einsum`."""
-
-
-def _einsum(equation, *args):
-    """Even though `B.einsum` uses `opt_einsum`, further speed-ups are possible by
-    appropriately using broadcasting or matrix multiplications. This function catches
-    a few of those speed-ups.
-
-    Args:
-        equation (str): Equation.
-        *args (tensor): Arguments.
-
-    Returns:
-        tensor: Result.
-    """
-    if equation == "...ab,...bc,...bd->...acd":
-        x, y, z = args
-        return B.sum(
-            x[..., :, :, None, None]
-            * y[..., None, :, :, None]
-            * z[..., None, :, None, :],
-            axis=-3,
-        )
-    elif equation == "...abc,...bd,...cd->...ad":
-        x, y, z = args
-        w = B.matmul(x, y[..., None, :, :], tr_a=True)
-        return B.sum(w * z[..., None, :, :], axis=-2)
-    elif equation == "...abc,...bd,...ce->...ade":
-        x, y, z = args
-        return B.matmul(y[..., None, :, :], x, z[..., None, :, :], tr_a=True)
-    elif _einsum_allowed_fallback:
-        # Could not find a speed-up. Just use `B.einsum`, which uses `opt_einsum`
-        # to find a good contraction order.
-        return B.einsum(equation, *args)
-    else:
-        raise RuntimeError(
-            f'Could not find optimised implementation for equation "{equation}".'
-        )

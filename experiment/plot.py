@@ -1,10 +1,9 @@
 import lab as B
 import matplotlib.pyplot as plt
+import neuralprocesses.torch as nps
 import stheno
 import torch
 from wbml.plot import tweak
-
-import neuralprocesses.torch as nps
 
 __all__ = ["visualise"]
 
@@ -72,22 +71,22 @@ def visualise_1d(model, gen, *, path, config, predict):
         )
 
         # Plot prediction.
-        err = 1.96 * B.sqrt(var[i][0])
+        err = 1.96 * B.sqrt(var[i][0, 0])
         plt.plot(
             x,
-            mean[i][0],
+            mean[i][0, 0],
             label="Prediction",
             style="pred",
         )
         plt.fill_between(
             x,
-            mean[i][0] - err,
-            mean[i][0] + err,
+            mean[i][0, 0] - err,
+            mean[i][0, 0] + err,
             style="pred",
         )
         plt.plot(
             x,
-            samples[i][:10, 0].T,
+            B.transpose(samples[i][:10, 0, 0]),
             style="pred",
             ls="-",
             lw=0.5,
