@@ -244,12 +244,12 @@ async def main():
         )
     elif args.mode == "conditional-predprey":
         commands = [
-            f"python train.py --data predprey --model {model}"
+            f"python train.py --data predprey --model {model} --rate 1e-4"
             for model in ["convcnp", "convgnp", "fullconvgnp", "acnp"]
         ]
     elif args.mode == "latent-variable-predprey":
         commands = [
-            f"python train.py --data predprey --model {model} --objective {objective}"
+            f"python train.py --data predprey --model {model} --objective {objective} --rate 1e-4"
             for model in ["anp", "convnp"]
             for objective in [
                 f"loglik --num-samples 20",
