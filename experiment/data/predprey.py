@@ -26,7 +26,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         num_tasks=num_tasks_train,
         device=device,
     )
-    gen_cv = nps.PredPreyGenerator(
+    gen_cv = lambda: nps.PredPreyGenerator(
         torch.float32,
         seed=20,
         batch_size=args.batch_size,

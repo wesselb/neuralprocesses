@@ -1,18 +1,22 @@
 import argparse
 import os
 import sys
+import warnings
 from functools import partial
+import time
 
+import experiment as exp
 import lab as B
+import neuralprocesses.torch as nps
 import numpy as np
 import torch
 import wbml.out as out
+from matrix.util import ToDenseWarning
 from wbml.experiment import WorkingDirectory
 
-import experiment as exp
-import neuralprocesses.torch as nps
-
 __all__ = ["main"]
+
+warnings.filterwarnings("ignore", category=ToDenseWarning)
 
 
 def train(state, model, opt, objective, gen, *, epoch):
@@ -34,8 +38,9 @@ def train(state, model, opt, objective, gen, *, epoch):
         val.backward()
         opt.step()
 
-    out.kv("Loglik (T)", exp.with_err(B.concat(*vals)))
-    return state, B.mean(B.concat(*vals))
+    vals = B.concat(*vals)
+    out.kv("Loglik (T)", exp.with_err(vals, and_lower=True))
+    return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
 
 
 def eval(state, model, objective, gen):
@@ -60,13 +65,14 @@ def eval(state, model, objective, gen):
                 kls_diag.append(B.to_numpy(batch["pred_logpdf_diag"] / n - obj))
 
         # Report numbers.
-        out.kv("Loglik (V)", exp.with_err(B.concat(*vals)))
+        vals = B.concat(*vals)
+        out.kv("Loglik (V)", exp.with_err(vals, and_lower=True))
         if kls:
-            out.kv("KL (full)", exp.with_err(B.concat(*kls)))
+            out.kv("KL (full)", exp.with_err(B.concat(*kls), and_upper=True))
         if kls_diag:
-            out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag)))
+            out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag), and_upper=True))
 
-        return state, B.mean(B.concat(*vals))
+        return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
 
 
 def main(**kw_args):
@@ -514,6 +520,9 @@ def main(**kw_args):
                             partial(nps.ar_loglik, order="random", normalise=True),
                             gen,
                         )
+
+        # Sleep for twenty seconds before exiting.
+        time.sleep(20)
     else:
         # Perform training. First, check if we want to resume training.
         start = 0
@@ -548,7 +557,7 @@ def main(**kw_args):
                 )
 
                 # The epoch is done. Now evaluate.
-                state, val = eval(state, model, objective_cv, gen_cv)
+                state, val = eval(state, model, objective_cv, gen_cv())
 
                 # Save current model.
                 torch.save(
@@ -573,13 +582,15 @@ def main(**kw_args):
                         wd.file(f"model-best.torch"),
                     )
 
-                # Visualise a prediction by the model.
-                exp.visualise(
-                    model,
-                    gen_cv,
-                    path=wd.file(f"train-epoch-{i + 1:03d}.pdf"),
-                    config=config,
-                )
+                # Visualise a few predictions by the model.
+                gen = gen_cv()
+                for j in range(5):
+                    exp.visualise(
+                        model,
+                        gen,
+                        path=wd.file(f"train-epoch-{i + 1:03d}-{j + 1}.pdf"),
+                        config=config,
+                    )
 
 
 if __name__ == "__main__":

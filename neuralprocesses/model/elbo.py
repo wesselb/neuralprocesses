@@ -78,7 +78,7 @@ def elbo(
         **kw_args,
     )
 
-    # Sample from poster.
+    # Sample from posterior.
     state, z = sample(state, qz, num=num_samples)
     z = B.cast(float, z)
 

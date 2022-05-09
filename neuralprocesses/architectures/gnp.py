@@ -146,7 +146,9 @@ def construct_gnp(
                 in_dim=dim_embedding * len(dim_yc),
                 out_dim=lv_mlp_out_channels,
                 num_layers=num_enc_layers,
-                width=width,
+                # The capacity of this MLP should increase with the number of outputs,
+                # but multiplying by `len(dim_yc)` is too aggressive.
+                width=width * min(len(dim_yc), 2),
                 dtype=dtype,
             ),
             lv_likelihood,
@@ -175,7 +177,9 @@ def construct_gnp(
                     in_dim=dim_x + dim_embedding * len(dim_yc) + dim_lv,
                     out_dim=mlp_out_channels,
                     num_layers=num_dec_layers,
-                    width=width * len(dim_yc),
+                    # The capacity of this MLP should increase with the number of
+                    # outputs, but multiplying by `len(dim_yc)` is too aggressive.
+                    width=width * min(len(dim_yc), 2),
                     dtype=dtype,
                 ),
                 selector,  # Select the right target output.

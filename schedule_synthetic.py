@@ -164,18 +164,20 @@ async def main():
             "sawtooth",
             "mixture",
         ],
-        required=True,
     )
-    parser.add_argument("--dim-y", type=int, required=True)
+    parser.add_argument("--dim-y", type=int)
     parser.add_argument(
         "--mode",
         choices=[
             "conditional",
             "latent-variable",
+            "conditional-predprey",
+            "latent-variable-predprey",
         ],
         required=True,
     )
     parser.add_argument("--evaluate", action="store_true")
+    parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--memory", type=int, default=11_019)
     parser.add_argument("--test", action="store_true")
     args = parser.parse_args()
@@ -190,7 +192,7 @@ async def main():
     if args.mode == "conditional":
         # Conditional models:
         commands = [
-            f"python train_gp.py"
+            f"python train.py"
             f" --model {model}"
             f" --data {args.data}"
             f" --dim-x {dim_x}"
@@ -211,7 +213,7 @@ async def main():
         # Latent-variable models:
         commands = (
             [
-                f"python train_gp.py"
+                f"python train.py"
                 f" --model {model}"
                 f" --objective {objective}"
                 f" --data {args.data}"
@@ -228,7 +230,7 @@ async def main():
             # The ConvNP for 2D inputs is expensive. We reduce the number of samples to
             # keep the memory and runtime in check.
             + [
-                f"python train_gp.py"
+                f"python train.py"
                 f" --model convnp"
                 f" --objective {objective}"
                 f" --data {args.data}"
@@ -240,6 +242,20 @@ async def main():
                 ]
             ]
         )
+    elif args.mode == "conditional-predprey":
+        commands = [
+            f"python train.py --data predprey --model {model} --rate 1e-4"
+            for model in ["convcnp", "convgnp", "fullconvgnp", "acnp"]
+        ]
+    elif args.mode == "latent-variable-predprey":
+        commands = [
+            f"python train.py --data predprey --model {model} --objective {objective} --rate 1e-4"
+            for model in ["anp", "convnp"]
+            for objective in [
+                f"loglik --num-samples 20",
+                f"elbo --num-samples 5",
+            ]
+        ]
     else:
         raise RuntimeError(f'Bad mode "{args.mode}".')
 
@@ -247,6 +263,8 @@ async def main():
     # and AR evaluation.
     if args.evaluate:
         commands = [c + " --evaluate" for c in commands]
+    if args.evaluate_last:
+        commands = [c + " --evaluate-last" for c in commands]
 
     # If we're testing, just list the commands and exit.
     if args.test:
@@ -286,8 +304,8 @@ async def main():
             if stats["memory"] + 1.10 * benchmark[c]["memory"] > 0.9 * args.memory:
                 # Takes too much memory.
                 continue
-            if stats["utilisation"] + benchmark[c]["utilisation"] > 120:
-                # Fine to max out the GPU, but not much more than that.
+            if stats["utilisation"] + benchmark[c]["utilisation"] > 100:
+                # Don't more than max out the GPU.
                 continue
             eligible_commands.append(c)
 

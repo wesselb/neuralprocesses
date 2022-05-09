@@ -44,7 +44,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         device=device,
     )[name]
 
-    gen_cv = nps.construct_predefined_gens(
+    gen_cv = lambda: nps.construct_predefined_gens(
         torch.float32,
         seed=20,  # Use a different seed!
         batch_size=args.batch_size,
