@@ -29,10 +29,10 @@ class ImageGenerator(DataGenerator):
             dataset: str,
             data_root: str,
             split: str,
-            batch_size: int,
             dtype: torch.dtype,
             device: str,
             seed: int,
+            batch_size: int,
             num_tasks: int,
             num_targets: UniformDiscrete = UniformDiscrete(100, 256),
             *args,
@@ -86,12 +86,13 @@ class ImageGenerator(DataGenerator):
             train=(split == "train")
         )
 
-
-    def epoch(self):
-        self.iterator = self.dataloader.__iter__()
-        return super().epoch()
-
     def generate_batch(self):
+
+        if not hasattr(self, "iterator"):
+            self.iterator = self.dataloader.__iter__()
+
+        else:
+            
 
         images, _ = self.iterator.__next__()
 
