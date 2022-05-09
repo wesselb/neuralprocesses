@@ -24,4 +24,3 @@ cover
 *.swp
 .vscode/*
 venv-np
-_experiments
