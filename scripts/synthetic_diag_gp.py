@@ -34,7 +34,7 @@ def gens_eval(data, dim_x, dim_y):
     ]
 
 
-for data in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]:
+for data in ["eq", "matern", "weakly-periodic"]:
     for dim_x in [1, 2]:
         for dim_y in [1, 2]:
             with out.Section(f"{data}-{dim_x}-{dim_y}"):
