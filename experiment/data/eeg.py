@@ -13,11 +13,11 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["dim_y"] = 7
 
     # Architecture choices specific for the EEG experiments
-    config["points_per_unit"] = 512
+    config["points_per_unit"] = 256
     config["margin"] = 0.1
     config["transform"] = None
-    config["unet_channels"] = (32, 64, 128, 256, 512, 1024)
-    config["dws_receptive_field"] = 0.1
+    config["unet_channels"] = (64,) * 6
+    config["dws_receptive_field"] = 1.
 
     # Other settings specific to the predator-prey experiments:
     config["plot"] = {1: {"range": (0, 1), "axvline": []}}
@@ -31,13 +31,15 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         device=device,
     )
 
-    gen_cv = nps.EEGGenerator(
-        dtype=torch.float32,
-        split_seed=20,
-        split="valid",
-        batch_size=args.batch_size,
-        num_tasks=num_tasks_cv,
-        device=device,
+    gen_cv = lambda: (
+        nps.EEGGenerator(
+            dtype=torch.float32,
+            split_seed=20,
+            split="valid",
+            batch_size=args.batch_size,
+            num_tasks=num_tasks_cv,
+            device=device,
+        )
     )
     gens_eval = lambda: (
         "Evaluation",
