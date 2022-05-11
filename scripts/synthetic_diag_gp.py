@@ -4,6 +4,7 @@ import lab.torch as B
 from wbml.experiment import WorkingDirectory
 
 import neuralprocesses.torch as nps
+from experiment import with_err
 
 wd = WorkingDirectory("_experiments", "synthetic_diag_gp")
 
@@ -38,15 +39,20 @@ for data in ["eq", "matern", "weakly-periodic"]:
     for dim_x in [1, 2]:
         for dim_y in [1, 2]:
             with out.Section(f"{data}-{dim_x}-{dim_y}"):
-                for name, gen in gens_eval(data, dim_x, dim_y):
+                for task, gen in gens_eval(data, dim_x, dim_y):
                     with out.Section(task.capitalize()):
                         out.kv(
                             "Diag",
-                            nps.with_err(
-                                [
-                                    (batch["pred_logpdf"] - batch["pred_logpdf_diag"])
-                                    / nps.num_tasks(batch["xt"], batch["yt"])
-                                    for batch in gen.epoch()
-                                ]
+                            with_err(
+                                B.stack(
+                                    *[
+                                        (
+                                            batch["pred_logpdf"]
+                                            - batch["pred_logpdf_diag"]
+                                        )
+                                        / nps.num_data(batch["xt"], batch["yt"])
+                                        for batch in gen.epoch()
+                                    ]
+                                )
                             ),
                         )
