@@ -7,7 +7,6 @@ from .. import _dispatch
 __all__ = ["predict"]
 
 
-
 @_dispatch
 def predict(
     state: B.RandomState,
