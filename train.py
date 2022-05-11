@@ -205,6 +205,7 @@ def main(**kw_args):
     # General architecture choices:
     config = {
         "epsilon": 1e-8,
+        "cholesky_retry_factor": 1e6,
         "width": 256,
         "dim_embedding": 256,
         "num_heads": 8,
@@ -231,6 +232,7 @@ def main(**kw_args):
 
     # Set the regularisation based on the experiment settings.
     B.epsilon = config["epsilon"]
+    B.cholesky_retry_factor = config["cholesky_retry_factor"]
 
     # Construct the model.
     if args.model == "cnp":
