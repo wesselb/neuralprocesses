@@ -96,7 +96,7 @@ def construct_convgnp(
     dws_receptive_field=None,
     dws_layers=6,
     dws_channels=64,
-    num_basis_functions=512,
+    num_basis_functions=64,
     dim_lv=0,
     lv_likelihood="het",
     encoder_scales=None,
