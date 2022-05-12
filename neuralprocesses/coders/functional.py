@@ -1,4 +1,5 @@
 import matrix  # noqa
+from plum import convert
 
 from .. import _dispatch
 from ..util import register_module, register_composite_coder
