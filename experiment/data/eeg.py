@@ -41,18 +41,23 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
             device=device,
         )
     )
-    gens_eval = lambda: (
-        "Evaluation",
-        nps.EEGGenerator(
+
+    def gens_eval():
+
+        gen_eval = nps.EEGGenerator(
             dtype=torch.float32,
             split_seed=30,
             split="test",
             batch_size=args.batch_size,
             num_tasks=num_tasks_eval,
             device=device,
-        ),
-    )
+		)
+
+        return [("standard eval", gen_eval)]
+
     return gen_train, gen_cv, gens_eval
+
+
 
 
 register_data("eeg", setup)
