@@ -13,11 +13,14 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["dim_y"] = 7
 
     # Architecture choices specific for the EEG experiments
-    config["points_per_unit"] = 256
     config["margin"] = 0.1
     config["transform"] = None
-    config["unet_channels"] = (64,) * 6
     config["dws_receptive_field"] = 1.
+    config["unet_channels"] = (64,) * 6
+    config["epsilon"] = 1e-6
+    config["fullconvgnp_kernel_factor"] = 1
+    config["points_per_unit"] = 256
+    config["encoder_scales"] = 1 / 512
 
     # Other settings specific to the predator-prey experiments:
     config["plot"] = {1: {"range": (0, 1), "axvline": []}}
