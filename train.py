@@ -172,7 +172,6 @@ def main(**kw_args):
 
     # Setup script.
     out.report_time = True
-    B.epsilon = 1e-8
     wd = WorkingDirectory(
         *args.root,
         *(args.subdir or ()),
@@ -211,12 +210,16 @@ def main(**kw_args):
 
     # General architecture choices:
     config = {
+        "epsilon": 1e-8,
+        "cholesky_retry_factor": 1e6,
         "width": 256,
         "dim_embedding": 256,
         "num_heads": 8,
         "num_layers": 6,
         "unet_channels": (64,) * 6,
         "dws_channels": 64,
+        "encoder_scales": None,
+        "fullconvgnp_kernel_factor": 2,
         # Performance of the ConvGNP is sensitive to this parameter. Moreover, it
         # doesn't make sense to set it to a value higher of the last hidden layer of
         # the CNN architecture. We therefore set it to 64.
@@ -232,6 +235,10 @@ def main(**kw_args):
         num_tasks_eval=2**6 if args.evaluate_fast else 2**12,
         device=device,
     )
+
+    # Set the regularisation based on the experiment settings.
+    B.epsilon = config["epsilon"]
+    B.cholesky_retry_factor = config["cholesky_retry_factor"]
 
     # Construct the model.
     if args.model == "cnp":
@@ -320,6 +327,7 @@ def main(**kw_args):
             dws_layers=config["num_layers"],
             dws_receptive_field=config["dws_receptive_field"],
             margin=config["margin"],
+            encoder_scales=config["encoder_scales"],
             transform=config["transform"],
         )
     elif args.model == "convgnp":
@@ -336,6 +344,7 @@ def main(**kw_args):
             dws_receptive_field=config["dws_receptive_field"],
             num_basis_functions=config["num_basis_functions"],
             margin=config["margin"],
+            encoder_scales=config["encoder_scales"],
             transform=config["transform"],
         )
     elif args.model == "convnp":
@@ -360,6 +369,7 @@ def main(**kw_args):
             dws_receptive_field=config["dws_receptive_field"],
             dim_lv=16,
             margin=config["margin"],
+            encoder_scales=config["encoder_scales"],
             transform=config["transform"],
         )
     elif args.model == "fullconvgnp":
@@ -373,7 +383,9 @@ def main(**kw_args):
             dws_channels=config["dws_channels"],
             dws_layers=config["num_layers"],
             dws_receptive_field=config["dws_receptive_field"],
+            kernel_factor=config["fullconvgnp_kernel_factor"],
             margin=config["margin"],
+            encoder_scales=config["encoder_scales"],
             transform=config["transform"],
         )
     else:

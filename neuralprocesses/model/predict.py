@@ -7,24 +7,6 @@ from .. import _dispatch
 __all__ = ["predict"]
 
 
-def _retry(f, *args):
-    # Try sampling with increasingly higher regularisation.
-    epsilon_before = B.epsilon
-    while True:
-        try:
-            res = f(*args)
-            break  # Success! Break the loop to exit.
-        except Exception as e:
-            # Failed. Increase regularisation and retry.
-            B.epsilon *= 10
-            if B.epsilon > 1e-3:
-                # Regularisation too high. Reset regularisation before throwing.
-                B.epsilon = epsilon_before
-                raise e
-    B.epsilon = epsilon_before  # Reset regularisation after success.
-    return res
-
-
 @_dispatch
 def predict(
     state: B.RandomState,
@@ -79,8 +61,8 @@ def predict(
         # encoding was a `Dirac`, so we can stop batching. In this case, we can
         # efficiently compute everything that we need and exit.
         if this_num_samples > 1 and B.shape_batch(pred, 0) == 1:
-            state, ft = _retry(pred.noiseless.sample, state, num_samples)
-            state, yt = _retry(pred.sample, state, num_samples)
+            state, ft = pred.noiseless.sample(state, num_samples)
+            state, yt = pred.sample(state, num_samples)
             return (
                 state,
                 # Squeeze the newly introduced sample dimension.
@@ -92,9 +74,9 @@ def predict(
             )
 
         # Produce samples.
-        state, sample = _retry(pred.noiseless.sample, state)
+        state, sample = pred.noiseless.sample(state)
         ft.append(sample)
-        state, sample = _retry(pred.sample, state)
+        state, sample = pred.sample(state)
         yt.append(sample)
 
         # Produce moments.

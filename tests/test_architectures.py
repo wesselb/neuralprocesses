@@ -3,8 +3,6 @@ from itertools import product
 import lab as B
 import numpy as np
 import pytest
-from matrix import Woodbury, Diagonal
-from stheno import Normal
 
 from .util import nps as nps_fixed_dtype, approx, generate_data  # noqa
 
@@ -215,11 +213,6 @@ def model_sample(request, nps, config):
 
 
 def check_prediction(nps, pred, yt):
-    # Stabilise the matrix inversion lemma by ensuring that the model didn't output
-    # too small noise variances.
-    if hasattr(pred, "_noise"):
-        pred._noise = pred._noise + 1e-1 * B.eye(pred._noise)
-
     # Check that the log-pdf at the target data is finite and of the right data type.
     objective = pred.logpdf(yt)
     assert B.rank(objective) == 1

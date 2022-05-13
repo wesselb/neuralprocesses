@@ -1,16 +1,20 @@
+from typing import Union
+
 import lab as B
+import neuralprocesses
 import pytest
 import tensorflow as tf
 import torch
 from numpy.testing import assert_allclose
 from plum import Dispatcher
-from typing import Union
-
-import neuralprocesses
 
 __all__ = ["approx", "nps", "generate_data"]
 
 _dispatch = Dispatcher()
+
+# Stabilise numerics during tests.
+B.epsilon = 1e-6
+B.cholesky_retry_factor = 1e4
 
 
 @_dispatch

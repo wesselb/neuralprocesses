@@ -31,6 +31,7 @@ def construct_fullconvgnp(
     dws_receptive_field=None,
     dws_layers=6,
     dws_channels=64,
+    kernel_factor=2,
     dim_lv=0,
     encoder_scales=None,
     decoder_scale=None,
@@ -77,6 +78,10 @@ def construct_fullconvgnp(
             Must be specified if `conv_arch` is set to "dws".
         dws_layers (int, optional): Layers of the DWS architecture. Defaults to 8.
         dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
+        kernel_factor (int, optional): Factor to reduce the number of channel of the
+            kernel CNN architecture and the kernel points per unit by. Set to 1 to
+            put the architecture for the kernel on equal footing with the architecture
+            for the mean. Defaults to 2.
         dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         encoder_scales (float or tuple[float], optional): Initial value for the length
             scales of the set convolutions for the context sets embeddings. Defaults
@@ -134,7 +139,7 @@ def construct_fullconvgnp(
             # We need covariance matrices for every pair of outputs.
             out_channels=dim_yt * dim_yt,
             # Keep the parameters in check.
-            channels=tuple(n // 2 for n in unet_channels),
+            channels=tuple(int(n / kernel_factor) for n in unet_channels),
             kernels=unet_kernels,
             activations=unet_activations,
             resize_convs=unet_resize_convs,
@@ -158,9 +163,9 @@ def construct_fullconvgnp(
             in_channels=conv_in_channels + 1,  # Add identity channel.
             # We need covariance matrices for every pair of outputs.
             out_channels=dim_yt * dim_yt,
-            channels=dws_channels // 2,  # Keep the parameters in check.
+            channels=int(dws_channels / kernel_factor),  # Keep the parameters in check.
             num_layers=dws_layers,
-            points_per_unit=points_per_unit // 2,  # Keep memory in control.
+            points_per_unit=points_per_unit / kernel_factor,  # Keep memory in control.
             receptive_field=dws_receptive_field,
             dtype=dtype,
         )
@@ -177,7 +182,7 @@ def construct_fullconvgnp(
         dim=dim_x,
     )
     disc_kernel = nps.Discretisation(
-        points_per_unit=points_per_unit // 2,  # Keep memory in control.
+        points_per_unit=points_per_unit / kernel_factor,  # Keep memory in control.
         multiple=2**conv_kernel.num_halving_layers,
         margin=margin,
         dim=dim_x,  # Only 1D, because the input is later repeated to make it 2D.

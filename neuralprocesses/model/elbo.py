@@ -145,7 +145,7 @@ def _merge_context_target(contexts: list, xt: B.Numeric, yt: B.Numeric):
 @_dispatch
 def _merge_context_target(contexts: list, xt: AggregateInput, yt: Aggregate):
     updated_xt, updated_yt = [], []
-    q_context_updates = [None] * len(xt)
+    q_context_updates = [None] * len(contexts)
 
     for (xti, i), yti in zip(xt, yt):
         xci, yci = contexts[i]
