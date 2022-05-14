@@ -7,7 +7,7 @@ from .. import _dispatch
 from ..datadims import data_dims
 from ..util import register_module, compress_batch_dimensions
 
-__all__ = ["Linear", "MLP", "UNet", "ConvNet"]
+__all__ = ["Linear", "MLP", "UNet", "ConvNet", "ResidualBlock"]
 
 
 @register_module
@@ -320,7 +320,9 @@ class ConvNet:
 
     Attributes:
         dim (int): Dimensionality.
+        kernel (int): Kernel size.
         num_halving_layers (int): Number of layers with stride equal to two.
+        receptive_field (float): Receptive field.
         conv_net (module): The architecture.
     """
 
@@ -334,76 +336,136 @@ class ConvNet:
         points_per_unit: float,
         receptive_field: float,
         separable: bool = True,
+        residual: bool = False,
         dtype=None,
     ):
         self.dim = dim
 
-        activation = self.nn.ReLU()
-
         # Make it a drop-in substitute for :class:`UNet`.
         self.num_halving_layers = 0
+        self.receptive_field = receptive_field
 
         # Compute kernel size.
         receptive_points = receptive_field * points_per_unit
         kernel = math.ceil(1 + (receptive_points - 1) / num_layers)
         kernel = kernel + 1 if kernel % 2 == 0 else kernel  # Make kernel size odd.
+        self.kernel = kernel  # Store it for reference.
 
-        Conv = getattr(self.nn, f"Conv{dim}d")
+        # Construct basic building blocks.
+        activation = self.nn.ReLU()
+        self._base_conv = getattr(self.nn, f"Conv{dim}d")
+
         layers = [
-            Conv(
+            self._pointwise(
                 in_channels=in_channels,
                 out_channels=channels,
-                kernel=1,
-                dtype=dtype,
-            ),
-            activation,
-        ]
-        for _ in range(num_layers):
-            if separable:
-                layers.extend(
-                    [
-                        # Construct depthwise separable convolution by setting
-                        # `groups=channels`.
-                        Conv(
-                            in_channels=channels,
-                            out_channels=channels,
-                            kernel=kernel,
-                            groups=channels,
-                            dtype=dtype,
-                        ),
-                        # Construct a pointwise MLP with `kernel=1`.
-                        Conv(
-                            in_channels=channels,
-                            out_channels=channels,
-                            kernel=1,
-                            dtype=dtype,
-                        ),
-                        activation,
-                    ]
-                )
-            else:
-                layers.extend(
-                    [
-                        Conv(
-                            in_channels=channels,
-                            out_channels=channels,
-                            kernel=kernel,
-                            groups=1,
-                            dtype=dtype,
-                        ),
-                        activation,
-                    ]
-                )
-        layers.append(
-            Conv(
-                in_channels=channels,
-                out_channels=out_channels,
-                kernel=1,
                 dtype=dtype,
             )
-        )
+        ]
+        for i in range(num_layers):
+            last = i + 1 == num_layers
+            if residual:
+                layers.append(
+                    self.nps.ResidualBlock(
+                        self._conv(
+                            in_channels=channels,
+                            out_channels=channels,
+                            kernel=kernel,
+                            separable=separable,
+                            activation=activation,
+                            dtype=dtype,
+                        ),
+                        self._pointwise(
+                            in_channels=channels,
+                            out_channels=channels,
+                            dtype=dtype,
+                        ),
+                        self._pointwise(
+                            in_channels=channels,
+                            out_channels=out_channels if last else channels,
+                            dtype=dtype,
+                        ),
+                        activation,
+                    )
+                )
+            else:
+                layers.append(
+                    self._conv(
+                        in_channels=channels,
+                        out_channels=out_channels if last else channels,
+                        kernel=kernel,
+                        separable=separable,
+                        activation=activation,
+                        dtype=dtype,
+                    )
+                )
         self.conv_net = self.nn.Sequential(*layers)
+
+    def _conv(self, *, in_channels, out_channels, kernel, separable, activation, dtype):
+        if separable:
+            return self.nn.Sequential(
+                activation,
+                # Construct depthwise separable convolution by setting
+                # `groups=channels`.
+                self._base_conv(
+                    in_channels=in_channels,
+                    out_channels=in_channels,
+                    kernel=kernel,
+                    groups=in_channels,
+                    dtype=dtype,
+                ),
+                self._pointwise(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    dtype=dtype,
+                ),
+            )
+        else:
+            return self.nn.Sequential(
+                activation,
+                self._base_conv(
+                    in_channels=channels,
+                    out_channels=channels,
+                    kernel=kernel,
+                    dtype=dtype,
+                ),
+            )
+
+    def _pointwise(self, *, in_channels, out_channels, dtype):
+        # Construct a pointwise linear layer by setting `kernel=1`.
+        return self._base_conv(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel=1,
+            dtype=dtype,
+        )
 
     def __call__(self, x):
         x, uncompress = compress_batch_dimensions(x, self.dim + 1)
         return uncompress(self.conv_net(x))
+
+
+@register_module
+class ResidualBlock:
+    """Block of a residual network.
+
+    Args:
+        layer1 (object): First linear layer.
+        layer2 (object): Second linear layer.
+        layer_post (object): Linear layer after the addition.
+        activation (object): Activation function.
+    """
+
+    def __init__(self, layer1, layer2, layer_post, activation):
+        self.layer1 = layer1
+        self.layer2 = layer2
+        self.layer_post = layer_post
+        self.activation = activation
+
+    def __call__(self, x):
+        y = self.activation(x)
+        y = self.layer1(y)
+        y = self.activation(y)
+        y = self.layer2(y)
+        x = x + y
+        return self.layer_post(x)
