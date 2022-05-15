@@ -47,16 +47,32 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
 
     def gens_eval():
 
-        gen_eval = nps.EEGGenerator(
+        gen_eval_scattered = nps.EEGGenerator(
             dtype=torch.float32,
             split_seed=30,
             split="test",
             batch_size=args.batch_size,
             num_tasks=num_tasks_eval,
+            single_channel=False,
             device=device,
-		)
+        )
 
-        return [("standard eval", gen_eval)]
+        gen_eval_single_channel = nps.EEGGenerator(
+            dtype=torch.float32,
+            split_seed=30,
+            split="test",
+            batch_size=args.batch_size,
+            num_tasks=num_tasks_eval,
+            single_channel=True,
+            device=device,
+        )
+
+        #gens = [
+        #    ("standard eval", gen_eval_scattered),
+        #    ("single channel eval", gen_eval_single_channel),
+        #]
+
+        return [("standard eval", gen_eval_scattered)]
 
     return gen_train, gen_cv, gens_eval
 

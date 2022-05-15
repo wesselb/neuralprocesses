@@ -28,6 +28,7 @@ class EEGGenerator(DataGenerator):
         batch_size,
         device,
         shuffle_seed=0,
+        single_channel=False,
         num_targets=UniformDiscrete(100, 256),
     ):
 
@@ -179,6 +180,9 @@ class EEGGenerator(DataGenerator):
         # Set counter for resetting at the end of an epoch
         self.i = 0
 
+        # Whether to occlude a single channel for predictions
+        self.single_channel = single_channel
+
     def make_trials(self, data, subjects):
 
         trials = []
@@ -231,20 +235,42 @@ class EEGGenerator(DataGenerator):
         xt = []
         yt = []
 
-        for i in range(7):
+        if self.single_channel:
 
-            ctx = (x, y[:, i : i + 1, :])
+            n = np.random.randint(low=0, high=7)
 
-            self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
-            idx = self.shuffle_state.permutation(256)
+            for i in range(7):
 
-            c_idx = idx[k:]
-            t_idx = idx[:k]
+                if i == n:
+                    
+                    contexts.append((x[:, :, :0], y[:, i : i + 1, :0]))
 
-            contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
+                    xt.append((x[:, :, :], i))
+                    yt.append(y[:, i : i + 1, :])
 
-            xt.append((x[:, :, t_idx], i))
-            yt.append(y[:, i : i + 1, t_idx])
+                else:
+
+                    contexts.append((x[:, :, :], y[:, i : i + 1, :]))
+
+                    xt.append((x[:, :, :0], i))
+                    yt.append(y[:, i : i + 1, :0])
+
+
+        else:
+
+            for i in range(7):
+
+                self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
+                idx = self.shuffle_state.permutation(256)
+
+                c_idx = idx[k:]
+                t_idx = idx[:k]
+
+                contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
+
+                xt.append((x[:, :, t_idx], i))
+                yt.append(y[:, i : i + 1, t_idx])
+
 
         with B.on_device(self.device):
             contexts = [
