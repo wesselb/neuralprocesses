@@ -3,10 +3,11 @@ import numpy as np
 from plum import Dispatcher, Union
 from wbml.util import inv_perm
 
-from .util import tile_for_sampling
 from .model import Model
+from .util import tile_for_sampling
 from .. import _dispatch
 from ..aggregate import AggregateInput, Aggregate
+from ..mask import Masked
 from ..numdata import num_data
 
 __all__ = ["ar_predict", "ar_loglik"]
@@ -182,6 +183,23 @@ def ar_predict(model: Model, *args, **kw_args):
 
 
 @_dispatch
+def _ar_merge_contexts(xc1: B.Numeric, yc1: B.Numeric, xc2: B.Numeric, yc2: B.Numeric):
+    xc_merged = B.concat(xc1, xc2, axis=-1)
+    yc_merged = B.concat(yc1, yc2, axis=-1)
+    # If there are any NaNs, set those to zero and use a mask.
+    if B.any(B.isnan(yc_merged)):
+        mask = ~B.isnan(yc_merged)
+        yc_merged[~mask] = 0
+        yc_merged = Masked(yc_merged, mask)
+    return xc_merged, yc_merged
+
+
+@_dispatch
+def _ar_merge_contexts(xc1: B.Numeric, yc1: Masked, xc2: B.Numeric, yc2: Masked):
+    return _ar_merge_contexts(xc1, yc1.y, xc2, yc2.y)
+
+
+@_dispatch
 def ar_loglik(
     state: B.RandomState,
     model: Model,
@@ -234,10 +252,7 @@ def ar_loglik(
 
         # Append to the context.
         xci, yci = contexts[i_out]
-        contexts[i_out] = (
-            B.concat(xci, xti, axis=-1),
-            B.concat(yci, yti, axis=-1),
-        )
+        contexts[i_out] = _ar_merge_contexts(xci, yci, xti, yti)
     logpdf = sum(logpdfs)
 
     if normalise:
