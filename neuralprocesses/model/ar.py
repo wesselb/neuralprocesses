@@ -193,6 +193,11 @@ def _mask_nans(yc: B.Numeric):
 
 
 @_dispatch
+def _mask_nans(yc: Masked):
+    return yc
+
+
+@_dispatch
 def _merge_ycs(yc1: B.Numeric, yc2: B.Numeric):
     return B.concat(yc1, yc2, axis=-1)
 
