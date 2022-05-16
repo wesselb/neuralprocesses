@@ -54,7 +54,7 @@ def batch_index(yt: Aggregate, index):
 
 @_dispatch
 def batch_index(y: Masked, index):
-    return Masked(batch_index(y.y, index), batch_index(y.mask), index)
+    return Masked(batch_index(y.y, index), batch_index(y.mask, index))
 
 
 @_dispatch
