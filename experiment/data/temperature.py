@@ -2,6 +2,7 @@ import lab as B
 import torch
 
 import neuralprocesses.torch as nps
+from neuralprocesses.architectures.util import construct_likelihood
 from .util import register_data
 
 __all__ = []
@@ -15,7 +16,15 @@ def construct_model(
     hr_deg=0.75 / 75,
     mr_deg=0.75 / 7.5,
     lr_deg=0.75,
+    likelihood="het",
 ):
+    likelihood_in_channels, selector, likelihood = construct_likelihood(
+        nps,
+        spec=likelihood,
+        dim_y=1,
+        num_basis_functions=64,
+        dtype=torch.float32,
+    )
 
     # High-resolution CNN:
     conv_hr = nps.UNet(
@@ -149,12 +158,12 @@ def construct_model(
                 nps.MLP(
                     in_dim=width_hr + width_mr + width_lr,
                     layers=(width_hr + width_mr + width_lr, width_mlp, width_mlp),
-                    out_dim=2,
+                    out_dim=likelihood_in_channels,
                 ),
-                nps.SelectFromChannels(1, 1),
+                selector,
             ),
         ),
-        nps.HeterogeneousGaussianLikelihood(),
+        likelihood,
     )
 
     return nps.Model(encoder, decoder)
@@ -165,7 +174,9 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["dim_y"] = 1
 
     if args.model == "convcnp":
-        config["model"] = construct_model()
+        config["model"] = construct_model(likelihood="het")
+    elif args.model == "convgnp":
+        config["model"] = construct_model(likelihood="lowrank")
     else:
         raise ValueError(f'Experiment does not yet support model "{args.model}".')
 
