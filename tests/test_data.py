@@ -169,8 +169,8 @@ def test_temperature(nps, subset, target_square, context_fraction, context_alter
     assert _bcn_form(xc)
     assert _bcn_form(yc)
     assert _within_germany(xt)
-    assert B.shape(xt, -1) >= 3
-    assert B.shape(yt, -1) >= 3
+    assert B.shape(xt, -1) >= 15
+    assert B.shape(yt, -1) >= 15
     if target_square > 0:
         # Check that all targets lie in the same square.
         assert B.max(B.pw_dists(B.transpose(xt))) <= B.sqrt(2) * target_square

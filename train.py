@@ -113,6 +113,7 @@ def main(**kw_args):
     parser.add_argument("--resume-at-epoch", type=int)
     parser.add_argument("--train-fast", action="store_true")
     parser.add_argument("--check-completed", action="store_true")
+    parser.add_argument("--unnnormalised", action="store_true")
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--evaluate-fast", action="store_true")
@@ -127,6 +128,8 @@ def main(**kw_args):
     parser.add_argument("--no-action", action="store_true")
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--ar", action="store_true")
+    parser.add_argument("--experiment-setting", action="str")
+
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
         # Carefully convert these to command line arguments.
@@ -415,12 +418,12 @@ def main(**kw_args):
         objective = partial(
             nps.loglik,
             num_samples=args.num_samples,
-            normalise=True,
+            normalise=not args.unnormalised,
         )
         objective_cv = partial(
             nps.loglik,
             num_samples=args.num_samples,
-            normalise=True,
+            normalise=not args.unnormalised,
         )
         objectives_eval = [
             (
@@ -429,7 +432,7 @@ def main(**kw_args):
                     nps.loglik,
                     num_samples=args.evaluate_num_samples,
                     batch_size=args.evaluate_batch_size,
-                    normalise=True,
+                    normalise=not args.unnormalised,
                 ),
             )
         ]
@@ -438,13 +441,13 @@ def main(**kw_args):
             nps.elbo,
             num_samples=args.num_samples,
             subsume_context=True,
-            normalise=True,
+            normalise=not args.unnormalised,
         )
         objective_cv = partial(
             nps.elbo,
             num_samples=args.num_samples,
             subsume_context=False,  # Lower bound the right quantity.
-            normalise=True,
+            normalise=not args.unnormalised,
         )
         objectives_eval = [
             (
@@ -454,7 +457,7 @@ def main(**kw_args):
                     # Don't need a high number of samples, because it is unbiased.
                     num_samples=5,
                     subsume_context=False,  # Lower bound the right quantity.
-                    normalise=True,
+                    normalise=not args.unnormalised,
                 ),
             ),
             (
@@ -463,7 +466,7 @@ def main(**kw_args):
                     nps.loglik,
                     num_samples=args.evaluate_num_samples,
                     batch_size=args.evaluate_batch_size,
-                    normalise=True,
+                    normalise=not args.unnormalised,
                 ),
             ),
         ]
@@ -527,7 +530,11 @@ def main(**kw_args):
                         state, _ = eval(
                             state,
                             model,
-                            partial(nps.ar_loglik, order="random", normalise=True),
+                            partial(
+                                nps.ar_loglik,
+                                order="random",
+                                normalise=not args.unnormalised,
+                            ),
                             gen,
                         )
 

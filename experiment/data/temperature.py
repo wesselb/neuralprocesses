@@ -176,8 +176,9 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         torch.float32,
         seed=10,
         batch_size=args.batch_size,
-        context_fraction=0.8,
+        context_fraction=0.5,
         context_alternate=True,
+        target_min=5,
         target_square=2,
         subset="train",
         device=device,
@@ -186,7 +187,11 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         torch.float32,
         seed=20,
         batch_size=args.batch_size,
+        context_fraction=0,  # Don't sample contexts.
+        target_min=1,
+        target_square=2,
         subset="cv",
+        passes=2,
         device=device,
     )
     gens_eval = lambda: [
@@ -196,6 +201,10 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
                 torch.float32,
                 seed=30,
                 batch_size=args.batch_size,
+                context_fraction=0,  # Don't sample contexts.
+                target_min=1,
+                # Don't sample squares, but the whole data.
+                target_square=2 if "eval-square" in args.experiment_settings else 0,
                 subset="eval",
                 device=device,
             ),

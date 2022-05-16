@@ -18,7 +18,7 @@ class _TemperatureData:
 
         # Load times associated with the data.
         self.times = pd.date_range("1979-01-01", "2009-01-01")[:-1]
-        self.train_mask = self.times < pd.Timestamp("2003-01-01")
+        self.train_mask = self.times < pd.Timestamp("2000-01-01")
         self.cv_mask = pd.Timestamp("2000-01-01") <= self.times
         self.cv_mask &= self.times < pd.Timestamp("2003-01-01")
         self.eval_mask = pd.Timestamp("2003-01-01") <= self.times
@@ -92,6 +92,8 @@ class TemperatureGenerator(DataGenerator):
             sampling contexts. Defaults to `False`.
         subset (str, optional): Subset of the data. Must be one of `"train"`, `"cv"` or
             `"eval"`. Defaults to `"train"`.
+        passes (int, optional): How many times to cycle through the data in an epoch.
+            Defaults to 1.
         device (str, optional): Device. Defaults to `"cpu"`.
         data_path (str, optional): Path to the data. Defaults to `"climate_data"`.
 
@@ -102,6 +104,12 @@ class TemperatureGenerator(DataGenerator):
         seed (int): Seed.
         batch_size (int): Number of tasks per batch.
         num_batches (int): Number of batches in an epoch.
+        target_min (int): Minimum number of target points.
+        target_square (float): Size of the square of target points to sample.
+        context_fraction (float): Fraction of context stations.
+        context_alternate (bool): Alternate between sampling no contexts and sampling
+            contexts.
+        passes (int): How many times to cycle through the data in an epoch.
         device (str): Device.
     """
 
@@ -117,6 +125,7 @@ class TemperatureGenerator(DataGenerator):
         context_fraction=0.0,
         context_alternate=False,
         subset="train",
+        passes=1,
         device="cpu",
         data_path="climate_data",
     ):
@@ -125,6 +134,7 @@ class TemperatureGenerator(DataGenerator):
         self.context_fraction = context_fraction
         self.context_alternate = context_alternate
         self._alternate_i = 0
+        self.passes = passes
 
         # Load data if it isn't yet loaded.
         if TemperatureGenerator._data is None:
@@ -175,7 +185,11 @@ class TemperatureGenerator(DataGenerator):
 
     def shuffle(self):
         """Shuffle the data, preparing for a new epoch."""
-        self.state, self._inds = B.randperm(self.state, self.int64, len(self._times))
+        perms = []
+        for _ in range(self.passes):
+            self.state, perm = B.randperm(self.state, self.int64, len(self._times))
+            perms.append(perm)
+        self._inds = B.concat(*perms, axis=0)
 
     def generate_batch(self):
         if len(self._inds) == 0:
