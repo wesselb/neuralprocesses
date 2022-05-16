@@ -156,7 +156,7 @@ def visualise_2d(model, gen, *, path, config, predict):
             vmin=vmax,
             vmax=vmin,
             origin="lower",
-            extent=[-2, 2, -2, 2],
+            extent=plot_config["range"][0] + plot_config["range"][1],
             label=label,
         )
         plt.scatter(
