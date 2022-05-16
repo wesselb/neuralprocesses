@@ -549,13 +549,14 @@ def main(**kw_args):
         start = 0
         if args.resume_at_epoch:
             start = args.resume_at_epoch - 1
-            model.load_state_dict(
-                torch.load(wd.file("model-last.torch"), map_location=device)["weights"]
-            )
+            d = torch.load(wd.file("model-last.torch"), map_location=device)
+            model.load_state_dict(d["weights"])
+            best_eval_lik = d["objective"]
+        else:
+            best_eval_lik = -np.inf
 
         # Setup training loop.
         opt = torch.optim.Adam(model.parameters(), args.rate)
-        best_eval_lik = -np.inf
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
