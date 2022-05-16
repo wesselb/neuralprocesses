@@ -160,6 +160,10 @@ def main(**kw_args):
     if not exp.data[args.data]["requires_dim_y"]:
         del args.dim_y
 
+    # Ensure that `args.experiment_setting` is always a list.
+    if not args.experiment_setting:
+        args.experiment_setting = []
+
     # Determine the mode of the script.
     if args.check_completed or args.no_action:
         # Don't add any mode suffix.
