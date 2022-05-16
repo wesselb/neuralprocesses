@@ -183,20 +183,45 @@ def ar_predict(model: Model, *args, **kw_args):
 
 
 @_dispatch
-def _ar_merge_contexts(xc1: B.Numeric, yc1: B.Numeric, xc2: B.Numeric, yc2: B.Numeric):
-    xc_merged = B.concat(xc1, xc2, axis=-1)
-    yc_merged = B.concat(yc1, yc2, axis=-1)
-    # If there are any NaNs, set those to zero and use a mask.
-    if B.any(B.isnan(yc_merged)):
-        mask = ~B.isnan(yc_merged)
-        yc_merged[~mask] = 0
-        yc_merged = Masked(yc_merged, mask)
-    return xc_merged, yc_merged
+def _mask_nans(yc: B.Numeric):
+    mask = ~B.isnan(yc)
+    if B.any(~mask):
+        yc = B.where(mask, yc, B.zero(yc))
+        return Masked(yc, mask)
+    else:
+        return yc
 
 
 @_dispatch
-def _ar_merge_contexts(xc1: B.Numeric, yc1: Masked, xc2: B.Numeric, yc2: Masked):
-    return _ar_merge_contexts(xc1, yc1.y, xc2, yc2.y)
+def _merge_ycs(yc1: B.Numeric, yc2: B.Numeric):
+    return B.concat(yc1, yc2, axis=-1)
+
+
+@_dispatch
+def _merge_ycs(yc1: Masked, yc2: B.Numeric):
+    with B.on_device(yc2):
+        return _merge_ycs(yc1, Masked(yc2, B.ones(yc2)))
+
+
+@_dispatch
+def _merge_ycs(yc1: B.Numeric, yc2: Masked):
+    with B.on_device(yc1):
+        return _merge_ycs(Masked(yc1, B.ones(yc1)), yc2)
+
+
+@_dispatch
+def _merge_ycs(yc1: Masked, yc2: Masked):
+    return Masked(
+        _merge_ycs(yc1.y, yc2.y),
+        _merge_ycs(yc1.mask, yc2.mask),
+    )
+
+
+@_dispatch
+def _merge_contexts(xc1: B.Numeric, yc1, xc2: B.Numeric, yc2):
+    xc_merged = B.concat(xc1, xc2, axis=-1)
+    yc_merged = _merge_ycs(_mask_nans(yc1), _mask_nans(yc2))
+    return xc_merged, yc_merged
 
 
 @_dispatch
@@ -252,7 +277,7 @@ def ar_loglik(
 
         # Append to the context.
         xci, yci = contexts[i_out]
-        contexts[i_out] = _ar_merge_contexts(xci, yci, xti, yti)
+        contexts[i_out] = _merge_contexts(xci, yci, xti, yti)
     logpdf = sum(logpdfs)
 
     if normalise:
