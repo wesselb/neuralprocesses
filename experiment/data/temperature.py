@@ -204,7 +204,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
                 context_fraction=0,  # Don't sample contexts.
                 target_min=1,
                 # Don't sample squares, but the whole data.
-                target_square=2 if "eval-square" in args.experiment_settings else 0,
+                target_square=2 if "eval-square" in args.experiment_setting else 0,
                 subset="eval",
                 device=device,
             ),
