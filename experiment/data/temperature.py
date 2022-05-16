@@ -188,7 +188,6 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         seed=10,
         batch_size=args.batch_size,
         context_fraction=0.5,
-        context_alternate=True,
         target_min=5,
         target_square=2,
         subset="train",
