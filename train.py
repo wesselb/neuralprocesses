@@ -113,7 +113,7 @@ def main(**kw_args):
     parser.add_argument("--resume-at-epoch", type=int)
     parser.add_argument("--train-fast", action="store_true")
     parser.add_argument("--check-completed", action="store_true")
-    parser.add_argument("--unnnormalised", action="store_true")
+    parser.add_argument("--unnormalised", action="store_true")
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--evaluate-fast", action="store_true")
