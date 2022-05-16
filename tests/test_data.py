@@ -1,7 +1,11 @@
 import lab as B
 import pytest
+from plum import Dispatcher
 
 from .util import nps  # noqa
+
+
+_dispatch = Dispatcher()
 
 
 @pytest.fixture(params=[1, 2], scope="module")
@@ -85,3 +89,96 @@ def test_predefined_gens(nps, gen, dim_x, dim_y):
             assert len(yt) == dim_y
             for nti, yti in zip(nts, yt):
                 assert B.shape(yti) == (4, 1, nti)
+
+
+@_dispatch
+def _within_germany(x: B.Numeric):
+    return _lons_lats_within_germany(x[:, 0, :], x[:, 1, :])
+
+
+@_dispatch
+def _within_germany(x: tuple):
+    return _lons_lats_within_germany(x[0], x[1])
+
+
+def _lons_lats_within_germany(lons, lats):
+    return (6 <= B.mean(lons) <= 16) and (47 <= B.mean(lats) <= 55)
+
+
+@_dispatch
+def _bcn_form(x: B.Numeric):
+    return B.rank(x) >= 3 and B.shape(x, 0) == 16
+
+
+@_dispatch
+def _bcn_form(x: tuple):
+    return all(_bcn_form(xi) for xi in x)
+
+
+@pytest.mark.xfail()
+@pytest.mark.parametrize("subset", ["train", "cv", "eval"])
+@pytest.mark.parametrize("target_square", [0, 2])
+@pytest.mark.parametrize("context_fraction", [0, 0.5])
+@pytest.mark.parametrize("context_alternate", [False, True])
+def test_temperature(nps, subset, target_square, context_fraction, context_alternate):
+    gen = nps.TemperatureGenerator(
+        nps.dtype,
+        batch_size=16,
+        context_fraction=context_fraction,
+        context_alternate=context_alternate,
+        target_min=15,
+        target_square=target_square,
+        subset=subset,
+    )
+    batch = gen.generate_batch()
+
+    # Check the contexts.
+    xc, yc = batch["contexts"][0]  # Stations
+    yc = yc.y  # Context stations are masked to deal with NaNs.
+    assert _bcn_form(xc)
+    assert _bcn_form(yc)
+    if context_fraction == 0:
+        assert B.shape(xc, -1) == 0
+        assert B.shape(yc, -1) == 0
+    else:
+        assert B.shape(xc, -1) > 0
+        assert B.shape(yc, -1) > 0
+        assert _within_germany(xc)
+
+    xc, yc = batch["contexts"][1]  # Gridded data
+    assert _bcn_form(xc)
+    assert _bcn_form(yc)
+    assert _within_germany(xc)
+
+    xc, yc = batch["contexts"][2]  # Elevation at targets
+    assert _bcn_form(xc)
+    assert _bcn_form(yc)
+    assert _within_germany(xc)
+    if context_fraction == 0 and target_square == 0:
+        assert B.shape(xc, -1) == B.shape(batch["xt"], -1)
+        assert B.shape(yc, -1) == B.shape(batch["yt"], -1)
+
+    xc, yc = batch["contexts"][3]  # Gridded elevation
+    yc = yc.y  # Gridded elevation is masked to deal with NaNs.
+    assert _bcn_form(xc)
+    assert _bcn_form(yc)
+    assert _within_germany(xc)
+
+    # Check the targets.
+    xt, yt = batch["xt"], batch["yt"]
+    assert _bcn_form(xc)
+    assert _bcn_form(yc)
+    assert _within_germany(xt)
+    assert B.shape(xt, -1) >= 3
+    assert B.shape(yt, -1) >= 3
+    if target_square > 0:
+        # Check that all targets lie in the same square.
+        assert B.max(B.pw_dists(B.transpose(xt))) <= B.sqrt(2) * target_square
+
+    # Check alternation.
+    if context_alternate and context_fraction > 0:
+        batch = gen.generate_batch()
+        xc, yc = batch["contexts"][0]  # Stations
+        yc = yc.y  # Context stations are masked to deal with NaNs.
+        assert B.shape(xc, -1) == 0
+        assert B.shape(yc, -1) == 0

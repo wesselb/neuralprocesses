@@ -128,9 +128,10 @@ def visualise_2d(model, gen, *, path, config, predict):
         # specification.
         # TODO: Use tuple specification when it is supported everywhere.
         n = 100
-        x = B.linspace(B.dtype(batch["xt"]), *plot_config["range"], n)
-        x0 = B.flatten(B.broadcast_to(x[:, None], n, n))
-        x1 = B.flatten(B.broadcast_to(x[None, :], n, n))
+        x0 = B.linspace(B.dtype(batch["xt"]), *plot_config["range"][0], n)
+        x1 = B.linspace(B.dtype(batch["xt"]), *plot_config["range"][1], n)
+        x0 = B.flatten(B.broadcast_to(x0[:, None], n, n))
+        x1 = B.flatten(B.broadcast_to(x1[None, :], n, n))
         x_list = B.stack(x0, x1)
 
     # Predict with model and produce five noiseless samples.

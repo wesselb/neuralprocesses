@@ -1,4 +1,5 @@
 import abc
+import math
 
 import lab as B
 import numpy as np
@@ -72,13 +73,7 @@ class DataGenerator(AbstractGenerator):
             self.state = B.create_random_state(dtype, seed)
 
         self.batch_size = batch_size
-        self.num_batches = num_tasks // batch_size
-
-        if self.num_batches * self.batch_size != num_tasks:
-            raise ValueError(
-                f"Number of tasks {num_tasks} must be a multiple of "
-                f"the batch size {batch_size}."
-            )
+        self.num_batches = math.ceil(num_tasks / batch_size)
 
 
 class SyntheticGenerator(DataGenerator):

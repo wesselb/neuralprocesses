@@ -16,18 +16,18 @@ class FunctionalCoder:
         disc (:class:`.discretisation.AbstractDiscretisation`): Discretisation.
         coder (coder): Coder.
         target (function, optional): Function which takes in the inputs of the current
-            encoding and the desired inputs and which returns the inputs to span the
-            discretisation over.
+            encoding and the desired inputs and which returns a tuple containing the
+            inputs to span the discretisation over.
 
     Attributes:
         disc (:class:`.discretisation.AbstractDiscretisation`): Discretisation.
         coder (coder): Coder.
         target (function): Function which takes in the inputs of the current encoding
-            and the desired inputs and which returns the inputs to span the
-            discretisation over.
+            and the desired inputs and which returns a tuple containing the inputs to
+            span the discretisation over.
     """
 
-    def __init__(self, disc, coder, target=lambda *args: args):
+    def __init__(self, disc, coder, target=lambda xc, xt: (xc, xt)):
         self.disc = disc
         self.coder = coder
         self.target = target
@@ -35,13 +35,13 @@ class FunctionalCoder:
 
 @_dispatch
 def code(coder: FunctionalCoder, xz, z, x, **kw_args):
-    x = coder.disc(*convert(coder.target(xz, x), tuple), **kw_args)
+    x = coder.disc(*coder.target(xz, x), **kw_args)
     return code(coder.coder, xz, z, x, **kw_args)
 
 
 @_dispatch
 def code_track(coder: FunctionalCoder, xz, z, x, h, **kw_args):
-    x = coder.disc(*convert(coder.target(xz, x), tuple), **kw_args)
+    x = coder.disc(*coder.target(xz, x), **kw_args)
     return code_track(coder.coder, xz, z, x, h + [x], **kw_args)
 
 
