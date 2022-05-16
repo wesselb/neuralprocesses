@@ -68,11 +68,11 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         )
 
         gens = [
-            #("standard eval", gen_eval_scattered),
+            ("standard eval", gen_eval_scattered),
             ("single channel eval", gen_eval_single_channel),
         ]
 
-        return gens # [("standard eval", gen_eval_scattered)]
+        return gens
 
     return gen_train, gen_cv, gens_eval
 
