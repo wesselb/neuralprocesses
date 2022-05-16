@@ -252,9 +252,6 @@ class EEGGenerator(DataGenerator):
 
                     contexts.append((x[:, :, :], y[:, i : i + 1, :]))
 
-                    xt.append((x[:, :, :0], i))
-                    yt.append(y[:, i : i + 1, :0])
-
 
         else:
 
