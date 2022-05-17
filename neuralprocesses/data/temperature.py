@@ -297,7 +297,7 @@ class TemperatureGenerator(DataGenerator):
         lats = self._elev_hr_lats[lats_mask]
         elev = self._elev_hr["topo"][lats_mask, lons_mask]
         # Extract the data, construct the mask, and save it.
-        mask = _cast_and_tile(B.broadcast_to(elev.mask, *B.shape(elev.data)))
+        mask = _cast_and_tile(B.broadcast_to(~elev.mask, *B.shape(elev.data)))
         elev = _cast_and_tile(elev.data) / 100
         elev[mask == 0] = 0
         b["xc_elev_hr_lons"] = _cast_and_tile(lons)
