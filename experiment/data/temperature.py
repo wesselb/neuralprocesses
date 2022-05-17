@@ -247,25 +247,25 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         config["model"] = construct_mlp_model(likelihood="het")
         target_elev = True
         target_square = 0
-        context_fraction = 0
+        context_sample = False
         do_plot = False
     elif args.model == "convgnp-mlp":
         config["model"] = construct_mlp_model(likelihood="lowrank")
         target_elev = True
         target_square = 0
-        context_fraction = 0
+        context_sample = False
         do_plot = False
     elif args.model == "convcnp-multires":
         config["model"] = construct_multires_model(likelihood="het")
         target_elev = False
-        target_square = 2
-        context_fraction = 0.5
+        target_square = 3
+        context_sample = True
         do_plot = True
     elif args.model == "convgnp-multires":
         config["model"] = construct_multires_model(likelihood="lowrank")
         target_elev = False
-        target_square = 2
-        context_fraction = 0.5
+        target_square = 3
+        context_sample = True
         do_plot = True
     else:
         raise ValueError(f'Experiment does not yet support model "{args.model}".')
@@ -280,8 +280,8 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         torch.float32,
         seed=10,
         batch_size=args.batch_size,
-        context_fraction=context_fraction,
-        target_min=5,
+        context_sample=context_sample,
+        target_min=10,
         target_square=target_square,
         target_elev=target_elev,
         subset="train",
@@ -291,13 +291,13 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         torch.float32,
         seed=20,
         batch_size=args.batch_size,
-        context_fraction=context_fraction,
-        target_min=5,
+        context_sample=context_sample,
+        target_min=1,
         target_square=target_square,
         target_elev=target_elev,
         subset="cv",
         # Cycle over the data a few times to account for the random square sampling.
-        passes=5,
+        passes=10,
         device=device,
     )
     gens_eval = lambda: [
@@ -307,7 +307,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
                 torch.float32,
                 seed=30,
                 batch_size=args.batch_size,
-                context_fraction=0,  # Don't sample contexts.
+                context_sample=False,
                 target_min=1,
                 # Don't sample squares, but use the whole data.
                 target_square=2 if "eval-square" in args.experiment_setting else 0,

@@ -116,9 +116,8 @@ class TemperatureGenerator(DataGenerator):
             Defaults to not sampling a square.
         target_elev (bool, optional): Append the elevation at the target inputs as
             auxiliary information. Defaults to `False`.
-        context_fraction (float, optional): Fraction of context stations. Defaults to 0.
-        context_alternate (bool, optional): Alternate between sampling no contexts and
-            sampling contexts. Defaults to `False`.
+        context_sample (bool, optional): Randomly split the data into context and
+            target. Defaults to `False`.
         subset (str, optional): Subset of the data. Must be one of `"train"`, `"cv"` or
             `"eval"`. Defaults to `"train"`.
         passes (int, optional): How many times to cycle through the data in an epoch.
@@ -154,8 +153,7 @@ class TemperatureGenerator(DataGenerator):
         target_min=5,
         target_square=0.0,
         target_elev=False,
-        context_fraction=0.0,
-        context_alternate=False,
+        context_sample=False,
         subset="train",
         passes=1,
         device="cpu",
@@ -164,8 +162,7 @@ class TemperatureGenerator(DataGenerator):
         self.target_min = target_min
         self.target_square = target_square
         self.target_elev = target_elev
-        self.context_fraction = context_fraction
-        self.context_alternate = context_alternate
+        self.context_sample = context_sample
         self._alternate_i = 0
         self.passes = passes
 
@@ -272,28 +269,6 @@ class TemperatureGenerator(DataGenerator):
         # Concatenate tasks into one batch and convert to the right framework.
         b = {k: _concat(*(t[k] for t in tasks)) for k in tasks[0].keys()}
 
-        # Check if it is our turn.
-        alternate_turn = self._alternate_i % 2 == 0
-        self._alternate_i += 1
-
-        # Perform a division into context and target.
-        n = B.shape(b["xt"], -1)
-        if not self.context_alternate or (self.context_alternate and alternate_turn):
-            nc_upper = max(int(self.context_fraction * n), 1)
-        else:
-            nc_upper = 1
-        self.state, nc = B.randint(self.state, self.int64, lower=0, upper=nc_upper)
-        self.state, perm = B.randperm(self.state, self.int64, n)
-        b["xc_s"] = B.take(b["xt"], perm[:nc], axis=-1)
-        b["yc_s"] = B.take(b["yt"], perm[:nc], axis=-1)
-        b["xt"] = B.take(b["xt"], perm[nc:], axis=-1)
-        b["yt"] = B.take(b["yt"], perm[nc:], axis=-1)
-        b["yt_elev"] = B.take(b["yt_elev"], perm[nc:], axis=-1)
-
-        # Apply the mask to the station contexts, which have only one channel.
-        mask = ~B.isnan(b["yc_s"])
-        b["yc_s"] = Masked(B.where(mask, b["yc_s"], B.zero(b["yc_s"])), mask)
-
         # Determine bounds of the target points for the square selection.
         lowers = B.min(B.min(b["xt"], axis=2), axis=0)
         uppers = B.max(B.max(b["xt"], axis=2), axis=0)
@@ -323,10 +298,69 @@ class TemperatureGenerator(DataGenerator):
 
                 # Only stop sampling if the minimum number of targets was selected.
                 if B.sum(mask) >= self.target_min:
+                    # Take everything not in the
+                    b["xc_s_outside_square"] = B.take(b["xt"], ~mask, axis=-1)
+                    b["yc_s_outside_square"] = B.take(b["yt"], ~mask, axis=-1)
                     b["xt"] = B.take(b["xt"], mask, axis=-1)
                     b["yt"] = B.take(b["yt"], mask, axis=-1)
                     b["yt_elev"] = B.take(b["yt_elev"], mask, axis=-1)
                     break
+
+        else:
+            # We don't sample a square, so nothing is outside the square.
+            b["xc_s_outside_square"] = b["xt"][:, :, :0]
+            b["yc_s_outside_square"] = b["yt"][:, :, :0]
+
+        # Perform a division into context and target. Separately split whatever is
+        # inside and outside the square.
+        n_inside = B.shape(b["xt"], -1)
+        n_outside = B.shape(b["xc_s_outside_square"], -1)
+        if self.context_sample:
+            # Flip a coin for how large the context should be.
+            self.state, coin = B.randint(self.state, self.int64, lower=0, upper=3)
+            if coin == 0:
+                nc_inside_upper = n_inside
+                nc_outside_upper = n_outside
+            elif coin == 1:
+                nc_inside_upper = int(0.1 * n_inside)
+                nc_outside_upper = int(0.1 * n_outside)
+            else:
+                nc_inside_upper = 0
+                nc_outside_upper = 0
+            self.state, nc_inside = B.randint(
+                self.state,
+                self.int64,
+                lower=0,
+                upper=max(min(nc_inside_upper + 1, n_inside - self.target_min), 1),
+            )
+            self.state, nc_outside = B.randint(
+                self.state,
+                self.int64,
+                lower=0,
+                upper=nc_outside_upper + 1,
+            )
+        else:
+            nc_inside = 0
+            nc_outside = 0
+        self.state, perm_inside = B.randperm(self.state, self.int64, n_inside)
+        self.state, perm_outside = B.randperm(self.state, self.int64, n_outside)
+        b["xc_s"] = B.concat(
+            B.take(b["xt"], perm_inside[:nc_inside], axis=-1),
+            B.take(b["xc_s_outside_square"], perm_outside[:nc_outside], axis=-1),
+            axis=-1,
+        )
+        b["yc_s"] = B.concat(
+            B.take(b["yt"], perm_inside[:nc_inside], axis=-1),
+            B.take(b["yc_s_outside_square"], perm_outside[:nc_outside], axis=-1),
+            axis=-1,
+        )
+        b["xt"] = B.take(b["xt"], perm_inside[nc_inside:], axis=-1)
+        b["yt"] = B.take(b["yt"], perm_inside[nc_inside:], axis=-1)
+        b["yt_elev"] = B.take(b["yt_elev"], perm_inside[nc_inside:], axis=-1)
+
+        # Apply the mask to the station contexts, which have only one channel.
+        mask = ~B.isnan(b["yc_s"])
+        b["yc_s"] = Masked(B.where(mask, b["yc_s"], B.zero(b["yc_s"])), mask)
 
         # Move everything to the right device.
         with B.on_device(self.device):
