@@ -23,3 +23,8 @@ class AugmentedInput:
 @B.dispatch
 def on_device(x: AugmentedInput):
     return B.on_device(x.x)
+
+
+@B.dispatch
+def dtype(x: AugmentedInput):
+    return B.dtype(x)
