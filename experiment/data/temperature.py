@@ -246,20 +246,27 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     if args.model == "convcnp-mlp":
         config["model"] = construct_mlp_model(likelihood="het")
         target_elev = True
+        do_plot = False
     elif args.model == "convgnp-mlp":
         config["model"] = construct_mlp_model(likelihood="lowrank")
         target_elev = True
+        do_plot = False
     elif args.model == "convcnp-multires":
         config["model"] = construct_multires_model(likelihood="het")
         target_elev = False
+        do_plot = True
     elif args.model == "convgnp-multires":
         config["model"] = construct_multires_model(likelihood="lowrank")
         target_elev = False
+        do_plot = True
     else:
         raise ValueError(f'Experiment does not yet support model "{args.model}".')
 
-    # Other settings specific to the predator-prey experiments:
-    config["plot"] = {2: {"range": ((6, 16), (47, 55))}}
+    # Other settings specific to the temperature experiment:
+    if do_plot:
+        config["plot"] = {2: {"range": ((6, 16), (47, 55))}}
+    else:
+        config["plot"] = {}
 
     gen_train = nps.TemperatureGenerator(
         torch.float32,

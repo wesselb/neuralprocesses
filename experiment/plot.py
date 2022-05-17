@@ -33,7 +33,10 @@ def visualise(model, gen, *, path, config, predict=nps.predict):
 def visualise_1d(model, gen, *, path, config, predict):
     batch = nps.batch_index(gen.generate_batch(), slice(0, 1, None))
 
-    plot_config = config["plot"][1]
+    try:
+        plot_config = config["plot"][1]
+    except KeyError:
+        return
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
@@ -120,7 +123,10 @@ def visualise_1d(model, gen, *, path, config, predict):
 def visualise_2d(model, gen, *, path, config, predict):
     batch = nps.batch_index(gen.generate_batch(), slice(0, 1, None))
 
-    plot_config = config["plot"][2]
+    try:
+        plot_config = config["plot"][2]
+    except KeyError:
+        return
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
