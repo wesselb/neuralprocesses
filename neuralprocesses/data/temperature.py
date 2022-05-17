@@ -99,7 +99,7 @@ class _TemperatureData:
         # The high-resolution elevation is lat-lon form, so we need to transpose. This
         # is relatively safe, because the code will break if we get this wrong.
         self.yc_elev_hr = B.t(elev_hr_data)[None, None, :] / 100
-        self.yc_elev_hr_mask = B.t(elev_hr_mask)[None, None, :] / 100
+        self.yc_elev_hr_mask = B.t(elev_hr_mask)[None, None, :]
 
 
 class TemperatureGenerator(DataGenerator):
