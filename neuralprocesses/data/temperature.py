@@ -57,6 +57,7 @@ class _TemperatureData:
         # Select the relevant subset for Germany.
         lons = (6, 16)
         lats = (47, 55)
+
         # Process the grids.
         lon_mask = lons[0] <= self.xc_grid[0][0, 0, :]
         lon_mask &= self.xc_grid[0][0, 0, :] < lons[1]
@@ -68,6 +69,7 @@ class _TemperatureData:
         )
         self.yc_grid_train = self.yc_grid_train[:, :, lon_mask, :][:, :, :, lat_mask]
         self.yc_grid_eval = self.yc_grid_eval[:, :, lon_mask, :][:, :, :, lat_mask]
+
         # Process the elevations and the targets.
         mask = (lons[0] <= self.xt[0, 0, :]) & (self.xt[0, 0, :] < lons[1])
         mask &= (lats[0] <= self.xt[0, 1, :]) & (self.xt[0, 1, :] < lats[1])
@@ -75,6 +77,29 @@ class _TemperatureData:
         self.yc_elev_t = self.yc_elev_t[:, :, mask]
         self.xt = self.xt[:, :, mask]
         self.yt = self.yt[:, :, mask]
+
+        # Load the high-resolution elevation data.
+        elev_hr = netCDF4.Dataset(f"{data_path}/elev_data_1km/data.nc")
+        elev_hr_lons = elev_hr["X"][:].data
+        elev_hr_lats = elev_hr["Y"][:].data
+
+        # Select the relevant latitudes, longitudes, and elevation.
+        lons_mask = (lons[0] <= elev_hr_lons) & (elev_hr_lons < lons[1])
+        lats_mask = (lats[0] <= elev_hr_lats) & (elev_hr_lats < lats[1])
+        elev_hr = elev_hr["topo"][lats_mask, lons_mask]
+        # Extract the data, construct the mask, and save it. Note that a `False` in
+        # `elev.mask` means that a data point is present!
+        elev_hr_mask = B.broadcast_to(~elev_hr.mask, *B.shape(elev_hr.data))
+        elev_hr_data = elev_hr.data / 100
+        elev_hr_data[elev_hr_mask == 0] = 0
+        self.xc_elev_hr = (
+            elev_hr_lons[lons_mask][None, None, :],
+            elev_hr_lats[lats_mask][None, None, :],
+        )
+        # The high-resolution elevation is lat-lon form, so we need to transpose. This
+        # is relatively safe, because the code will break if we get this wrong.
+        self.yc_elev_hr = B.t(elev_hr_data)[None, None, :] / 100
+        self.yc_elev_hr_mask = B.t(elev_hr_mask)[None, None, :] / 100
 
 
 class TemperatureGenerator(DataGenerator):
@@ -149,8 +174,12 @@ class TemperatureGenerator(DataGenerator):
             self._yc_grid = data.yc_grid_train[data.train_mask[:n]]
             self._xc_elev_t = data.xc_elev_t[:, :, data.train_stations]
             self._yc_elev_t = data.yc_elev_t[:, :, data.train_stations]
+            self._xc_elev_hr = data.xc_elev_hr
+            self._yc_elev_hr = data.yc_elev_hr
+            self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xt = data.xt[:, :, data.train_stations]
             self._yt = data.yt[:, :, data.train_stations][data.train_mask]
+
         elif subset == "cv":
             num_tasks = data.cv_mask.sum()
             self._times = data.times[data.cv_mask]
@@ -159,8 +188,12 @@ class TemperatureGenerator(DataGenerator):
             self._yc_grid = data.yc_grid_train[data.cv_mask[:n]]
             self._xc_elev_t = data.xc_elev_t[:, :, data.cv_stations]
             self._yc_elev_t = data.yc_elev_t[:, :, data.cv_stations]
+            self._xc_elev_hr = data.xc_elev_hr
+            self._yc_elev_hr = data.yc_elev_hr
+            self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xt = data.xt[:, :, data.cv_stations]
             self._yt = data.yt[:, :, data.cv_stations][data.cv_mask]
+
         elif subset == "eval":
             num_tasks = data.eval_mask.sum()
             self._times = data.times[data.eval_mask]
@@ -168,15 +201,14 @@ class TemperatureGenerator(DataGenerator):
             self._yc_grid = data.yc_grid_eval
             self._xc_elev_t = data.xc_elev_t[:, :, data.eval_stations]
             self._yc_elev_t = data.yc_elev_t[:, :, data.eval_stations]
+            self._xc_elev_hr = data.xc_elev_hr
+            self._yc_elev_hr = data.yc_elev_hr
+            self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xt = data.xt[:, :, data.eval_stations]
             self._yt = data.yt[:, :, data.eval_stations][data.eval_mask]
+
         else:
             raise ValueError(f'Invalid subset "{subset}".')
-
-        # Load the high-resolution elevation data.
-        self._elev_hr = netCDF4.Dataset(f"{data_path}/elev_data_1km/data.nc")
-        self._elev_hr_lons = self._elev_hr["X"][:].data
-        self._elev_hr_lats = self._elev_hr["Y"][:].data
 
         super().__init__(dtype, seed, num_tasks, batch_size, device)
 
@@ -212,6 +244,10 @@ class TemperatureGenerator(DataGenerator):
                     "yc_grid": self._yc_grid[i],
                     "xc_elev_t": self._xc_elev_t[0],
                     "yc_elev_t": self._yc_elev_t[0],
+                    "xc_elev_hr_lons": self._xc_elev_hr[0][0],
+                    "xc_elev_hr_lats": self._xc_elev_hr[1][0],
+                    "yc_elev_hr": self._yc_elev_hr[0],
+                    "yc_elev_hr_mask": self._yc_elev_hr_mask[0],
                     "xt": self._xt[0],
                     "yt": self._yt[i],
                 }
@@ -276,35 +312,6 @@ class TemperatureGenerator(DataGenerator):
                     b["xt"] = B.take(b["xt"], mask, axis=-1)
                     b["yt"] = B.take(b["yt"], mask, axis=-1)
                     break
-        else:
-            # Cover everything in the square.
-            centre = (uppers + lowers) / 2
-            half_side = B.max(uppers - lowers) / 2
-
-        def _cast_and_tile(x):
-            x = B.cast(self.dtype, x)
-            return B.tile(x[None, None, ...], len(tasks), 1, *((1,) * B.rank(x)))
-
-        # Load the high-resolution elevation data for the selected square.
-        centre, half_side = B.to_numpy(centre, half_side)
-        half_side = half_side + 0.5  # Add half a degree for good measure.
-        # First select the relevant latitudes and longitudes and then the elevation.
-        lons_mask = centre[0] - half_side <= self._elev_hr_lons
-        lons_mask &= centre[0] + half_side >= self._elev_hr_lons
-        lats_mask = centre[1] - half_side <= self._elev_hr_lats
-        lats_mask &= centre[1] + half_side >= self._elev_hr_lats
-        lons = self._elev_hr_lons[lons_mask]
-        lats = self._elev_hr_lats[lats_mask]
-        elev = self._elev_hr["topo"][lats_mask, lons_mask]
-        # Extract the data, construct the mask, and save it.
-        mask = _cast_and_tile(B.broadcast_to(~elev.mask, *B.shape(elev.data)))
-        elev = _cast_and_tile(elev.data) / 100
-        elev[mask == 0] = 0
-        b["xc_elev_hr_lons"] = _cast_and_tile(lons)
-        b["xc_elev_hr_lats"] = _cast_and_tile(lats)
-        # The high-resolution elevation is lat-lon form, so we need to transpose. This
-        # is relatively safe, because the code will break if we get this wrong.
-        b["yc_elev_hr"] = Masked(B.t(elev), B.t(mask))
 
         # Move everything to the right device.
         with B.on_device(self.device):
@@ -314,8 +321,10 @@ class TemperatureGenerator(DataGenerator):
         b["contexts"] = [
             (b["xc_s"], b["yc_s"]),
             ((b["xc_grid_lons"], b["xc_grid_lats"]), b["yc_grid"]),
-            (b["xc_elev_t"], b["yc_elev_t"]),
-            ((b["xc_elev_hr_lons"], b["xc_elev_hr_lats"]), b["yc_elev_hr"]),
+            (
+                (b["xc_elev_hr_lons"], b["xc_elev_hr_lats"]),
+                Masked(b["yc_elev_hr"], b["yc_elev_hr_mask"]),
+            ),
         ]
 
         return b

@@ -9,16 +9,16 @@ __all__ = []
 
 
 class Fuse(torch.nn.Module):
-    def __init__(self, sc):
+    def __init__(self, set_conv):
         super().__init__()
-        self.sc = sc
+        self.set_conv = set_conv
 
 
 @nps.code.dispatch
 def code(coder: Fuse, xz, z, x, **kw_args):
     xz1, xz2 = xz
     z1, z2 = z
-    xz2, z2 = nps.code(coder.sc, xz2, z2, xz1, **kw_args)
+    _, z2 = nps.code(coder.set_conv, xz2, z2, xz1, **kw_args)
     return xz1, B.concat(z1, z2, axis=-1 - nps.data_dims(xz1))
 
 
@@ -26,7 +26,6 @@ def construct_model(
     width_hr=64,
     width_mr=64,
     width_lr=128,
-    width_mlp=128,
     width_bridge=32,
     hr_deg=0.75 / 75,
     mr_deg=0.75 / 7.5,
@@ -44,7 +43,7 @@ def construct_model(
     # High-resolution CNN:
     conv_hr = nps.UNet(
         dim=2,
-        in_channels=(1 + 1) + (3 + 1) + (1 + 1) + width_bridge,
+        in_channels=(1 + 1) + (1 + 1) + width_bridge,  # Stations and HR elevation
         # Four channels should give a TF of at least one.
         channels=(width_hr,) * 4,
         out_channels=likelihood_in_channels,
@@ -61,7 +60,7 @@ def construct_model(
     # Medium-resolution CNN:
     conv_mr = nps.UNet(
         dim=2,
-        in_channels=(1 + 1) + (3 + 1) + width_bridge,
+        in_channels=(1 + 1) + (1 + 1) + width_bridge,  # Stations and HR elevation
         # Four channels should give a TF of at least ten.
         channels=(width_mr,) * 4,
         out_channels=width_bridge,
@@ -78,7 +77,7 @@ def construct_model(
     # Low-resolution CNN:
     conv_lr = nps.ConvNet(
         dim=2,
-        in_channels=25 + 1,
+        in_channels=(25 + 1) + (1 + 1),  # Coarse grid and HR elevation
         channels=width_lr,
         out_channels=width_bridge,
         num_layers=6,
@@ -97,11 +96,11 @@ def construct_model(
 
     encoder = nps.Chain(
         nps.RestructureParallel(
-            ("station", "grid", "elev_station", "elev_grid"),
+            ("station", "grid", "elev_grid"),
             (
-                ("station", "elev_station", "elev_grid"),
-                ("station", "elev_station"),
-                ("grid",),
+                ("station", "elev_grid"),
+                ("station", "elev_grid"),
+                ("grid", "elev_grid"),
             ),
         ),
         nps.Parallel(
@@ -130,6 +129,7 @@ def construct_model(
                     nps.Parallel(
                         nps.SetConv(scale=mr_deg),
                         nps.SetConv(scale=mr_deg),
+                        nps.SetConv(scale=hr_deg),
                     ),
                     nps.DivideByFirstChannel(),
                     nps.Materialise(),
@@ -145,6 +145,7 @@ def construct_model(
                     nps.PrependDensityChannel(),
                     nps.Parallel(
                         nps.SetConv(scale=lr_deg),
+                        nps.SetConv(scale=hr_deg),
                     ),
                     nps.DivideByFirstChannel(),
                     nps.Materialise(),
@@ -182,31 +183,6 @@ def construct_model(
         ),
         likelihood,
     )
-
-    # decoder = nps.Chain(
-    #     nps.Parallel(
-    #         conv_hr,
-    #         conv_mr,
-    #         conv_lr,
-    #     ),
-    #     nps.RepeatForAggregateInputs(
-    #         nps.Chain(
-    #             nps.Parallel(
-    #                 nps.SetConv(scale=hr_deg),
-    #                 nps.SetConv(scale=mr_deg),
-    #                 nps.SetConv(scale=lr_deg),
-    #             ),
-    #             lambda xs: B.concat(*xs, axis=-2),
-    #             nps.MLP(
-    #                 in_dim=width_hr + width_mr + width_lr,
-    #                 layers=(width_hr + width_mr + width_lr, width_mlp, width_mlp),
-    #                 out_dim=likelihood_in_channels,
-    #             ),
-    #             selector,
-    #         ),
-    #     ),
-    #     likelihood,
-    # )
 
     return nps.Model(encoder, decoder)
 
