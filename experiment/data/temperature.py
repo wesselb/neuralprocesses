@@ -246,18 +246,26 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     if args.model == "convcnp-mlp":
         config["model"] = construct_mlp_model(likelihood="het")
         target_elev = True
+        target_square = 0
+        context_fraction = 0
         do_plot = False
     elif args.model == "convgnp-mlp":
         config["model"] = construct_mlp_model(likelihood="lowrank")
         target_elev = True
+        target_square = 0
+        context_fraction = 0
         do_plot = False
     elif args.model == "convcnp-multires":
         config["model"] = construct_multires_model(likelihood="het")
         target_elev = False
+        target_square = 2
+        context_fraction = 0.5
         do_plot = True
     elif args.model == "convgnp-multires":
         config["model"] = construct_multires_model(likelihood="lowrank")
         target_elev = False
+        target_square = 2
+        context_fraction = 0.5
         do_plot = True
     else:
         raise ValueError(f'Experiment does not yet support model "{args.model}".')
@@ -272,9 +280,9 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         torch.float32,
         seed=10,
         batch_size=args.batch_size,
-        context_fraction=0.5,
+        context_fraction=context_fraction,
         target_min=5,
-        target_square=2,
+        target_square=target_square,
         target_elev=target_elev,
         subset="train",
         device=device,
@@ -283,9 +291,9 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         torch.float32,
         seed=20,
         batch_size=args.batch_size,
-        context_fraction=0.5,
+        context_fraction=context_fraction,
         target_min=5,
-        target_square=2,
+        target_square=target_square,
         target_elev=target_elev,
         subset="cv",
         # Cycle over the data a few times to account for the random square sampling.
