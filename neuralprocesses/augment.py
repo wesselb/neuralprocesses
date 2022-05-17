@@ -27,4 +27,4 @@ def on_device(x: AugmentedInput):
 
 @B.dispatch
 def dtype(x: AugmentedInput):
-    return B.dtype(x)
+    return B.dtype(x.x)
