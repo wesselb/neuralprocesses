@@ -99,6 +99,11 @@ def main(**kw_args):
             "convgnp",
             "convnp",
             "fullconvgnp",
+            # Experiment-specific architectures:
+            "convcnp-mlp",
+            "convgnp-mlp",
+            "convcnp-multires",
+            "convgnp-multires",
         ],
         default="convcnp",
     )
@@ -128,6 +133,8 @@ def main(**kw_args):
     parser.add_argument("--no-action", action="store_true")
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--ar", action="store_true")
+    parser.add_argument("--also-ar", action="store_true")
+    parser.add_argument("--no-ar", action="store_true")
     parser.add_argument("--experiment-setting", type=str, nargs="*")
 
     if kw_args:
@@ -397,20 +404,10 @@ def main(**kw_args):
             raise ValueError(f'Invalid model "{args.model}".')
 
     # Settings specific model the model:
-    if args.model in {
-        "cnp",
-        "gnp",
-        "acnp",
-        "agnp",
-        "convcnp",
-        "convgnp",
-        "fullconvgnp",
-    }:
-        config["fix_noise"] = False
-    elif args.model in {"np", "anp", "convnp"}:
+    if args.model in {"np", "anp", "convnp"}:
         config["fix_noise"] = True
     else:
-        raise ValueError(f'Invalid model "{args.model}".')
+        config["fix_noise"] = False
 
     # Ensure that the model is on the GPU and print some statistics.
     model = model.to(device)
@@ -499,7 +496,7 @@ def main(**kw_args):
             name = "model-best.torch"
         model.load_state_dict(torch.load(wd.file(name), map_location=device)["weights"])
 
-        if not args.ar:
+        if not args.ar or args.also_ar:
             # Make some plots.
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
@@ -517,7 +514,9 @@ def main(**kw_args):
                             state, _ = eval(state, model, objective_eval, gen)
 
         # Always run AR evaluation for the conditional models.
-        if args.model in {"cnp", "acnp", "convcnp"} or args.ar:
+        if not args.no_ar and (
+            args.model in {"cnp", "acnp", "convcnp"} or args.ar or args.also_ar
+        ):
             # Make some plots.
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
