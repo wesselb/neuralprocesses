@@ -8,11 +8,26 @@ from .util import register_data
 __all__ = []
 
 
+class Fuse(torch.nn.Module):
+    def __init__(self, sc):
+        super().__init__()
+        self.sc = sc
+
+
+@nps.code.dispatch
+def code(coder: Fuse, xz, z, x, **kw_args):
+    xz1, xz2 = xz
+    z1, z2 = z
+    xz2, z2 = nps.code(coder.sc, xz2, z2, xz1, **kw_args)
+    return xz1, B.concat(z1, z2, axis=-1 - nps.data_dims(xz1))
+
+
 def construct_model(
     width_hr=64,
     width_mr=64,
     width_lr=128,
     width_mlp=128,
+    width_bridge=32,
     hr_deg=0.75 / 75,
     mr_deg=0.75 / 7.5,
     lr_deg=0.75,
@@ -29,10 +44,10 @@ def construct_model(
     # High-resolution CNN:
     conv_hr = nps.UNet(
         dim=2,
-        in_channels=(1 + 1) + (3 + 1) + (1 + 1),
+        in_channels=(1 + 1) + (3 + 1) + (1 + 1) + width_bridge,
         # Four channels should give a TF of at least one.
         channels=(width_hr,) * 4,
-        out_channels=width_hr,
+        out_channels=likelihood_in_channels,
     )
     assert conv_hr.receptive_field * hr_deg >= 1
     disc_hr = nps.Discretisation(
@@ -46,10 +61,10 @@ def construct_model(
     # Medium-resolution CNN:
     conv_mr = nps.UNet(
         dim=2,
-        in_channels=(1 + 1) + (3 + 1),
+        in_channels=(1 + 1) + (3 + 1) + width_bridge,
         # Four channels should give a TF of at least ten.
         channels=(width_mr,) * 4,
-        out_channels=width_mr,
+        out_channels=width_bridge,
     )
     assert conv_mr.receptive_field * mr_deg >= 10
     disc_mr = nps.Discretisation(
@@ -65,7 +80,7 @@ def construct_model(
         dim=2,
         in_channels=25 + 1,
         channels=width_lr,
-        out_channels=width_lr,
+        out_channels=width_bridge,
         num_layers=6,
         receptive_field=9.5,  # Force kernel size 3.
         points_per_unit=1 / lr_deg,
@@ -143,28 +158,50 @@ def construct_model(
 
     decoder = nps.Chain(
         nps.Parallel(
-            conv_hr,
-            conv_mr,
+            lambda x: x,
+            lambda x: x,
             conv_lr,
         ),
-        nps.RepeatForAggregateInputs(
-            nps.Chain(
-                nps.Parallel(
-                    nps.SetConv(scale=hr_deg),
-                    nps.SetConv(scale=mr_deg),
-                    nps.SetConv(scale=lr_deg),
-                ),
-                lambda xs: B.concat(*xs, axis=-2),
-                nps.MLP(
-                    in_dim=width_hr + width_mr + width_lr,
-                    layers=(width_hr + width_mr + width_lr, width_mlp, width_mlp),
-                    out_dim=likelihood_in_channels,
-                ),
-                selector,
-            ),
+        nps.RestructureParallel((0, 1, 2), ((0,), (1, 2))),
+        nps.Parallel(
+            lambda x: x,
+            Fuse(nps.SetConv(scale=lr_deg)),
         ),
+        nps.RestructureParallel(((0,), 1), (0, 1)),
+        nps.Parallel(
+            lambda x: x,
+            conv_mr,
+        ),
+        Fuse(nps.SetConv(scale=mr_deg)),
+        conv_hr,
+        nps.RepeatForAggregateInputs(nps.Chain(nps.SetConv(scale=hr_deg), selector)),
         likelihood,
     )
+
+    # decoder = nps.Chain(
+    #     nps.Parallel(
+    #         conv_hr,
+    #         conv_mr,
+    #         conv_lr,
+    #     ),
+    #     nps.RepeatForAggregateInputs(
+    #         nps.Chain(
+    #             nps.Parallel(
+    #                 nps.SetConv(scale=hr_deg),
+    #                 nps.SetConv(scale=mr_deg),
+    #                 nps.SetConv(scale=lr_deg),
+    #             ),
+    #             lambda xs: B.concat(*xs, axis=-2),
+    #             nps.MLP(
+    #                 in_dim=width_hr + width_mr + width_lr,
+    #                 layers=(width_hr + width_mr + width_lr, width_mlp, width_mlp),
+    #                 out_dim=likelihood_in_channels,
+    #             ),
+    #             selector,
+    #         ),
+    #     ),
+    #     likelihood,
+    # )
 
     return nps.Model(encoder, decoder)
 
