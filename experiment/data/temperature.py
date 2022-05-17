@@ -174,7 +174,12 @@ def construct_model(
         ),
         Fuse(nps.SetConv(scale=mr_deg)),
         conv_hr,
-        nps.RepeatForAggregateInputs(nps.Chain(nps.SetConv(scale=hr_deg), selector)),
+        nps.RepeatForAggregateInputs(
+            nps.Chain(
+                nps.SetConv(scale=hr_deg),
+                selector,
+            )
+        ),
         likelihood,
     )
 
@@ -234,8 +239,8 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         torch.float32,
         seed=20,
         batch_size=args.batch_size,
-        context_fraction=0,  # Don't sample contexts.
-        target_min=1,
+        context_fraction=0.5,
+        target_min=5,
         target_square=2,
         subset="cv",
         passes=2,
@@ -250,7 +255,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
                 batch_size=args.batch_size,
                 context_fraction=0,  # Don't sample contexts.
                 target_min=1,
-                # Don't sample squares, but the whole data.
+                # Don't sample squares, but use the whole data.
                 target_square=2 if "eval-square" in args.experiment_setting else 0,
                 subset="eval",
                 device=device,
