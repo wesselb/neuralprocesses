@@ -311,28 +311,34 @@ class TemperatureGenerator(DataGenerator):
             b["xc_s_outside_square"] = b["xt"][:, :, :0]
             b["yc_s_outside_square"] = b["yt"][:, :, :0]
 
-        # Perform a division into context and target. Separately split whatever is
-        # inside and outside the square.
-        # Points inside:
-        n_all = [(True, i) for i in range(B.shape(b["xt"], -1))]
-        # Points outside:
-        n_all += [(False, i) for i in range(B.shape(b["xc_s_outside_square"], -1))]
+        # Perform a division into context and target. In the line below, `True`
+        # indicates that the index belongs to a point inside the square and `False`
+        # indicates that the index belongs to a point outside the square.
+        inds = [(True, i) for i in range(B.shape(b["xt"], -1))]
+        inds += [(False, i) for i in range(B.shape(b["xc_s_outside_square"], -1))]
         # Shuffle the points.
-        self.state, perm = B.randperm(self.state, self.int64, len(n_all))
-        n_all = [n_all[i] for i in perm]
+        self.state, perm = B.randperm(self.state, self.int64, len(inds))
+        inds = [inds[i] for i in perm]
         # Find the maximum number of context points by ensuring that there are at least
         # `self.target_min` in the target set.
-        nc_upper = len(n_all)
+        nc_upper = len(inds)
         count = 0
-        for inside, _ in reversed(n_all):
+        for inside, _ in reversed(inds):
             count += inside
             nc_upper -= 1
             if count >= self.target_min:
                 break
-        self.state, nc = B.randint(self.state, self.int64, lower=0, upper=nc_upper)
-        inds_c_inside = [i for inside, i in n_all[:nc] if inside]
-        inds_t_inside = [i for inside, i in n_all[nc:] if inside]
-        inds_c_outside = [i for inside, i in n_all[:nc] if not inside]
+        # Now emphasise the lower numbers, because those are more important.
+        for _ in range(6):
+            self.state, outcome = B.randint(self.state, self.int64, 4)
+            if outcome == 3:
+                break
+            else:
+                nc_upper //= 2
+        self.state, nc = B.randint(self.state, self.int64, lower=0, upper=nc_upper + 1)
+        inds_c_inside = [i for inside, i in inds[:nc] if inside]
+        inds_t_inside = [i for inside, i in inds[nc:] if inside]
+        inds_c_outside = [i for inside, i in inds[:nc] if not inside]
         # Perform the split.
         b["xc_s"] = B.concat(
             B.take(b["xt"], inds_c_inside, axis=-1),
