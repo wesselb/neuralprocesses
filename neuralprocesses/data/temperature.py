@@ -90,7 +90,7 @@ class _TemperatureData:
         # Extract the data, construct the mask, and save it. Note that a `False` in
         # `elev.mask` means that a data point is present!
         elev_hr_mask = B.broadcast_to(~elev_hr.mask, *B.shape(elev_hr.data))
-        elev_hr_data = elev_hr.data / 100
+        elev_hr_data = elev_hr.data
         elev_hr_data[elev_hr_mask == 0] = 0
         self.xc_elev_hr = (
             elev_hr_lons[lons_mask][None, None, :],
@@ -98,6 +98,7 @@ class _TemperatureData:
         )
         # The high-resolution elevation is lat-lon form, so we need to transpose. This
         # is relatively safe, because the code will break if we get this wrong.
+        # Moreover, normalise by 100 to stabilise initialisation.
         self.yc_elev_hr = B.t(elev_hr_data)[None, None, :] / 100
         self.yc_elev_hr_mask = B.t(elev_hr_mask)[None, None, :]
 
