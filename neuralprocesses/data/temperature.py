@@ -313,50 +313,40 @@ class TemperatureGenerator(DataGenerator):
 
         # Perform a division into context and target. Separately split whatever is
         # inside and outside the square.
-        n_inside = B.shape(b["xt"], -1)
-        n_outside = B.shape(b["xc_s_outside_square"], -1)
-        if self.context_sample:
-            # Flip a coin for how large the context should be.
-            self.state, coin = B.randint(self.state, self.int64, lower=0, upper=3)
-            if coin == 0:
-                nc_inside_upper = n_inside
-                nc_outside_upper = n_outside
-            elif coin == 1:
-                nc_inside_upper = int(0.1 * n_inside)
-                nc_outside_upper = int(0.1 * n_outside)
-            else:
-                nc_inside_upper = 0
-                nc_outside_upper = 0
-            self.state, nc_inside = B.randint(
-                self.state,
-                self.int64,
-                lower=0,
-                upper=max(min(nc_inside_upper + 1, n_inside - self.target_min), 1),
-            )
-            self.state, nc_outside = B.randint(
-                self.state,
-                self.int64,
-                lower=0,
-                upper=nc_outside_upper + 1,
-            )
-        else:
-            nc_inside = 0
-            nc_outside = 0
-        self.state, perm_inside = B.randperm(self.state, self.int64, n_inside)
-        self.state, perm_outside = B.randperm(self.state, self.int64, n_outside)
+        # Points inside:
+        n_all = [(True, i) for i in range(B.shape(b["xt"], -1))]
+        # Points outside:
+        n_all += [(False, i) for i in range(B.shape(b["xc_s_outside_square"], -1))]
+        # Shuffle the points.
+        self.state, perm = B.randperm(self.state, self.int64, len(n_all))
+        n_all = [n_all[i] for i in perm]
+        # Find the maximum number of context points by ensuring that there are at least
+        # `self.target_min` in the target set.
+        nc_upper = len(n_all)
+        count = 0
+        for inside, _ in reversed(n_all):
+            count += inside
+            nc_upper -= 1
+            if count >= self.target_min:
+                break
+        self.state, nc = B.randint(self.state, self.int64, lower=0, upper=nc_upper)
+        inds_c_inside = [i for inside, i in n_all[:nc] if inside]
+        inds_t_inside = [i for inside, i in n_all[nc:] if inside]
+        inds_c_outside = [i for inside, i in n_all[:nc] if not inside]
+        # Perform the split.
         b["xc_s"] = B.concat(
-            B.take(b["xt"], perm_inside[:nc_inside], axis=-1),
-            B.take(b["xc_s_outside_square"], perm_outside[:nc_outside], axis=-1),
+            B.take(b["xt"], inds_c_inside, axis=-1),
+            B.take(b["xc_s_outside_square"], inds_c_outside, axis=-1),
             axis=-1,
         )
         b["yc_s"] = B.concat(
-            B.take(b["yt"], perm_inside[:nc_inside], axis=-1),
-            B.take(b["yc_s_outside_square"], perm_outside[:nc_outside], axis=-1),
+            B.take(b["yt"], inds_c_inside, axis=-1),
+            B.take(b["yc_s_outside_square"], inds_c_outside, axis=-1),
             axis=-1,
         )
-        b["xt"] = B.take(b["xt"], perm_inside[nc_inside:], axis=-1)
-        b["yt"] = B.take(b["yt"], perm_inside[nc_inside:], axis=-1)
-        b["yt_elev"] = B.take(b["yt_elev"], perm_inside[nc_inside:], axis=-1)
+        b["xt"] = B.take(b["xt"], inds_t_inside, axis=-1)
+        b["yt"] = B.take(b["yt"], inds_t_inside, axis=-1)
+        b["yt_elev"] = B.take(b["yt_elev"], inds_t_inside, axis=-1)
 
         # Apply the mask to the station contexts, which have only one channel.
         mask = ~B.isnan(b["yc_s"])
