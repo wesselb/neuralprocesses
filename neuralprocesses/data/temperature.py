@@ -240,25 +240,31 @@ class TemperatureGenerator(DataGenerator):
 
             tasks.append(
                 {
-                    "xc_grid_lons": self._xc_grid[0][0],
-                    "xc_grid_lats": self._xc_grid[1][0],
-                    "yc_grid": self._yc_grid[i],
-                    "xc_elev_t": self._xc_elev_t[0],
-                    "yc_elev_t": self._yc_elev_t[0],
-                    "xc_elev_hr_lons": self._xc_elev_hr[0][0],
-                    "xc_elev_hr_lats": self._xc_elev_hr[1][0],
-                    "yc_elev_hr": self._yc_elev_hr[0],
-                    "yc_elev_hr_mask": self._yc_elev_hr_mask[0],
-                    "xt": self._xt[0],
-                    "yt": self._yt[i],
+                    "xc_grid_lons": self._xc_grid[0],
+                    "xc_grid_lats": self._xc_grid[1],
+                    "yc_grid": self._yc_grid[i : i + 1],
+                    "xc_elev_t": self._xc_elev_t,
+                    "yc_elev_t": self._yc_elev_t,
+                    "xc_elev_hr_lons": self._xc_elev_hr[0],
+                    "xc_elev_hr_lats": self._xc_elev_hr[1],
+                    "yc_elev_hr": self._yc_elev_hr,
+                    "yc_elev_hr_mask": self._yc_elev_hr_mask,
+                    "xt": self._xt,
+                    "yt": self._yt[i : i + 1],
                 }
             )
 
-        # Stack tasks into one batch and convert to the right framework.
-        b = {
-            k: B.cast(self.dtype, B.stack(*(t[k] for t in tasks)))
-            for k in tasks[0].keys()
-        }
+        def _concat(*xs):
+            if all(id(xs[0]) == id(x) for x in xs):
+                # No need to cast, convert, and concatenate all of them. This is much
+                # more efficient.
+                x = B.cast(self.dtype, xs[0])
+                return B.tile(x, len(xs), *((1,) * (B.rank(x) - 1)))
+            else:
+                return B.concat(*(B.cast(self.dtype, x) for x in xs), axis=0)
+
+        # Concatenate tasks into one batch and convert to the right framework.
+        b = {k: _concat(*(t[k] for t in tasks)) for k in tasks[0].keys()}
 
         # Check if it is our turn.
         alternate_turn = self._alternate_i % 2 == 0
