@@ -112,7 +112,6 @@ def construct_model(
                     nps.Parallel(
                         nps.SetConv(scale=hr_deg),
                         nps.SetConv(scale=hr_deg),
-                        nps.SetConv(scale=hr_deg),
                     ),
                     nps.DivideByFirstChannel(),
                     nps.Materialise(),
@@ -127,7 +126,6 @@ def construct_model(
                 nps.Chain(
                     nps.PrependDensityChannel(),
                     nps.Parallel(
-                        nps.SetConv(scale=mr_deg),
                         nps.SetConv(scale=mr_deg),
                         nps.SetConv(scale=hr_deg),
                     ),
