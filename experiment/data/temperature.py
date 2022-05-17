@@ -243,7 +243,8 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         target_min=5,
         target_square=2,
         subset="cv",
-        passes=2,
+        # Cycle over the data a few times to account for the random square sampling.
+        passes=5,
         device=device,
     )
     gens_eval = lambda: [
