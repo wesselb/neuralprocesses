@@ -330,7 +330,7 @@ class TemperatureGenerator(DataGenerator):
                 break
         # Now emphasise the lower numbers, because those are more important.
         for _ in range(6):
-            self.state, outcome = B.randint(self.state, self.int64, 4)
+            self.state, outcome = B.randint(self.state, self.int64, upper=4)
             if outcome == 3:
                 break
             else:
