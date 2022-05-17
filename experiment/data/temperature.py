@@ -8,6 +8,60 @@ from .util import register_data
 __all__ = []
 
 
+def construct_mlp_model(
+    width_lr=128,
+    lr_deg=0.75,
+    likelihood="het",
+):
+    likelihood_in_channels, selector, likelihood = construct_likelihood(
+        nps,
+        spec=likelihood,
+        dim_y=1,
+        num_basis_functions=64,
+        dtype=torch.float32,
+    )
+
+    conv_lr = nps.ConvNet(
+        dim=2,
+        in_channels=25,
+        channels=width_lr,
+        out_channels=128,
+        num_layers=6,
+        receptive_field=9.5,  # Force kernel size 3.
+        points_per_unit=1 / lr_deg,
+        residual=True,
+    )
+    assert conv_lr.kernel == 3
+
+    encoder = nps.Chain(
+        nps.RestructureParallel(
+            ("station", "grid", "elev_grid"),
+            ("grid",),
+        ),
+        nps.Materialise(),
+        nps.DeterministicLikelihood(),
+    )
+    decoder = nps.Chain(
+        conv_lr,
+        nps.RepeatForAggregateInputs(
+            nps.Chain(
+                nps.SetConv(scale=lr_deg),
+                nps.Augment(
+                    nps.MLP(
+                        in_dim=128 + 3,
+                        layers=(128 + 3, 128, 128),
+                        out_dim=likelihood_in_channels,
+                    ),
+                ),
+                selector,
+            )
+        ),
+        likelihood,
+    )
+
+    return nps.Model(encoder, decoder)
+
+
 class Fuse(torch.nn.Module):
     def __init__(self, set_conv):
         super().__init__()
@@ -22,7 +76,7 @@ def code(coder: Fuse, xz, z, x, **kw_args):
     return xz1, B.concat(z1, z2, axis=-1 - nps.data_dims(xz1))
 
 
-def construct_model(
+def construct_multires_model(
     width_hr=64,
     width_mr=64,
     width_lr=128,
@@ -189,10 +243,18 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["dim_x"] = 2
     config["dim_y"] = 1
 
-    if args.model == "convcnp":
-        config["model"] = construct_model(likelihood="het")
-    elif args.model == "convgnp":
-        config["model"] = construct_model(likelihood="lowrank")
+    if args.model == "convcnp-mlp":
+        config["model"] = construct_mlp_model(likelihood="het")
+        target_elev = True
+    elif args.model == "convgnp-mlp":
+        config["model"] = construct_mlp_model(likelihood="lowrank")
+        target_elev = True
+    elif args.model == "convcnp-multires":
+        config["model"] = construct_multires_model(likelihood="het")
+        target_elev = False
+    elif args.model == "convgnp-multires":
+        config["model"] = construct_multires_model(likelihood="lowrank")
+        target_elev = False
     else:
         raise ValueError(f'Experiment does not yet support model "{args.model}".')
 
@@ -206,6 +268,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         context_fraction=0.5,
         target_min=5,
         target_square=2,
+        target_elev=target_elev,
         subset="train",
         device=device,
     )
@@ -216,6 +279,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         context_fraction=0.5,
         target_min=5,
         target_square=2,
+        target_elev=target_elev,
         subset="cv",
         # Cycle over the data a few times to account for the random square sampling.
         passes=5,
@@ -232,6 +296,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
                 target_min=1,
                 # Don't sample squares, but use the whole data.
                 target_square=2 if "eval-square" in args.experiment_setting else 0,
+                target_elev=target_elev,
                 subset="eval",
                 device=device,
             ),

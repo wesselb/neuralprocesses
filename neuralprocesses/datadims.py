@@ -3,6 +3,7 @@ import lab as B
 from . import _dispatch
 from .aggregate import Aggregate, AggregateInput
 from .parallel import Parallel
+from .augment import AugmentedInput
 
 __all__ = ["data_dims"]
 
@@ -74,3 +75,8 @@ def _data_dims_merge(d1: Aggregate, d2):
 @_dispatch
 def _data_dims_merge(d1, d2: Aggregate):
     return _data_dims_merge(*(_data_dims_merge(d1, d2i) for d2i in d2))
+
+
+@_dispatch
+def data_dims(x: AugmentedInput):
+    return data_dims(x.x)

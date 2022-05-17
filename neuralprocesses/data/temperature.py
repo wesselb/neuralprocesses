@@ -5,6 +5,7 @@ import pandas as pd
 
 from .data import DataGenerator
 from ..mask import Masked
+from ..augment import AugmentedInput
 
 __all__ = ["TemperatureGenerator"]
 
@@ -42,17 +43,17 @@ class _TemperatureData:
             shape=(2192, 25, 87, 50),
         )
 
-        # Load elevation at targets and transpose into the right form.
-        self.xc_elev_t = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
-        self.xc_elev_t = self.xc_elev_t.T[None, :, :]
-        self.yc_elev_t = np.load(f"{data_path}/data/elevation/elev_tmax_all.npy")
-        self.yc_elev_t = self.yc_elev_t.T[None, :, :]
-
         # Load targets and transpose into the right form.
         self.xt = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
         self.xt = self.xt.T[None, :, :]
         self.yt = np.load(f"{data_path}/data/target/tmax_all_y_target.npy")
         self.yt = self.yt[:, None, :]
+
+        # Load elevation at targets and transpose into the right form.
+        self.xt_elev = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
+        self.xt_elev = self.xt_elev.T[None, :, :]
+        self.yt_elev = np.load(f"{data_path}/data/elevation/elev_tmax_all.npy")
+        self.yt_elev = self.yt_elev.T[None, :, :]
 
         # Select the relevant subset for Germany.
         lons = (6, 16)
@@ -73,10 +74,10 @@ class _TemperatureData:
         # Process the elevations and the targets.
         mask = (lons[0] <= self.xt[0, 0, :]) & (self.xt[0, 0, :] < lons[1])
         mask &= (lats[0] <= self.xt[0, 1, :]) & (self.xt[0, 1, :] < lats[1])
-        self.xc_elev_t = self.xc_elev_t[:, :, mask]
-        self.yc_elev_t = self.yc_elev_t[:, :, mask]
         self.xt = self.xt[:, :, mask]
         self.yt = self.yt[:, :, mask]
+        self.xt_elev = self.xt_elev[:, :, mask]
+        self.yt_elev = self.yt_elev[:, :, mask]
 
         # Load the high-resolution elevation data.
         elev_hr = netCDF4.Dataset(f"{data_path}/elev_data_1km/data.nc")
@@ -113,6 +114,8 @@ class TemperatureGenerator(DataGenerator):
         target_min (int, optional): Minimum number of target points. Defaults to 5.
         target_square (float, optional): Size of the square of target points to sample.
             Defaults to not sampling a square.
+        target_elev (bool, optional): Append the elevation at the target inputs as
+            auxiliary information. Defaults to `False`.
         context_fraction (float, optional): Fraction of context stations. Defaults to 0.
         context_alternate (bool, optional): Alternate between sampling no contexts and
             sampling contexts. Defaults to `False`.
@@ -132,6 +135,8 @@ class TemperatureGenerator(DataGenerator):
         num_batches (int): Number of batches in an epoch.
         target_min (int): Minimum number of target points.
         target_square (float): Size of the square of target points to sample.
+        target_elev (bool): Append the elevation at the target inputs as auxiliary
+            information.
         context_fraction (float): Fraction of context stations.
         context_alternate (bool): Alternate between sampling no contexts and sampling
             contexts.
@@ -148,6 +153,7 @@ class TemperatureGenerator(DataGenerator):
         batch_size=16,
         target_min=5,
         target_square=0.0,
+        target_elev=False,
         context_fraction=0.0,
         context_alternate=False,
         subset="train",
@@ -157,6 +163,7 @@ class TemperatureGenerator(DataGenerator):
     ):
         self.target_min = target_min
         self.target_square = target_square
+        self.target_elev = target_elev
         self.context_fraction = context_fraction
         self.context_alternate = context_alternate
         self._alternate_i = 0
@@ -173,13 +180,13 @@ class TemperatureGenerator(DataGenerator):
             n = data.yc_grid_train.shape[0]
             self._xc_grid = data.xc_grid
             self._yc_grid = data.yc_grid_train[data.train_mask[:n]]
-            self._xc_elev_t = data.xc_elev_t[:, :, data.train_stations]
-            self._yc_elev_t = data.yc_elev_t[:, :, data.train_stations]
             self._xc_elev_hr = data.xc_elev_hr
             self._yc_elev_hr = data.yc_elev_hr
             self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xt = data.xt[:, :, data.train_stations]
             self._yt = data.yt[:, :, data.train_stations][data.train_mask]
+            self._xt_elev = data.xt_elev[:, :, data.train_stations]
+            self._yt_elev = data.yt_elev[:, :, data.train_stations]
 
         elif subset == "cv":
             num_tasks = data.cv_mask.sum()
@@ -187,26 +194,26 @@ class TemperatureGenerator(DataGenerator):
             n = data.yc_grid_train.shape[0]
             self._xc_grid = data.xc_grid
             self._yc_grid = data.yc_grid_train[data.cv_mask[:n]]
-            self._xc_elev_t = data.xc_elev_t[:, :, data.cv_stations]
-            self._yc_elev_t = data.yc_elev_t[:, :, data.cv_stations]
             self._xc_elev_hr = data.xc_elev_hr
             self._yc_elev_hr = data.yc_elev_hr
             self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xt = data.xt[:, :, data.cv_stations]
             self._yt = data.yt[:, :, data.cv_stations][data.cv_mask]
+            self._xt_elev = data.xt_elev[:, :, data.cv_stations]
+            self._yt_elev = data.yt_elev[:, :, data.cv_stations]
 
         elif subset == "eval":
             num_tasks = data.eval_mask.sum()
             self._times = data.times[data.eval_mask]
             self._xc_grid = data.xc_grid
             self._yc_grid = data.yc_grid_eval
-            self._xc_elev_t = data.xc_elev_t[:, :, data.eval_stations]
-            self._yc_elev_t = data.yc_elev_t[:, :, data.eval_stations]
             self._xc_elev_hr = data.xc_elev_hr
             self._yc_elev_hr = data.yc_elev_hr
             self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xt = data.xt[:, :, data.eval_stations]
             self._yt = data.yt[:, :, data.eval_stations][data.eval_mask]
+            self._xt_elev = data.xt_elev[:, :, data.eval_stations]
+            self._yt_elev = data.yt_elev[:, :, data.eval_stations]
 
         else:
             raise ValueError(f'Invalid subset "{subset}".')
@@ -243,14 +250,13 @@ class TemperatureGenerator(DataGenerator):
                     "xc_grid_lons": self._xc_grid[0],
                     "xc_grid_lats": self._xc_grid[1],
                     "yc_grid": self._yc_grid[i : i + 1],
-                    "xc_elev_t": self._xc_elev_t,
-                    "yc_elev_t": self._yc_elev_t,
                     "xc_elev_hr_lons": self._xc_elev_hr[0],
                     "xc_elev_hr_lats": self._xc_elev_hr[1],
                     "yc_elev_hr": self._yc_elev_hr,
                     "yc_elev_hr_mask": self._yc_elev_hr_mask,
                     "xt": self._xt,
                     "yt": self._yt[i : i + 1],
+                    "yt_elev": self._yt_elev,
                 }
             )
 
@@ -282,6 +288,7 @@ class TemperatureGenerator(DataGenerator):
         b["yc_s"] = B.take(b["yt"], perm[:nc], axis=-1)
         b["xt"] = B.take(b["xt"], perm[nc:], axis=-1)
         b["yt"] = B.take(b["yt"], perm[nc:], axis=-1)
+        b["yt_elev"] = B.take(b["yt_elev"], perm[nc:], axis=-1)
 
         # Apply the mask to the station contexts, which have only one channel.
         mask = ~B.isnan(b["yc_s"])
@@ -318,6 +325,7 @@ class TemperatureGenerator(DataGenerator):
                 if B.sum(mask) >= self.target_min:
                     b["xt"] = B.take(b["xt"], mask, axis=-1)
                     b["yt"] = B.take(b["yt"], mask, axis=-1)
+                    b["yt_elev"] = B.take(b["yt_elev"], mask, axis=-1)
                     break
 
         # Move everything to the right device.
@@ -333,6 +341,10 @@ class TemperatureGenerator(DataGenerator):
                 Masked(b["yc_elev_hr"], b["yc_elev_hr_mask"]),
             ),
         ]
+
+        # Append the elevation as auxiliary information, if asked for.
+        if self.target_elev:
+            b["xt"] = AugmentedInput(b["xt"], b["yt_elev"])
 
         return b
 

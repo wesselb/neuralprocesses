@@ -3,6 +3,7 @@ import lab as B
 from .. import _dispatch
 from ..augment import AugmentedInput
 from ..datadims import data_dims
+from ..materialise import _repeat_concat
 from ..util import register_module, register_composite_coder
 
 __all__ = ["Augment"]
@@ -40,8 +41,7 @@ def code(
 
 @_dispatch
 def _augment(xz: AugmentedInput, z: B.Numeric):
-    d = data_dims(xz.x)
-    return xz.x, B.concat(z, xz.augmentation, axis=-1 - d)
+    return xz.x, _repeat_concat(data_dims(xz), z, xz.augmentation)
 
 
 @_dispatch
