@@ -228,7 +228,7 @@ class TemperatureGenerator(DataGenerator):
             perms.append(perm)
         self._inds = B.concat(*perms, axis=0)
 
-    def generate_batch(self):
+    def generate_batch(self, nc=None):
         if len(self._inds) == 0:
             raise RuntimeError("No data left. Shuffle the generator and try again.")
 
@@ -319,28 +319,29 @@ class TemperatureGenerator(DataGenerator):
             # Shuffle the points.
             self.state, perm = B.randperm(self.state, self.int64, len(inds))
             inds = [inds[i] for i in perm]
-            # Find the maximum number of context points by ensuring that there are at
-            # least `self.target_min` in the target set.
-            nc_upper = len(inds)
-            count = 0
-            for inside, _ in reversed(inds):
-                count += inside
-                nc_upper -= 1
-                if count >= self.target_min:
-                    break
-            # Now emphasise the lower numbers, because those are more important.
-            for _ in range(4):
-                self.state, outcome = B.randint(self.state, self.int64, upper=4)
-                if outcome == 3:
-                    break
-                else:
-                    nc_upper //= 2
-            self.state, nc = B.randint(
-                self.state,
-                self.int64,
-                lower=0,
-                upper=nc_upper + 1,
-            )
+            if nc is None:
+                # Find the maximum number of context points by ensuring that there are
+                # at least `self.target_min` in the target set.
+                nc_upper = len(inds)
+                count = 0
+                for inside, _ in reversed(inds):
+                    count += inside
+                    nc_upper -= 1
+                    if count >= self.target_min:
+                        break
+                # Now emphasise the lower numbers, because those are more important.
+                for _ in range(4):
+                    self.state, outcome = B.randint(self.state, self.int64, upper=4)
+                    if outcome == 3:
+                        break
+                    else:
+                        nc_upper //= 2
+                self.state, nc = B.randint(
+                    self.state,
+                    self.int64,
+                    lower=0,
+                    upper=nc_upper + 1,
+                )
             inds_c_inside = [i for inside, i in inds[:nc] if inside]
             inds_t_inside = [i for inside, i in inds[nc:] if inside]
             inds_c_outside = [i for inside, i in inds[:nc] if not inside]
