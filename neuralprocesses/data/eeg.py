@@ -28,9 +28,14 @@ class EEGGenerator(DataGenerator):
         batch_size,
         device,
         shuffle_seed=0,
-        single_channel=False,
+        mode="random",
         num_targets=UniformDiscrete(100, 256),
     ):
+
+        # Ensure correct options have been passed
+        assert mode in ["random", "single_channel", "extrapolation"]
+
+        self.mode = mode
 
         super().__init__(
             dtype=dtype,
@@ -235,7 +240,22 @@ class EEGGenerator(DataGenerator):
         xt = []
         yt = []
 
-        if self.single_channel:
+        if mode == "standard":
+
+            for i in range(7):
+
+                self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
+                idx = self.shuffle_state.permutation(256)
+
+                c_idx = idx[k:]
+                t_idx = idx[:k]
+
+                contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
+
+                xt.append((x[:, :, t_idx], i))
+                yt.append(y[:, i : i + 1, t_idx])
+
+        elif mode == "single_channel":
 
             n = np.random.randint(low=0, high=7)
 
@@ -252,21 +272,18 @@ class EEGGenerator(DataGenerator):
 
                     contexts.append((x[:, :, :], y[:, i : i + 1, :]))
 
+        elif mode == "extrapolation":
 
-        else:
+            c_idx = np.arange(0, 128)
+            t_idx = np.arange(127, 256)
 
             for i in range(7):
-
-                self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
-                idx = self.shuffle_state.permutation(256)
-
-                c_idx = idx[k:]
-                t_idx = idx[:k]
 
                 contexts.append((x[:, :, c_idx], y[:, i : i + 1, c_idx]))
 
                 xt.append((x[:, :, t_idx], i))
                 yt.append(y[:, i : i + 1, t_idx])
+
 
 
         with B.on_device(self.device):

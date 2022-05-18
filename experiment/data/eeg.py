@@ -53,7 +53,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
             split="test",
             batch_size=args.batch_size,
             num_tasks=num_tasks_eval,
-            single_channel=False,
+            mode="standard",
             device=device,
         )
 
@@ -63,13 +63,24 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
             split="test",
             batch_size=args.batch_size,
             num_tasks=num_tasks_eval,
-            single_channel=True,
+            mode="single_channel",
+            device=device,
+        )
+
+        gen_eval_extrapolation = nps.EEGGenerator(
+            dtype=torch.float32,
+            split_seed=30,
+            split="test",
+            batch_size=args.batch_size,
+            num_tasks=num_tasks_eval,
+            mode="extrapolation",
             device=device,
         )
 
         gens = [
             ("standard eval", gen_eval_scattered),
             ("single channel eval", gen_eval_single_channel),
+            ("extrapolation eval", gen_eval_extrapolation),
         ]
 
         return gens
