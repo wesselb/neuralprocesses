@@ -185,9 +185,6 @@ class EEGGenerator(DataGenerator):
         # Set counter for resetting at the end of an epoch
         self.i = 0
 
-        # Whether to occlude a single channel for predictions
-        self.single_channel = single_channel
-
     def make_trials(self, data, subjects):
 
         trials = []
@@ -240,7 +237,7 @@ class EEGGenerator(DataGenerator):
         xt = []
         yt = []
 
-        if mode == "standard":
+        if self.mode == "random":
 
             for i in range(7):
 
@@ -255,7 +252,7 @@ class EEGGenerator(DataGenerator):
                 xt.append((x[:, :, t_idx], i))
                 yt.append(y[:, i : i + 1, t_idx])
 
-        elif mode == "single_channel":
+        elif self.mode == "single_channel":
 
             n = np.random.randint(low=0, high=7)
 
@@ -272,10 +269,10 @@ class EEGGenerator(DataGenerator):
 
                     contexts.append((x[:, :, :], y[:, i : i + 1, :]))
 
-        elif mode == "extrapolation":
+        elif self.mode == "extrapolation":
 
-            c_idx = np.arange(0, 128)
-            t_idx = np.arange(127, 256)
+            c_idx = np.arange(0, 192)
+            t_idx = np.arange(192, 256)
 
             for i in range(7):
 
@@ -283,6 +280,9 @@ class EEGGenerator(DataGenerator):
 
                 xt.append((x[:, :, t_idx], i))
                 yt.append(y[:, i : i + 1, t_idx])
+
+        else:
+            raise Exception(f"Invalid mode {self.mode}")
 
 
 

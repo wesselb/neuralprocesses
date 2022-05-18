@@ -53,7 +53,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
             split="test",
             batch_size=args.batch_size,
             num_tasks=num_tasks_eval,
-            mode="standard",
+            mode="random",
             device=device,
         )
 
@@ -78,7 +78,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         )
 
         gens = [
-            ("standard eval", gen_eval_scattered),
+            ("random eval", gen_eval_scattered),
             ("single channel eval", gen_eval_single_channel),
             ("extrapolation eval", gen_eval_extrapolation),
         ]
