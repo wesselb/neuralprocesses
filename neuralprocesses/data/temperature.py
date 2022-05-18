@@ -298,7 +298,6 @@ class TemperatureGenerator(DataGenerator):
 
                 # Only stop sampling if the minimum number of targets was selected.
                 if B.sum(mask) >= self.target_min:
-                    # Take everything not in the
                     b["xc_s_outside_square"] = B.take(b["xt"], ~mask, axis=-1)
                     b["yc_s_outside_square"] = B.take(b["yt"], ~mask, axis=-1)
                     b["xt"] = B.take(b["xt"], mask, axis=-1)
@@ -365,7 +364,7 @@ class TemperatureGenerator(DataGenerator):
             b["yc_s"] = Masked(B.where(mask, b["yc_s"], B.zero(b["yc_s"])), mask)
 
         else:
-            # There no context to sample.
+            # There is no context to sample.
             b["xc_s"] = b["xt"][:, :, :0]
             b["yc_s"] = b["yt"][:, :, :0]
 
