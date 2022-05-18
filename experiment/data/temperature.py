@@ -94,7 +94,7 @@ def construct_multires_model(
         dtype=torch.float32,
     )
 
-    width_bridge = 64 is big else 32
+    width_bridge = 64 if big else 32
 
     # High-resolution CNN:
     conv_hr = nps.UNet(
