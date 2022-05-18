@@ -80,7 +80,6 @@ def construct_multires_model(
     width_hr=64,
     width_mr=64,
     width_lr=128,
-    width_bridge=32,
     hr_deg=0.75 / 75,
     mr_deg=0.75 / 7.5,
     lr_deg=0.75,
@@ -94,6 +93,8 @@ def construct_multires_model(
         num_basis_functions=64,
         dtype=torch.float32,
     )
+
+    width_bridge = 64 is big else 32
 
     # High-resolution CNN:
     conv_hr = nps.UNet(
