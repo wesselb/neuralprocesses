@@ -85,6 +85,7 @@ def construct_multires_model(
     mr_deg=0.75 / 7.5,
     lr_deg=0.75,
     likelihood="het",
+    big=False,
 ):
     likelihood_in_channels, selector, likelihood = construct_likelihood(
         nps,
@@ -99,10 +100,10 @@ def construct_multires_model(
         dim=2,
         in_channels=(1 + 1) + (1 + 1) + width_bridge,  # Stations and HR elevation
         # Four channels should give a TF of at least one.
-        channels=(width_hr,) * 4,
+        channels=(width_hr,) * (5 if big else 4),
         out_channels=likelihood_in_channels,
     )
-    assert conv_hr.receptive_field * hr_deg >= 1
+    assert conv_hr.receptive_field * hr_deg >= (2 if big else 1)
     disc_hr = nps.Discretisation(
         points_per_unit=1 / hr_deg,
         multiple=2**conv_hr.num_halving_layers,
@@ -116,15 +117,22 @@ def construct_multires_model(
         dim=2,
         in_channels=(1 + 1) + (1 + 1) + width_bridge,  # Stations and HR elevation
         # Four channels should give a TF of at least ten.
-        channels=(width_mr,) * 4,
+        channels=(width_mr,) * (5 if big else 4),
         out_channels=width_bridge,
     )
-    assert conv_mr.receptive_field * mr_deg >= 10
+    assert conv_mr.receptive_field * mr_deg >= (20 if big else 10)
     disc_mr = nps.Discretisation(
         points_per_unit=1 / mr_deg,
         multiple=2**conv_mr.num_halving_layers,
-        # Use a margin of half the lower bound on the RF.
-        margin=5,
+        margin=(
+            # Will encapsulate both the context and targets, so no need for a big
+            # margin.
+            0.1
+            if big
+            else
+            # Use a margin of half the lower bound on the RF.
+            5
+        ),
         dim=2,
     )
 
@@ -187,8 +195,14 @@ def construct_multires_model(
                     nps.Materialise(),
                     nps.DeterministicLikelihood(),
                 ),
-                # Let the discretisation only target the target inputs.
-                target=lambda xc, xt: (xt,),
+                target=(
+                    # Let the discretisation target both the context and target inputs.
+                    (lambda xc, xt: (xt, xc))
+                    if big
+                    else
+                    # Let the discretisation only target the target inputs.
+                    (lambda xc, xt: (xt,))
+                ),
             ),
             # Low resolution:
             nps.FunctionalCoder(
@@ -256,13 +270,19 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         context_sample = False
         do_plot = False
     elif args.model == "convcnp-multires":
-        config["model"] = construct_multires_model(likelihood="het")
+        config["model"] = construct_multires_model(
+            likelihood="het",
+            big="big" in args.experiment_setting,
+        )
         target_elev = False
         target_square = 3
         context_sample = True
         do_plot = True
     elif args.model == "convgnp-multires":
-        config["model"] = construct_multires_model(likelihood="lowrank")
+        config["model"] = construct_multires_model(
+            likelihood="lowrank",
+            big="big" in args.experiment_setting,
+        )
         target_elev = False
         target_square = 3
         context_sample = True
@@ -302,20 +322,33 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     )
     gens_eval = lambda: [
         (
-            "Evaluation",
+            "Downscaling",
             nps.TemperatureGenerator(
                 torch.float32,
                 seed=30,
                 batch_size=args.batch_size,
                 context_sample=False,
                 target_min=1,
-                # Don't sample squares, but use the whole data.
                 target_square=2 if "eval-square" in args.experiment_setting else 0,
                 target_elev=target_elev,
                 subset="eval",
                 device=device,
             ),
-        )
+        ),
+        (
+            "Fusion",
+            nps.TemperatureGenerator(
+                torch.float32,
+                seed=30,
+                batch_size=args.batch_size,
+                context_sample=True,
+                target_min=1,
+                target_square=2 if "eval-square" in args.experiment_setting else 0,
+                target_elev=target_elev,
+                subset="eval",
+                device=device,
+            ),
+        ),
     ]
     return gen_train, gen_cv, gens_eval
 
