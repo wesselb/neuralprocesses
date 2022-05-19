@@ -507,7 +507,7 @@ def main(**kw_args):
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
                     model,
-                    gens_cv,
+                    gen_cv,
                     path=wd.file(f"evaluate-{i + 1:03d}.pdf"),
                     config=config,
                 )
@@ -527,7 +527,7 @@ def main(**kw_args):
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
                     model,
-                    gens_cv,
+                    gen_cv,
                     path=wd.file(f"evaluate-ar-{i + 1:03d}.pdf"),
                     config=config,
                     predict=nps.ar_predict,
