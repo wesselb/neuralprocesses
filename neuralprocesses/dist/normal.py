@@ -163,7 +163,32 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
         return _monormal_unvectorise(B.diag(self.vectorised_normal.var), self.shape)
 
     def logpdf(self, x):
-        return self.vectorised_normal.logpdf(_monormal_vectorise(x, self.shape))
+        x = _monormal_vectorise(x, self.shape)
+        d = self.vectorised_normal
+        if B.all(~B.isnan(x)):
+            return d.logpdf(x)
+        else:
+            # Data is missing. Unfortunately, which elements are missing can differ
+            # between batches. The only thing we can now do is to loop over batches.
+            # For now, we only support a single batch dimension.
+            if B.rank(x) > 3:
+                raise NotImplementedError(
+                    "`MultiOutputNormal` for now only supports missing data with "
+                    "a single batch dimension."
+                )
+            logpdfs = []
+            for b in range(B.shape(x, 0)):
+                x_b = x[b]
+                mask = ~B.isnan(x_b[:, 0])
+                # Select the batch from the vectorised distribution.
+                d_b = Normal(_index_batch(d.mean, b), _index_batch(d.var, b))
+                # Select the non-missing elements.
+                d_b = Normal(
+                    B.take(d_b.mean, mask, axis=-2),
+                    B.submatrix(d_b.var, mask),
+                )
+                logpdfs.append(d_b.logpdf(x_b[mask, :]))
+            return B.stack(*logpdfs, axis=-1)
 
     @_dispatch
     def sample(self, state: B.RandomState, num: Union[B.Int, None] = None):
@@ -228,3 +253,32 @@ def _possibly_densify_variance(var: Woodbury):
         return B.dense(var)
     else:
         return var
+
+
+@_dispatch
+def _index_batch(a: B.Numeric, i: int):
+    return a[..., i, :, :]
+
+
+@_dispatch
+def _index_batch(a: Dense, i: int):
+    return Dense(a.mat[..., i, :, :])
+
+
+@_dispatch
+def _index_batch(a: Diagonal, i: int):
+    return Diagonal(a.diag[..., i, :])
+
+
+@_dispatch
+def _index_batch(a: LowRank, i: int):
+    return LowRank(
+        left=_index_batch(a.left, i),
+        right=_index_batch(a._right, i) if a._right else None,
+        middle=_index_batch(a._middle, i) if a._middle else None,
+    )
+
+
+@_dispatch
+def _index_batch(a: Woodbury, i: int):
+    return _index_batch(a.diag, i) + _index_batch(a.lr, i)

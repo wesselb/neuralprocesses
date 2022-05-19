@@ -28,7 +28,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
     # Other settings specific to the GP experiments:
     config["plot"] = {
         1: {"range": (-2, 4), "axvline": [2]},
-        2: {"range": (-2, 2)},
+        2: {"range": ((-2, 2), (-2, 2))},
     }
     config["transform"] = None
 

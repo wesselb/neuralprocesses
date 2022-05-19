@@ -33,7 +33,10 @@ def visualise(model, gen, *, path, config, predict=nps.predict):
 def visualise_1d(model, gen, *, path, config, predict):
     batch = nps.batch_index(gen.generate_batch(), slice(0, 1, None))
 
-    plot_config = config["plot"][1]
+    try:
+        plot_config = config["plot"][1]
+    except KeyError:
+        return
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
@@ -124,7 +127,10 @@ def visualise_1d(model, gen, *, path, config, predict):
 def visualise_2d(model, gen, *, path, config, predict):
     batch = nps.batch_index(gen.generate_batch(), slice(0, 1, None))
 
-    plot_config = config["plot"][2]
+    try:
+        plot_config = config["plot"][2]
+    except KeyError:
+        return
 
     # Define points to predict at.
     with B.on_device(batch["xt"]):
@@ -132,9 +138,10 @@ def visualise_2d(model, gen, *, path, config, predict):
         # specification.
         # TODO: Use tuple specification when it is supported everywhere.
         n = 100
-        x = B.linspace(B.dtype(batch["xt"]), *plot_config["range"], n)
-        x0 = B.flatten(B.broadcast_to(x[:, None], n, n))
-        x1 = B.flatten(B.broadcast_to(x[None, :], n, n))
+        x0 = B.linspace(B.dtype(batch["xt"]), *plot_config["range"][0], n)
+        x1 = B.linspace(B.dtype(batch["xt"]), *plot_config["range"][1], n)
+        x0 = B.flatten(B.broadcast_to(x0[:, None], n, n))
+        x1 = B.flatten(B.broadcast_to(x1[None, :], n, n))
         x_list = B.stack(x0, x1)
 
     # Predict with model and produce five noiseless samples.
@@ -159,7 +166,7 @@ def visualise_2d(model, gen, *, path, config, predict):
             vmin=vmax,
             vmax=vmin,
             origin="lower",
-            extent=[-2, 2, -2, 2],
+            extent=plot_config["range"][0] + plot_config["range"][1],
             label=label,
         )
         plt.scatter(

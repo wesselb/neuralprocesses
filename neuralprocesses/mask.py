@@ -24,6 +24,11 @@ class Masked:
         self.mask = mask
 
 
+@B.to_active_device.dispatch
+def to_active_device(masked: Masked):
+    return Masked(B.to_active_device(masked.y), B.to_active_device(masked.mask))
+
+
 @_dispatch
 def _pad_zeros(x: B.Numeric, up_to: int, axis: int):
     axis = resolve_axis(x, axis)

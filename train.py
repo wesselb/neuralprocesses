@@ -99,6 +99,11 @@ def main(**kw_args):
             "convgnp",
             "convnp",
             "fullconvgnp",
+            # Experiment-specific architectures:
+            "convcnp-mlp",
+            "convgnp-mlp",
+            "convcnp-multires",
+            "convgnp-multires",
         ],
         default="convcnp",
     )
@@ -114,6 +119,7 @@ def main(**kw_args):
     parser.add_argument("--resume-at-epoch", type=int)
     parser.add_argument("--train-fast", action="store_true")
     parser.add_argument("--check-completed", action="store_true")
+    parser.add_argument("--unnormalised", action="store_true")
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--evaluate-fast", action="store_true")
@@ -128,6 +134,10 @@ def main(**kw_args):
     parser.add_argument("--no-action", action="store_true")
     parser.add_argument("--load", action="store_true")
     parser.add_argument("--ar", action="store_true")
+    parser.add_argument("--also-ar", action="store_true")
+    parser.add_argument("--no-ar", action="store_true")
+    parser.add_argument("--experiment-setting", type=str, nargs="*")
+
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
         # Carefully convert these to command line arguments.
@@ -157,6 +167,10 @@ def main(**kw_args):
         del args.dim_x
     if not exp.data[args.data]["requires_dim_y"]:
         del args.dim_y
+
+    # Ensure that `args.experiment_setting` is always a list.
+    if not args.experiment_setting:
+        args.experiment_setting = []
 
     # Determine the mode of the script.
     if args.check_completed or args.no_action:
@@ -240,172 +254,166 @@ def main(**kw_args):
     B.epsilon = config["epsilon"]
     B.cholesky_retry_factor = config["cholesky_retry_factor"]
 
-    # Construct the model.
-    if args.model == "cnp":
-        model = nps.construct_gnp(
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            dim_embedding=config["dim_embedding"],
-            num_dec_layers=config["num_layers"],
-            width=config["width"],
-            likelihood="het",
-            transform=config["transform"],
-        )
-    elif args.model == "gnp":
-        model = nps.construct_gnp(
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            dim_embedding=config["dim_embedding"],
-            num_dec_layers=config["num_layers"],
-            width=config["width"],
-            likelihood="lowrank",
-            num_basis_functions=config["num_basis_functions"],
-            transform=config["transform"],
-        )
-    elif args.model == "np":
-        model = nps.construct_gnp(
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            dim_embedding=config["dim_embedding"],
-            num_dec_layers=config["num_layers"],
-            width=config["width"],
-            likelihood="het",
-            dim_lv=config["dim_embedding"],
-            transform=config["transform"],
-        )
-    elif args.model == "acnp":
-        model = nps.construct_agnp(
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            dim_embedding=config["dim_embedding"],
-            num_heads=config["num_heads"],
-            num_dec_layers=config["num_layers"],
-            width=config["width"],
-            likelihood="het",
-            transform=config["transform"],
-        )
-    elif args.model == "agnp":
-        model = nps.construct_agnp(
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            dim_embedding=config["dim_embedding"],
-            num_heads=config["num_heads"],
-            num_dec_layers=config["num_layers"],
-            width=config["width"],
-            likelihood="lowrank",
-            num_basis_functions=config["num_basis_functions"],
-            transform=config["transform"],
-        )
-    elif args.model == "anp":
-        model = nps.construct_agnp(
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            dim_embedding=config["dim_embedding"],
-            num_heads=config["num_heads"],
-            num_dec_layers=config["num_layers"],
-            width=config["width"],
-            likelihood="het",
-            dim_lv=config["dim_embedding"],
-            transform=config["transform"],
-        )
-    elif args.model == "convcnp":
-        model = nps.construct_convgnp(
-            points_per_unit=config["points_per_unit"],
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            likelihood="het",
-            conv_arch=args.arch,
-            unet_channels=config["unet_channels"],
-            dws_channels=config["dws_channels"],
-            dws_layers=config["num_layers"],
-            dws_receptive_field=config["dws_receptive_field"],
-            margin=config["margin"],
-            encoder_scales=config["encoder_scales"],
-            transform=config["transform"],
-        )
-    elif args.model == "convgnp":
-        model = nps.construct_convgnp(
-            points_per_unit=config["points_per_unit"],
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            likelihood="lowrank",
-            conv_arch=args.arch,
-            unet_channels=config["unet_channels"],
-            dws_channels=config["dws_channels"],
-            dws_layers=config["num_layers"],
-            dws_receptive_field=config["dws_receptive_field"],
-            num_basis_functions=config["num_basis_functions"],
-            margin=config["margin"],
-            encoder_scales=config["encoder_scales"],
-            transform=config["transform"],
-        )
-    elif args.model == "convnp":
-        if config["dim_x"] == 2:
-            # Reduce the number of channels in the conv. architectures by a factor
-            # $\sqrt(2)$. This keeps the runtime in check and reduces the parameters
-            # of the ConvNP to the number of parameters of the ConvCNP.
-            config["unet_channels"] = tuple(
-                int(c / 2**0.5) for c in config["unet_channels"]
-            )
-            config["dws_channels"] = int(config["dws_channels"] / 2**0.5)
-        model = nps.construct_convgnp(
-            points_per_unit=config["points_per_unit"],
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            likelihood="het",
-            conv_arch=args.arch,
-            unet_channels=config["unet_channels"],
-            dws_channels=config["dws_channels"],
-            dws_layers=config["num_layers"],
-            dws_receptive_field=config["dws_receptive_field"],
-            dim_lv=16,
-            margin=config["margin"],
-            encoder_scales=config["encoder_scales"],
-            transform=config["transform"],
-        )
-    elif args.model == "fullconvgnp":
-        model = nps.construct_fullconvgnp(
-            points_per_unit=config["points_per_unit"],
-            dim_x=config["dim_x"],
-            dim_yc=(1,) * config["dim_y"],
-            dim_yt=config["dim_y"],
-            conv_arch=args.arch,
-            unet_channels=config["unet_channels"],
-            dws_channels=config["dws_channels"],
-            dws_layers=config["num_layers"],
-            dws_receptive_field=config["dws_receptive_field"],
-            kernel_factor=config["fullconvgnp_kernel_factor"],
-            margin=config["margin"],
-            encoder_scales=config["encoder_scales"],
-            transform=config["transform"],
-        )
+    if "model" in config:
+        # See if the experiment constructed the particular flavour of the model already.
+        model = config["model"]
     else:
-        raise ValueError(f'Invalid model "{args.model}".')
+        # Construct the model.
+        if args.model == "cnp":
+            model = nps.construct_gnp(
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                dim_embedding=config["dim_embedding"],
+                num_dec_layers=config["num_layers"],
+                width=config["width"],
+                likelihood="het",
+                transform=config["transform"],
+            )
+        elif args.model == "gnp":
+            model = nps.construct_gnp(
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                dim_embedding=config["dim_embedding"],
+                num_dec_layers=config["num_layers"],
+                width=config["width"],
+                likelihood="lowrank",
+                num_basis_functions=config["num_basis_functions"],
+                transform=config["transform"],
+            )
+        elif args.model == "np":
+            model = nps.construct_gnp(
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                dim_embedding=config["dim_embedding"],
+                num_dec_layers=config["num_layers"],
+                width=config["width"],
+                likelihood="het",
+                dim_lv=config["dim_embedding"],
+                transform=config["transform"],
+            )
+        elif args.model == "acnp":
+            model = nps.construct_agnp(
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                dim_embedding=config["dim_embedding"],
+                num_heads=config["num_heads"],
+                num_dec_layers=config["num_layers"],
+                width=config["width"],
+                likelihood="het",
+                transform=config["transform"],
+            )
+        elif args.model == "agnp":
+            model = nps.construct_agnp(
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                dim_embedding=config["dim_embedding"],
+                num_heads=config["num_heads"],
+                num_dec_layers=config["num_layers"],
+                width=config["width"],
+                likelihood="lowrank",
+                num_basis_functions=config["num_basis_functions"],
+                transform=config["transform"],
+            )
+        elif args.model == "anp":
+            model = nps.construct_agnp(
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                dim_embedding=config["dim_embedding"],
+                num_heads=config["num_heads"],
+                num_dec_layers=config["num_layers"],
+                width=config["width"],
+                likelihood="het",
+                dim_lv=config["dim_embedding"],
+                transform=config["transform"],
+            )
+        elif args.model == "convcnp":
+            model = nps.construct_convgnp(
+                points_per_unit=config["points_per_unit"],
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                likelihood="het",
+                conv_arch=args.arch,
+                unet_channels=config["unet_channels"],
+                dws_channels=config["dws_channels"],
+                dws_layers=config["num_layers"],
+                dws_receptive_field=config["dws_receptive_field"],
+                margin=config["margin"],
+                encoder_scales=config["encoder_scales"],
+                transform=config["transform"],
+            )
+        elif args.model == "convgnp":
+            model = nps.construct_convgnp(
+                points_per_unit=config["points_per_unit"],
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                likelihood="lowrank",
+                conv_arch=args.arch,
+                unet_channels=config["unet_channels"],
+                dws_channels=config["dws_channels"],
+                dws_layers=config["num_layers"],
+                dws_receptive_field=config["dws_receptive_field"],
+                num_basis_functions=config["num_basis_functions"],
+                margin=config["margin"],
+                encoder_scales=config["encoder_scales"],
+                transform=config["transform"],
+            )
+        elif args.model == "convnp":
+            if config["dim_x"] == 2:
+                # Reduce the number of channels in the conv. architectures by a factor
+                # $\sqrt(2)$. This keeps the runtime in check and reduces the parameters
+                # of the ConvNP to the number of parameters of the ConvCNP.
+                config["unet_channels"] = tuple(
+                    int(c / 2**0.5) for c in config["unet_channels"]
+                )
+                config["dws_channels"] = int(config["dws_channels"] / 2**0.5)
+            model = nps.construct_convgnp(
+                points_per_unit=config["points_per_unit"],
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                likelihood="het",
+                conv_arch=args.arch,
+                unet_channels=config["unet_channels"],
+                dws_channels=config["dws_channels"],
+                dws_layers=config["num_layers"],
+                dws_receptive_field=config["dws_receptive_field"],
+                dim_lv=16,
+                margin=config["margin"],
+                encoder_scales=config["encoder_scales"],
+                transform=config["transform"],
+            )
+        elif args.model == "fullconvgnp":
+            model = nps.construct_fullconvgnp(
+                points_per_unit=config["points_per_unit"],
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                conv_arch=args.arch,
+                unet_channels=config["unet_channels"],
+                dws_channels=config["dws_channels"],
+                dws_layers=config["num_layers"],
+                dws_receptive_field=config["dws_receptive_field"],
+                kernel_factor=config["fullconvgnp_kernel_factor"],
+                margin=config["margin"],
+                encoder_scales=config["encoder_scales"],
+                transform=config["transform"],
+            )
+        else:
+            raise ValueError(f'Invalid model "{args.model}".')
 
     # Settings specific model the model:
-    if args.model in {
-        "cnp",
-        "gnp",
-        "acnp",
-        "agnp",
-        "convcnp",
-        "convgnp",
-        "fullconvgnp",
-    }:
-        config["fix_noise"] = False
-    elif args.model in {"np", "anp", "convnp"}:
+    if args.model in {"np", "anp", "convnp"}:
         config["fix_noise"] = True
     else:
-        raise ValueError(f'Invalid model "{args.model}".')
+        config["fix_noise"] = False
 
     # Ensure that the model is on the GPU and print some statistics.
     model = model.to(device)
@@ -417,12 +425,12 @@ def main(**kw_args):
         objective = partial(
             nps.loglik,
             num_samples=args.num_samples,
-            normalise=True,
+            normalise=not args.unnormalised,
         )
         objective_cv = partial(
             nps.loglik,
             num_samples=args.num_samples,
-            normalise=True,
+            normalise=not args.unnormalised,
         )
         objectives_eval = [
             (
@@ -431,7 +439,7 @@ def main(**kw_args):
                     nps.loglik,
                     num_samples=args.evaluate_num_samples,
                     batch_size=args.evaluate_batch_size,
-                    normalise=True,
+                    normalise=not args.unnormalised,
                 ),
             )
         ]
@@ -440,13 +448,13 @@ def main(**kw_args):
             nps.elbo,
             num_samples=args.num_samples,
             subsume_context=True,
-            normalise=True,
+            normalise=not args.unnormalised,
         )
         objective_cv = partial(
             nps.elbo,
             num_samples=args.num_samples,
             subsume_context=False,  # Lower bound the right quantity.
-            normalise=True,
+            normalise=not args.unnormalised,
         )
         objectives_eval = [
             (
@@ -456,7 +464,7 @@ def main(**kw_args):
                     # Don't need a high number of samples, because it is unbiased.
                     num_samples=5,
                     subsume_context=False,  # Lower bound the right quantity.
-                    normalise=True,
+                    normalise=not args.unnormalised,
                 ),
             ),
             (
@@ -465,7 +473,7 @@ def main(**kw_args):
                     nps.loglik,
                     num_samples=args.evaluate_num_samples,
                     batch_size=args.evaluate_batch_size,
-                    normalise=True,
+                    normalise=not args.unnormalised,
                 ),
             ),
         ]
@@ -494,7 +502,7 @@ def main(**kw_args):
             name = "model-best.torch"
         model.load_state_dict(torch.load(wd.file(name), map_location=device)["weights"])
 
-        if not args.ar:
+        if not args.ar or args.also_ar:
             # Make some plots.
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
@@ -512,7 +520,9 @@ def main(**kw_args):
                             state, _ = eval(state, model, objective_eval, gen)
 
         # Always run AR evaluation for the conditional models.
-        if args.model in {"cnp", "acnp", "convcnp"} or args.ar:
+        if not args.no_ar and (
+            args.model in {"cnp", "acnp", "convcnp"} or args.ar or args.also_ar
+        ):
             # Make some plots.
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
@@ -529,7 +539,11 @@ def main(**kw_args):
                         state, _ = eval(
                             state,
                             model,
-                            partial(nps.ar_loglik, order="random", normalise=True),
+                            partial(
+                                nps.ar_loglik,
+                                order="random",
+                                normalise=not args.unnormalised,
+                            ),
                             gen,
                         )
 
@@ -540,13 +554,14 @@ def main(**kw_args):
         start = 0
         if args.resume_at_epoch:
             start = args.resume_at_epoch - 1
-            model.load_state_dict(
-                torch.load(wd.file("model-last.torch"), map_location=device)["weights"]
-            )
+            d = torch.load(wd.file("model-last.torch"), map_location=device)
+            model.load_state_dict(d["weights"])
+            best_eval_lik = d["objective"]
+        else:
+            best_eval_lik = -np.inf
 
         # Setup training loop.
         opt = torch.optim.Adam(model.parameters(), args.rate)
-        best_eval_lik = -np.inf
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon

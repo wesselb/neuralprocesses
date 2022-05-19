@@ -1,3 +1,4 @@
+from .batch import *
 from .data import *
 from .gp import *
 from .mixture import *
@@ -6,3 +7,4 @@ from .predprey import *
 from .sawtooth import *
 from .batch import *
 from .eeg import *
+from .temperature import *

@@ -3,10 +3,11 @@ import numpy as np
 from plum import Dispatcher, Union
 from wbml.util import inv_perm
 
-from .util import tile_for_sampling
 from .model import Model
+from .util import tile_for_sampling
 from .. import _dispatch
 from ..aggregate import AggregateInput, Aggregate
+from ..mask import Masked
 from ..numdata import num_data
 
 __all__ = ["ar_predict", "ar_loglik"]
@@ -182,6 +183,53 @@ def ar_predict(model: Model, *args, **kw_args):
 
 
 @_dispatch
+def _mask_nans(yc: B.Numeric):
+    mask = ~B.isnan(yc)
+    if B.any(~mask):
+        yc = B.where(mask, yc, B.zero(yc))
+        return Masked(yc, mask)
+    else:
+        return yc
+
+
+@_dispatch
+def _mask_nans(yc: Masked):
+    return yc
+
+
+@_dispatch
+def _merge_ycs(yc1: B.Numeric, yc2: B.Numeric):
+    return B.concat(yc1, yc2, axis=-1)
+
+
+@_dispatch
+def _merge_ycs(yc1: Masked, yc2: B.Numeric):
+    with B.on_device(yc2):
+        return _merge_ycs(yc1, Masked(yc2, B.ones(yc2)))
+
+
+@_dispatch
+def _merge_ycs(yc1: B.Numeric, yc2: Masked):
+    with B.on_device(yc1):
+        return _merge_ycs(Masked(yc1, B.ones(yc1)), yc2)
+
+
+@_dispatch
+def _merge_ycs(yc1: Masked, yc2: Masked):
+    return Masked(
+        _merge_ycs(yc1.y, yc2.y),
+        _merge_ycs(yc1.mask, yc2.mask),
+    )
+
+
+@_dispatch
+def _merge_contexts(xc1: B.Numeric, yc1, xc2: B.Numeric, yc2):
+    xc_merged = B.concat(xc1, xc2, axis=-1)
+    yc_merged = _merge_ycs(_mask_nans(yc1), _mask_nans(yc2))
+    return xc_merged, yc_merged
+
+
+@_dispatch
 def ar_loglik(
     state: B.RandomState,
     model: Model,
@@ -234,10 +282,7 @@ def ar_loglik(
 
         # Append to the context.
         xci, yci = contexts[i_out]
-        contexts[i_out] = (
-            B.concat(xci, xti, axis=-1),
-            B.concat(yci, yti, axis=-1),
-        )
+        contexts[i_out] = _merge_contexts(xci, yci, xti, yti)
     logpdf = sum(logpdfs)
 
     if normalise:
