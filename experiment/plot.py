@@ -65,6 +65,7 @@ def visualise_1d(model, gen, *, path, config, predict):
             style="train",
             s=20,
         )
+
         plt.scatter(
             nps.batch_xt(batch, i)[0, 0],
             nps.batch_yt(batch, i)[0],
