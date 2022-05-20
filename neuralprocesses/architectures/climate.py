@@ -150,7 +150,7 @@ def construct_climate_convgnp_multires(
         # Stations, HR elevation, and low-resolution output:
         in_channels=(1 + 1) + (1 + 1) + width_bridge,
         # Four channels should give a TF of at least ten.
-        channels=(width_mr,) * 4,
+        channels=(32, 64, 128, 256),
         out_channels=width_bridge,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
@@ -171,7 +171,7 @@ def construct_climate_convgnp_multires(
         # Stations, HR elevation, and medium-resolution output:
         in_channels=(1 + 1) + (1 + 1) + width_bridge,
         # Four channels should give a TF of at least one.
-        channels=(width_hr,) * 4,
+        channels=(32, 64, 128, 256),
         out_channels=width_hr,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
