@@ -172,7 +172,7 @@ def main(**kw_args):
         args.experiment_setting = []
 
     # Determine the mode of the script.
-    if args.check_completed or args.no_action:
+    if args.check_completed or args.no_action or args.load:
         # Don't add any mode suffix.
         mode = ""
     elif args.evaluate:
