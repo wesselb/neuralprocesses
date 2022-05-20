@@ -1,7 +1,7 @@
 import pytest
 from plum import Dispatcher
-import neuralprocesses
 
+import neuralprocesses as nps_
 from ..util import nps  # noqa
 
 _dispatch = Dispatcher()
@@ -18,7 +18,7 @@ def _to_tuple(x: tuple):
 
 
 @_dispatch
-def _to_tuple(p: neuralprocesses.Parallel):
+def _to_tuple(p: nps_.Parallel):
     return tuple(_to_tuple(pi) for pi in p)
 
 
@@ -27,8 +27,8 @@ def test_restructure_parallel(nps):
 
     res = nps.code(
         reorg,
-        nps.Parallel("x1", nps.Parallel("x2", "x3")),
-        nps.Parallel("y1", nps.Parallel("y2", "y3")),
+        nps_.Parallel("x1", nps_.Parallel("x2", "x3")),
+        nps_.Parallel("y1", nps_.Parallel("y2", "y3")),
         None,
         root=True,
     )
@@ -38,8 +38,8 @@ def test_restructure_parallel(nps):
     with pytest.raises(RuntimeError, match="Parallel does not match structure."):
         nps.code(
             reorg,
-            nps.Parallel("x1", "x2", nps.Parallel("x3")),
-            nps.Parallel("y1", nps.Parallel("y2", "y3")),
+            nps_.Parallel("x1", "x2", nps_.Parallel("x3")),
+            nps_.Parallel("y1", nps_.Parallel("y2", "y3")),
             None,
             root=True,
         )

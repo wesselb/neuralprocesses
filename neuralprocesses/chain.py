@@ -1,7 +1,7 @@
 from matrix.util import indent
 
 from . import _dispatch
-from .util import register_module
+from .util import register_module, is_framework_module
 
 __all__ = ["Chain"]
 
@@ -20,9 +20,9 @@ class Chain:
     def __init__(self, *links):
         # Filter `None`s.
         links = tuple(filter(None, links))
-        try:
+        if any(is_framework_module(link) for link in links):
             self.links = self.nn.ModuleList(links)
-        except Exception:
+        else:
             self.links = links
 
     def __call__(self, x):

@@ -9,8 +9,15 @@ from wbml.util import inv_perm
 
 import neuralprocesses as nps
 from .. import _dispatch
+from ..util import is_framework_module
 
 __all__ = ["num_params", "Module"]
+
+
+@is_framework_module.dispatch
+def is_framework_module(x: torch.nn.Module):
+    # Register PyTorch framework types.
+    return True
 
 
 @_dispatch

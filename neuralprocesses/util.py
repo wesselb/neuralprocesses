@@ -1,9 +1,13 @@
 from functools import wraps
+
 import lab as B
 import numpy as np
 from lab.util import resolve_axis
 
+from . import _dispatch
+
 __all__ = [
+    "is_framework_module",
     "modules",
     "register_module",
     "models",
@@ -20,6 +24,20 @@ __all__ = [
     "merge_dimensions",
     "select",
 ]
+
+
+@_dispatch
+def is_framework_module(x):
+    """Check if something is a framework module.
+
+    Args:
+        x (object): Object to check.
+
+    Returns:
+        bool: `True` if `x` is a framework module, else `False`.
+    """
+    return False
+
 
 modules = []  #: Registered modules
 

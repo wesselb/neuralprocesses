@@ -2,15 +2,21 @@ from functools import partial
 from typing import Optional, Union
 
 import lab.tensorflow as B
-import neuralprocesses as nps
 import numpy as np
 import tensorflow as tf
 from plum import convert
 
+import neuralprocesses as nps
 from .. import _dispatch
-from ..util import compress_batch_dimensions
+from ..util import compress_batch_dimensions, is_framework_module
 
 __all__ = ["num_params", "Module"]
+
+
+@is_framework_module.dispatch
+def is_framework_module(x: Union[tf.keras.Model, tf.keras.layers.Layer]):
+    # Register TF framework types.
+    return True
 
 
 @_dispatch

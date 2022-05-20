@@ -2,7 +2,7 @@ import lab as B
 from matrix.util import indent
 
 from . import _dispatch
-from .util import register_module
+from .util import register_module, is_framework_module
 
 __all__ = ["Parallel", "broadcast_coder_over_parallel"]
 
@@ -19,9 +19,9 @@ class Parallel:
     """
 
     def __init__(self, *elements):
-        try:
+        if any(is_framework_module(element) for element in elements):
             self.elements = self.nn.ModuleList(elements)
-        except Exception:
+        else:
             self.elements = elements
 
     def __call__(self, x):
