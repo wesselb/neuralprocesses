@@ -1,9 +1,29 @@
 import abc
 
-__all__ = ["AbstractMultiOutputDistribution", "AbstractDistribution"]
+__all__ = ["AbstractDistribution", "AbstractMultiOutputDistribution"]
 
 
-class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
+class AbstractDistribution(metaclass=abc.ABCMeta):
+    """An interface for distributions, mostly used for sampling in the data
+    generators."""
+
+    @abc.abstractmethod
+    def sample(self, state, dtype, *shape):
+        """Sample.
+
+        Args:
+            state (random state, optional): Random state.
+            dtype (dtype, optional): Data type.
+            *shape (int): Batch shape of the sample.
+
+        Returns:
+            random state, optional: Random state.
+            tensor: Sample of dtype `dtype` and shape `(*shape, *d)` where `d`
+                specifies the dimensionality of the sample.
+        """
+
+
+class AbstractMultiOutputDistribution(AbstractDistribution):
     """An interface for multi-output distributions."""
 
     @abc.abstractmethod
@@ -34,7 +54,7 @@ class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def sample(self, state, num=1):
+    def sample(self, state, num=None):
         """Sample from the distribution.
 
         Args:
@@ -42,6 +62,7 @@ class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
             num (int, optional): Number of samples. Defaults to one.
 
         Returns:
+            state (random state, optional): Random state.
             tensor: Samples of shape `(num, *b, c, n)` if `num > 1` and of shape .
                 `(*b, c, n)` otherwise.
         """
@@ -66,23 +87,3 @@ class AbstractMultiOutputDistribution(metaclass=abc.ABCMeta):
             tensor: Entropies of shape `(*b,)`.
         """
         raise NotImplementedError(f"Cannot compute the entropy of {self}.")
-
-
-class AbstractDistribution(metaclass=abc.ABCMeta):
-    """An interface for distributions, mostly used for sampling in the data
-    generators."""
-
-    @abc.abstractmethod
-    def sample(self, state, dtype, *shape):
-        """Sample.
-
-        Args:
-            state (random state): Random state.
-            dtype (dtype): Data type.
-            *shape (int): Batch shape of the sample.
-
-        Returns:
-            random state: Random state.
-            tensor: Sample of dtype `dtype` and shape `(*shape, *d)` where `d`
-                specifies the dimensionality of the sample.
-        """

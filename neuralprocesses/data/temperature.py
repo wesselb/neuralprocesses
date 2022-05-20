@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 
 from .data import DataGenerator
-from ..mask import Masked
 from ..augment import AugmentedInput
+from ..dist import TruncatedGeometric
+from ..mask import Masked
 
 __all__ = ["TemperatureGenerator"]
 
@@ -111,13 +112,17 @@ class TemperatureGenerator(DataGenerator):
         dtype (dtype): Data type.
         seed (int, optional): Seed. Defaults to 0.
         batch_size (int, optional): Number of tasks per batch. Defaults to 16.
+        context_sample (bool, optional): Randomly split the data into context and
+            target. Defaults to `False`.
+        context_sample_factor (scalar, optional): When randomly splitting the data into
+            context and target, emphasise the lower numbers more. This factor is the
+            probability of the lowest number divided by the probability of the highest
+            number.
         target_min (int, optional): Minimum number of target points. Defaults to 5.
         target_square (float, optional): Size of the square of target points to sample.
             Defaults to not sampling a square.
         target_elev (bool, optional): Append the elevation at the target inputs as
             auxiliary information. Defaults to `False`.
-        context_sample (bool, optional): Randomly split the data into context and
-            target. Defaults to `False`.
         subset (str, optional): Subset of the data. Must be one of `"train"`, `"cv"` or
             `"eval"`. Defaults to `"train"`.
         passes (int, optional): How many times to cycle through the data in an epoch.
@@ -132,13 +137,13 @@ class TemperatureGenerator(DataGenerator):
         seed (int): Seed.
         batch_size (int): Number of tasks per batch.
         num_batches (int): Number of batches in an epoch.
+        context_sample (bool): Randomly split the data into context and target.
+        context_sample_factor (scalar): This factor is the probability of the lowest
+            number divided by the probability of the highest number. Defaults to 10.
         target_min (int): Minimum number of target points.
         target_square (float): Size of the square of target points to sample.
         target_elev (bool): Append the elevation at the target inputs as auxiliary
             information.
-        context_fraction (float): Fraction of context stations.
-        context_alternate (bool): Alternate between sampling no contexts and sampling
-            contexts.
         passes (int): How many times to cycle through the data in an epoch.
         device (str): Device.
     """
@@ -150,19 +155,21 @@ class TemperatureGenerator(DataGenerator):
         dtype,
         seed=0,
         batch_size=16,
+        context_sample=False,
+        context_sample_factor=10,
         target_min=5,
         target_square=0.0,
         target_elev=False,
-        context_sample=False,
         subset="train",
         passes=1,
         device="cpu",
         data_path="climate_data",
     ):
+        self.context_sample = context_sample
+        self.context_sample_factor = context_sample_factor
         self.target_min = target_min
         self.target_square = target_square
         self.target_elev = target_elev
-        self.context_sample = context_sample
         self._alternate_i = 0
         self.passes = passes
 
@@ -329,22 +336,14 @@ class TemperatureGenerator(DataGenerator):
                     nc_upper -= 1
                     if count >= self.target_min:
                         break
-                # Now emphasise the lower numbers, because those are more important.
-                for _ in range(4):
-                    self.state, outcome = B.randint(self.state, self.int64, upper=4)
-                    if outcome == 3:
-                        break
-                    else:
-                        nc_upper //= 2
-                self.state, nc = B.randint(
-                    self.state,
-                    self.int64,
-                    lower=0,
-                    upper=nc_upper + 1,
-                )
+                # Now sample from a truncated geometric distribution, which has the
+                # ability to emphasise the lower context numbers.
+                dist = TruncatedGeometric(0, nc_upper, self.context_sample_factor)
+                self.state, nc = dist.sample(self.state, self.int64)
             inds_c_inside = [i for inside, i in inds[:nc] if inside]
             inds_t_inside = [i for inside, i in inds[nc:] if inside]
             inds_c_outside = [i for inside, i in inds[:nc] if not inside]
+
             # Perform the split.
             b["xc_s"] = B.concat(
                 B.take(b["xt"], inds_c_inside, axis=-1),

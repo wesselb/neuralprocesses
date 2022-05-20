@@ -5,6 +5,7 @@ from .copy import *
 from .deepset import *
 from .densecov import *
 from .functional import *
+from .fuse import *
 from .inputs import *
 from .mapdiag import *
 from .nn import *

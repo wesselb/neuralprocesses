@@ -1,6 +1,8 @@
 import lab as B
 import pytest
 from plum import Dispatcher
+from neuralprocesses.augment import AugmentedInput
+from neuralprocesses.mask import Masked
 
 from .util import nps  # noqa
 
@@ -115,70 +117,76 @@ def _bcn_form(x: tuple):
     return all(_bcn_form(xi) for xi in x)
 
 
-@pytest.mark.xfail()
+# @pytest.mark.xfail()
 @pytest.mark.parametrize("subset", ["train", "cv", "eval"])
+@pytest.mark.parametrize("context_sample", [False, True])
 @pytest.mark.parametrize("target_square", [0, 2])
-@pytest.mark.parametrize("context_fraction", [0, 0.5])
-@pytest.mark.parametrize("context_alternate", [False, True])
-def test_temperature(nps, subset, target_square, context_fraction, context_alternate):
+@pytest.mark.parametrize("target_elev", [False, True])
+def test_temperature(
+    nps,
+    subset,
+    context_sample,
+    target_square,
+    target_elev,
+):
     gen = nps.TemperatureGenerator(
         nps.dtype,
         batch_size=16,
-        context_fraction=context_fraction,
-        context_alternate=context_alternate,
+        context_sample=context_sample,
         target_min=15,
         target_square=target_square,
+        target_elev=target_elev,
         subset=subset,
     )
     batch = gen.generate_batch()
 
     # Check the contexts.
     xc, yc = batch["contexts"][0]  # Stations
-    yc = yc.y  # Context stations are masked to deal with NaNs.
+    assert isinstance(yc, Masked)  # Context stations are masked to deal with NaNs.
+    yc = yc.y
     assert _bcn_form(xc)
     assert _bcn_form(yc)
-    if context_fraction == 0:
-        assert B.shape(xc, -1) == 0
-        assert B.shape(yc, -1) == 0
-    else:
+    if context_sample:
         assert B.shape(xc, -1) > 0
         assert B.shape(yc, -1) > 0
         assert _within_germany(xc)
+    else:
+        assert B.shape(xc, -1) == 0
+        assert B.shape(yc, -1) == 0
 
     xc, yc = batch["contexts"][1]  # Gridded data
     assert _bcn_form(xc)
     assert _bcn_form(yc)
     assert _within_germany(xc)
 
-    xc, yc = batch["contexts"][2]  # Elevation at targets
-    assert _bcn_form(xc)
-    assert _bcn_form(yc)
-    assert _within_germany(xc)
-    if context_fraction == 0 and target_square == 0:
-        assert B.shape(xc, -1) == B.shape(batch["xt"], -1)
-        assert B.shape(yc, -1) == B.shape(batch["yt"], -1)
-
-    xc, yc = batch["contexts"][3]  # Gridded elevation
-    yc = yc.y  # Gridded elevation is masked to deal with NaNs.
+    xc, yc = batch["contexts"][2]  # Gridded elevation
+    assert isinstance(yc, Masked)  # Gridded elevation is masked to deal with NaNs.
+    yc = yc.y
     assert _bcn_form(xc)
     assert _bcn_form(yc)
     assert _within_germany(xc)
 
     # Check the targets.
     xt, yt = batch["xt"], batch["yt"]
-    assert _bcn_form(xc)
-    assert _bcn_form(yc)
-    assert _within_germany(xt)
-    assert B.shape(xt, -1) >= 15
+    # The target inputs might be augmented.
+    if target_elev:
+        assert isinstance(xt, AugmentedInput)
+        assert _bcn_form(xt.x)
+        assert _bcn_form(xt.augmentation)
+        assert B.shape(xt.x, -1) >= 15
+        assert B.shape(xt.x, -1) == B.shape(xt.augmentation, -1)
+        assert _within_germany(xt.x)
+    else:
+        assert not isinstance(xt, AugmentedInput)
+        assert _bcn_form(xt)
+        assert B.shape(xt, -1) >= 15
+        assert _within_germany(xt)
+    assert _bcn_form(yt)
     assert B.shape(yt, -1) >= 15
-    if target_square > 0:
-        # Check that all targets lie in the same square.
-        assert B.max(B.pw_dists(B.transpose(xt))) <= B.sqrt(2) * target_square
 
-    # Check alternation.
-    if context_alternate and context_fraction > 0:
-        batch = gen.generate_batch()
-        xc, yc = batch["contexts"][0]  # Stations
-        yc = yc.y  # Context stations are masked to deal with NaNs.
-        assert B.shape(xc, -1) == 0
-        assert B.shape(yc, -1) == 0
+    # Check that all targets lie in the same square.
+    if target_square > 0:
+        if target_elev:
+            assert isinstance(xt, AugmentedInput)
+            xt = xt.x
+        assert B.max(B.pw_dists(B.transpose(xt))) <= B.sqrt(2) * target_square
