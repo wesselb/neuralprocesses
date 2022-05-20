@@ -99,7 +99,7 @@ def construct_climate_convgnp_multires(
     Args:
         width_lr (int, optional): Width of the low-resolution residual network. Defaults
             to 128.
-        width_lr (int, optional): Width of the medium-resolution UNet. Defaults to 128.
+        width_mr (int, optional): Width of the medium-resolution UNet. Defaults to 128.
         width_hr (int, optional): Width of the high-resolution UNet. Defaults to 128.
         width_bridge (int, optional): Number of channels to pass between the
             resolutions. Defaults to 32.
