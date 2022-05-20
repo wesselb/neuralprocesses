@@ -1,3 +1,6 @@
+from functools import reduce
+from operator import mul
+
 import lab as B
 from lab.util import resolve_axis
 
@@ -36,7 +39,7 @@ def _vectorise(z, num, offset=0):
     shape_before = shape[:i1]
     shape_compressed = shape[i1:i2]
     shape_after = shape[i2:]
-    z = B.reshape(z, *shape_before, -1, *shape_after)
+    z = B.reshape(z, *shape_before, reduce(mul, shape_compressed, 1), *shape_after)
     return z, shape_compressed
 
 
