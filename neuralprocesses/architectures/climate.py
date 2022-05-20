@@ -84,8 +84,8 @@ def construct_climate_convgnp_mlp(
 @register_model
 def construct_climate_convgnp_multires(
     width_lr=128,
-    width_mr=128,
-    width_hr=128,
+    width_mr=64,
+    width_hr=64,
     width_bridge=32,
     lr_deg=0.75,
     mr_deg=0.75 / 7.5,
