@@ -252,14 +252,12 @@ def construct_climate_convgnp_multires(
             lambda x: x,
             lambda x: x,
         ),
-        nps.RestructureParallel(("lr", "mr", "hr"), (("lr", "mr"), ("hr",))),
+        nps.RestructureParallel(("lr", "mr", "hr"), (("lr", "mr"), "hr")),
         nps.Parallel(
-            nps.Fuse(nps.SetConv(scale=lr_deg, dtype=dtype)),
-            lambda x: x,
-        ),
-        nps.RestructureParallel((("mr",), "hr"), ("mr", "hr")),
-        nps.Parallel(
-            conv_mr,
+            nps.Chain(
+                nps.Fuse(nps.SetConv(scale=lr_deg, dtype=dtype)),
+                conv_mr,
+            ),
             lambda x: x,
         ),
         nps.Fuse(nps.SetConv(scale=mr_deg, dtype=dtype)),
