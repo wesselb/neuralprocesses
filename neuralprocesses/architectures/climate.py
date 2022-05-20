@@ -172,8 +172,7 @@ def construct_climate_convgnp_multires(
         in_channels=(1 + 1) + (1 + 1) + width_bridge,
         # Four channels should give a TF of at least one.
         channels=(width_hr,) * 4,
-        # Number of channels to go into the MLP at the end:
-        out_channels=128,
+        out_channels=width_hr,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
         dtype=dtype,
@@ -267,7 +266,7 @@ def construct_climate_convgnp_multires(
             nps.Chain(
                 nps.SetConv(scale=hr_deg, dtype=dtype),
                 nps.MLP(
-                    in_dim=128,
+                    in_dim=width_hr,
                     layers=(128, 128, 128),
                     out_dim=likelihood_in_channels,
                 ),
