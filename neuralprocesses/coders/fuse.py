@@ -1,3 +1,7 @@
+import lab as B
+
+from .. import _dispatch
+from ..datadims import data_dims
 from ..parallel import Parallel
 from ..util import register_module
 
@@ -20,9 +24,9 @@ class Fuse:
         self.set_conv = set_conv
 
 
-@nps.code
+@_dispatch
 def code(coder: Fuse, xz: Parallel, z: Parallel, x, **kw_args):
     xz1, xz2 = xz
     z1, z2 = z
-    _, z1 = nps.code(coder.set_conv, xz1, z1, xz2, **kw_args)
-    return xz2, B.concat(z1, z2, axis=-1 - nps.data_dims(xz2))
+    _, z1 = code(coder.set_conv, xz1, z1, xz2, **kw_args)
+    return xz2, B.concat(z1, z2, axis=-1 - data_dims(xz2))
