@@ -208,13 +208,11 @@ def main(**kw_args):
         out.out("Not completed.")
         sys.exit(1)
 
-    # Use a GPU if one is available.
+    # Determine which device to use. Try to use a GPU if one is available.
     if args.device is not None:
         device = args.device
-	
     elif torch.cuda.is_available():
         device = "cuda"
-
     else:
         device = "cpu"
 
