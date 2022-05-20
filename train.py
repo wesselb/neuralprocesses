@@ -144,7 +144,7 @@ def main(**kw_args):
         args = parser.parse_args(
             sum(
                 [
-                    [f"--{k}"] + ([str(v)] if v is not True else [])
+                    ["--" + k.replace("_", "-")] + ([str(v)] if v is not True else [])
                     for k, v in kw_args.items()
                 ],
                 [],
@@ -552,9 +552,10 @@ def main(**kw_args):
         start = 0
         if args.resume_at_epoch:
             start = args.resume_at_epoch - 1
-            d = torch.load(wd.file("model-last.torch"), map_location=device)
-            model.load_state_dict(d["weights"])
-            best_eval_lik = d["objective"]
+            d_last = torch.load(wd.file("model-last.torch"), map_location=device)
+            d_best = torch.load(wd.file("model-best.torch"), map_location=device)
+            model.load_state_dict(d_last["weights"])
+            best_eval_lik = d_best["objective"]
         else:
             best_eval_lik = -np.inf
 
