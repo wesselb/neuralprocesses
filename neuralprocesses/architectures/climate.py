@@ -84,8 +84,8 @@ def construct_climate_convgnp_mlp(
 @register_model
 def construct_climate_convgnp_multires(
     width_lr=128,
-    width_mr=32,
-    width_hr=32,
+    width_mr=128,
+    width_hr=128,
     width_bridge=32,
     lr_deg=0.75,
     mr_deg=0.75 / 7.5,
@@ -152,6 +152,8 @@ def construct_climate_convgnp_multires(
         # Four channels should give a TF of at least ten.
         channels=(width_mr,) * 4,
         out_channels=width_bridge,
+        residual=True,
+        separable=True,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
         dtype=dtype,
@@ -173,6 +175,8 @@ def construct_climate_convgnp_multires(
         # Four channels should give a TF of at least one.
         channels=(width_hr,) * 4,
         out_channels=width_hr,
+        residual=True,
+        separable=True,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
         dtype=dtype,
