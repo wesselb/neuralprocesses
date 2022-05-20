@@ -117,7 +117,7 @@ def _bcn_form(x: tuple):
     return all(_bcn_form(xi) for xi in x)
 
 
-# @pytest.mark.xfail()
+@pytest.mark.xfail()
 @pytest.mark.parametrize("subset", ["train", "cv", "eval"])
 @pytest.mark.parametrize("context_sample", [False, True])
 @pytest.mark.parametrize("target_square", [0, 2])
@@ -131,6 +131,7 @@ def test_temperature(
 ):
     gen = nps.TemperatureGenerator(
         nps.dtype,
+        seed=1,
         batch_size=16,
         context_sample=context_sample,
         target_min=15,
@@ -142,17 +143,17 @@ def test_temperature(
 
     # Check the contexts.
     xc, yc = batch["contexts"][0]  # Stations
-    assert isinstance(yc, Masked)  # Context stations are masked to deal with NaNs.
-    yc = yc.y
     assert _bcn_form(xc)
-    assert _bcn_form(yc)
     if context_sample:
+        assert isinstance(yc, Masked)  # Context stations are masked to deal with NaNs.
+        yc = yc.y
         assert B.shape(xc, -1) > 0
         assert B.shape(yc, -1) > 0
         assert _within_germany(xc)
     else:
         assert B.shape(xc, -1) == 0
         assert B.shape(yc, -1) == 0
+    assert _bcn_form(yc)
 
     xc, yc = batch["contexts"][1]  # Gridded data
     assert _bcn_form(xc)
