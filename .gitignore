@@ -23,3 +23,5 @@ cover
 .DS_Store
 *.swp
 .vscode/*
+venv-np
+_experiments
