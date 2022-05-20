@@ -213,21 +213,37 @@ class UNet:
                     self.nn.Sequential(
                         Conv(
                             in_channels=((in_channels,) + channels)[i],
-                            out_channels=channels[i],
+                            out_channels=((in_channels,) + channels)[i],
+                            groups=((in_channels,) + channels)[i],
                             kernel=self.kernels[i],
                             stride=1,
+                            dtype=dtype,
+                        ),
+                        Conv(
+                            in_channels=((in_channels,) + channels)[i],
+                            out_channels=channels[i],
+                            kernel=1,
                             dtype=dtype,
                         ),
                         AvgPool(kernel=2, stride=2, dtype=dtype),
                     )
                     if self.receptive_fields[i] % 2 == 1
                     # Perform subsampling if the previous receptive field is even.
-                    else Conv(
-                        in_channels=((in_channels,) + channels)[i],
-                        out_channels=channels[i],
-                        kernel=self.kernels[i],
-                        stride=2,
-                        dtype=dtype,
+                    else self.nn.Sequential(
+                        Conv(
+                            in_channels=((in_channels,) + channels)[i],
+                            out_channels=((in_channels,) + channels)[i],
+                            groups=((in_channels,) + channels)[i],
+                            kernel=self.kernels[i],
+                            stride=2,
+                            dtype=dtype,
+                        ),
+                        Conv(
+                            in_channels=((in_channels,) + channels)[i],
+                            out_channels=channels[i],
+                            kernel=1,
+                            dtype=dtype,
+                        ),
                     )
                 )
                 for i in range(len(channels))
@@ -253,20 +269,37 @@ class UNet:
                     ),
                     Conv(
                         in_channels=get_num_in_channels(i),
-                        out_channels=((channels[0],) + channels)[i],
+                        out_channels=get_num_in_channels(i),
+                        groups=get_num_in_channels(i),
                         kernel=self.kernels[i],
+                        stride=1,
+                        dtype=dtype,
+                    ),
+                    Conv(
+                        in_channels=get_num_in_channels(i),
+                        out_channels=((channels[0],) + channels)[i],
+                        kernel=1,
                         stride=1,
                         dtype=dtype,
                     ),
                 )
             else:
-                return ConvTranspose(
-                    in_channels=get_num_in_channels(i),
-                    out_channels=((channels[0],) + channels)[i],
-                    kernel=self.kernels[i],
-                    stride=2,
-                    output_padding=1,
-                    dtype=dtype,
+                return self.nn.Sequential(
+                    ConvTranspose(
+                        in_channels=get_num_in_channels(i),
+                        out_channels=get_num_in_channels(i),
+                        groups=get_num_in_channels(i),
+                        kernel=self.kernels[i],
+                        stride=2,
+                        output_padding=1,
+                        dtype=dtype,
+                    ),
+                    Conv(
+                        in_channels=get_num_in_channels(i),
+                        out_channels=((channels[0],) + channels)[i],
+                        kernel=1,
+                        dtype=dtype,
+                    ),
                 )
 
         self.after_turn_layers = self.nn.ModuleList(
