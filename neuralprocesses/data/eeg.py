@@ -161,7 +161,9 @@ class EEGGenerator(DataGenerator):
         self.shuffle_state = B.create_random_state(np.float32, shuffle_seed)
 
         # Shuffle subjects
-        self.split_state, idx = B.randperm(self.split_state, np.int64, len(all_subjects))
+        self.split_state, idx = B.randperm(
+            self.split_state, np.int64, len(all_subjects)
+        )
         all_subjects = np.array(all_subjects)[idx]
         all_subjects = list(all_subjects)
 
@@ -241,7 +243,9 @@ class EEGGenerator(DataGenerator):
 
             for i in range(7):
 
-                self.shuffle_state, k = self.num_targets.sample(self.shuffle_state, np.int64)
+                self.shuffle_state, k = self.num_targets.sample(
+                    self.shuffle_state, np.int64
+                )
                 idx = self.shuffle_state.permutation(256)
 
                 c_idx = idx[k:]
@@ -259,7 +263,7 @@ class EEGGenerator(DataGenerator):
             for i in range(7):
 
                 if i == n:
-                    
+
                     contexts.append((x[:, :, :0], y[:, i : i + 1, :0]))
 
                     xt.append((x[:, :, :], i))
@@ -284,8 +288,6 @@ class EEGGenerator(DataGenerator):
         else:
             raise Exception(f"Invalid mode {self.mode}")
 
-
-
         with B.on_device(self.device):
             contexts = [
                 (
@@ -296,10 +298,7 @@ class EEGGenerator(DataGenerator):
             ]
 
             xt = AggregateInput(
-                *[
-                    (B.to_active_device(B.cast(self.dtype, _xt)), i)
-                    for _xt, i in xt
-                ]
+                *[(B.to_active_device(B.cast(self.dtype, _xt)), i) for _xt, i in xt]
             )
 
             yt = Aggregate(*[B.to_active_device(B.cast(self.dtype, _yt)) for _yt in yt])
