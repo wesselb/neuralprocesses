@@ -118,7 +118,10 @@ class UNet:
             Defaults to six layers each with 64 channels.
         unet_kernels (int or tuple[int], optional): Sizes of the kernels. Defaults to
             `5`.
-        activations (object or tuple[object], optional): Activation functions.
+        activation (object, optional): Activation functions.
+        residual (bool, optional): Use residual blocks. Defaults to `False`.
+        separable (bool, optional): Use depthwise separable convolutions. Defaults to
+            `False`.
         resize_convs (bool, optional): Use resize convolutions rather than
             transposed convolutions. Defaults to `False`.
         resize_conv_interp_method (str, optional): Interpolation method for the
@@ -128,7 +131,6 @@ class UNet:
     Attributes:
         dim (int): Dimensionality.
         kernels (tuple[int]): Sizes of the kernels.
-        activations (tuple[function]): Activation functions.
         num_halving_layers (int): Number of layers with striding equal to two.
         receptive_fields (list[float]): Receptive field for every intermediate value.
         receptive_field (float): Receptive field of the model.
@@ -143,7 +145,9 @@ class UNet:
         out_channels: int,
         channels: Tuple[int, ...] = (8, 16, 16, 32, 32, 64),
         kernels: Union[int, Tuple[int, ...]] = 5,
-        activations: Union[None, object, Tuple[object, ...]] = None,
+        activation: Union[object, None] = None,
+        residual: bool = False,
+        separable: bool = False,
         resize_convs: bool = False,
         resize_conv_interp_method: str = "nearest",
         dtype=None,
@@ -160,17 +164,8 @@ class UNet:
             )
         self.kernels = kernels
 
-        # Default to ReLUs. Moreover, if `activations` is an activation function, repeat
-        # it for every layer.
-        activations = activations or self.nn.ReLU()
-        if not isinstance(activations, (tuple, list)):
-            activations = (activations,) * len(channels)
-        elif len(activations) != len(channels):
-            raise ValueError(
-                f"Length of `activations` ({len(activations)}) must equal "
-                f"the length of `channels` ({len(channels)})."
-            )
-        self.activations = activations
+        # Default to ReLUs.
+        activation = activation or self.nn.ReLU()
 
         # Compute number of halving layers.
         self.num_halving_layers = len(channels)
@@ -179,6 +174,9 @@ class UNet:
         self.receptive_fields = [1]
         # Forward pass:
         for kernel in self.kernels:
+            # Deal with repeated convs:
+            if isinstance(kernel, tuple):
+                kernel = kernel[0] + sum([k - 1 for k in kernel[1:]])
             after_conv = self.receptive_fields[-1] + (kernel - 1)
             if after_conv % 2 == 0:
                 # If even, then subsample.
@@ -188,20 +186,25 @@ class UNet:
                 self.receptive_fields.append((after_conv + 1) // 2)
         # Backward pass:
         for kernel in reversed(self.kernels):
+            # Deal with repeated convs:
+            if isinstance(kernel, tuple):
+                kernel = kernel[0] + sum([k - 1 for k in kernel[1:]])
             after_interp = self.receptive_fields[-1] * 2 - 1
             self.receptive_fields.append(after_interp + (kernel - 1))
         self.receptive_field = self.receptive_fields[-1]
 
-        Conv = getattr(self.nn, f"Conv{dim}d")
-        ConvTranspose = getattr(self.nn, f"ConvTransposed{dim}d")
         UpSampling = getattr(self.nn, f"UpSampling{dim}d")
         AvgPool = getattr(self.nn, f"AvgPool{dim}d")
 
         # Final linear layer:
-        self.final_linear = Conv(
+        self.final_linear = _conv_block(
+            self,
+            dim=dim,
             in_channels=channels[0],
             out_channels=out_channels,
             kernel=1,
+            activation=activation,
+            preactivation=True,
             dtype=dtype,
         )
 
@@ -211,22 +214,34 @@ class UNet:
                 (
                     # Perform average pooling if the previous receptive field is odd.
                     self.nn.Sequential(
-                        Conv(
+                        _conv_block(
+                            self,
+                            dim=dim,
                             in_channels=((in_channels,) + channels)[i],
                             out_channels=channels[i],
                             kernel=self.kernels[i],
                             stride=1,
+                            activation=activation,
+                            preactivation=i > 0,
+                            separable=separable,
+                            residual=residual,
                             dtype=dtype,
                         ),
                         AvgPool(kernel=2, stride=2, dtype=dtype),
                     )
                     if self.receptive_fields[i] % 2 == 1
                     # Perform subsampling if the previous receptive field is even.
-                    else Conv(
+                    else _conv_block(
+                        self,
+                        dim=dim,
                         in_channels=((in_channels,) + channels)[i],
                         out_channels=channels[i],
                         kernel=self.kernels[i],
                         stride=2,
+                        activation=activation,
+                        preactivation=i > 0,
+                        separable=separable,
+                        residual=residual,
                         dtype=dtype,
                     )
                 )
@@ -251,21 +266,33 @@ class UNet:
                         interp_method=resize_conv_interp_method,
                         dtype=dtype,
                     ),
-                    Conv(
+                    _conv_block(
+                        self,
+                        dim=dim,
                         in_channels=get_num_in_channels(i),
                         out_channels=((channels[0],) + channels)[i],
                         kernel=self.kernels[i],
                         stride=1,
+                        activation=activation,
+                        preactivation=True,
+                        residual=residual,
+                        separable=separable,
                         dtype=dtype,
                     ),
                 )
             else:
-                return ConvTranspose(
+                return _conv_block(
+                    self,
+                    dim=dim,
                     in_channels=get_num_in_channels(i),
                     out_channels=((channels[0],) + channels)[i],
                     kernel=self.kernels[i],
                     stride=2,
-                    output_padding=1,
+                    activation=activation,
+                    preactivation=True,
+                    residual=residual,
+                    separable=separable,
+                    transposed=True,
                     dtype=dtype,
                 )
 
@@ -276,22 +303,18 @@ class UNet:
     def __call__(self, x):
         x, uncompress = compress_batch_dimensions(x, self.dim + 1)
 
-        hs = [self.activations[0](self.before_turn_layers[0](x))]
-        for layer, activation in zip(
-            self.before_turn_layers[1:],
-            self.activations[1:],
-        ):
-            hs.append(activation(layer(hs[-1])))
+        hs = [self.before_turn_layers[0](x)]
+        for layer in self.before_turn_layers[1:]:
+            hs.append(layer(hs[-1]))
 
         # Now make the turn!
 
-        h = self.activations[-1](self.after_turn_layers[-1](hs[-1]))
-        for h_prev, layer, activation in zip(
+        h = self.after_turn_layers[-1](hs[-1])
+        for h_prev, layer in zip(
             reversed(hs[:-1]),
             reversed(self.after_turn_layers[:-1]),
-            reversed(self.activations[:-1]),
         ):
-            h = activation(layer(B.concat(h_prev, h, axis=1)))
+            h = layer(B.concat(h_prev, h, axis=1))
 
         return uncompress(self.final_linear(h))
 
@@ -346,93 +369,28 @@ class ConvNet:
         kernel = kernel + 1 if kernel % 2 == 0 else kernel  # Make kernel size odd.
         self.kernel = kernel  # Store it for reference.
 
-        # Construct basic building blocks.
+        # Construct the network.
         activation = self.nn.ReLU()
-        self._base_conv = getattr(self.nn, f"Conv{dim}d")
-
-        layers = [
-            self._pointwise(
-                in_channels=in_channels,
-                out_channels=channels,
-                dtype=dtype,
-            )
-        ]
-        for i in range(num_layers):
-            last = i + 1 == num_layers
-            if residual:
-                layers.append(
-                    self.nps.ResidualBlock(
-                        self._conv(
-                            in_channels=channels,
-                            out_channels=channels,
-                            kernel=kernel,
-                            separable=separable,
-                            activation=activation,
-                            dtype=dtype,
-                        ),
-                        self._pointwise(
-                            in_channels=channels,
-                            out_channels=channels,
-                            dtype=dtype,
-                        ),
-                        self._pointwise(
-                            in_channels=channels,
-                            out_channels=out_channels if last else channels,
-                            dtype=dtype,
-                        ),
-                        activation,
-                    )
-                )
-            else:
-                layers.append(
-                    self._conv(
-                        in_channels=channels,
-                        out_channels=out_channels if last else channels,
-                        kernel=kernel,
-                        separable=separable,
-                        activation=activation,
-                        dtype=dtype,
-                    )
-                )
-        self.conv_net = self.nn.Sequential(*layers)
-
-    def _conv(self, *, in_channels, out_channels, kernel, separable, activation, dtype):
-        if separable:
-            return self.nn.Sequential(
-                activation,
-                # Construct depthwise separable convolution by setting
-                # `groups=channels`.
-                self._base_conv(
-                    in_channels=in_channels,
-                    out_channels=in_channels,
+        self.conv_net = self.nn.Sequential(
+            *(
+                _conv_block(
+                    self,
+                    dim=dim,
+                    in_channels=i,
+                    out_channels=o,
                     kernel=kernel,
-                    groups=in_channels,
+                    activation=activation,
+                    preactivation=p,
+                    separable=separable,
+                    residual=residual,
                     dtype=dtype,
-                ),
-                self._pointwise(
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    dtype=dtype,
-                ),
+                )
+                for i, o, p in zip(
+                    (in_channels,) + (channels,) * (num_layers - 1),
+                    (channels,) * (num_layers - 1) + (out_channels,),
+                    (False,) + (True,) * (num_layers - 1),
+                )
             )
-        else:
-            return self.nn.Sequential(
-                activation,
-                self._base_conv(
-                    in_channels=channels,
-                    out_channels=channels,
-                    kernel=kernel,
-                    dtype=dtype,
-                ),
-            )
-
-    def _pointwise(self, *, in_channels, out_channels, dtype):
-        # Construct a pointwise linear layer by setting `kernel=1`.
-        return self._base_conv(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel=1,
-            dtype=dtype,
         )
 
     def __call__(self, x):
@@ -445,22 +403,200 @@ class ResidualBlock:
     """Block of a residual network.
 
     Args:
-        layer1 (object): First linear layer.
-        layer2 (object): Second linear layer.
+        layer1 (object): First branch.
+        layer2 (object): Second branch.
+        layer_post (object): Layer after after the addition.
+
+    Attributes:
+        layer1 (object): First branch.
+        layer2 (object): Second branch.
         layer_post (object): Linear layer after the addition.
-        activation (object): Activation function.
     """
 
-    def __init__(self, layer1, layer2, layer_post, activation):
+    def __init__(self, layer1, layer2, layer_post):
         self.layer1 = layer1
         self.layer2 = layer2
         self.layer_post = layer_post
-        self.activation = activation
 
     def __call__(self, x):
-        y = self.activation(x)
-        y = self.layer1(y)
-        y = self.activation(y)
-        y = self.layer2(y)
-        x = x + y
-        return self.layer_post(x)
+        return self.layer_post(self.layer1(x) + self.layer2(x))
+
+
+def _conv_block(
+    coder,
+    *,
+    dim,
+    in_channels,
+    out_channels,
+    kernel,
+    stride: int = 1,
+    activation,
+    preactivation: bool,
+    separable=False,
+    residual=False,
+    transposed=False,
+    dtype,
+):
+    channels = min(in_channels, out_channels)
+
+    if residual:
+        if in_channels == channels and stride == 1:
+            # The input can be directly added to the output.
+            input_transform = lambda x: x
+        else:
+            # The input cannot be directly added to the output, so use an additional
+            # pointwise transform.
+            input_transform = _conv(
+                coder,
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=channels,
+                kernel=1,
+                stride=stride,
+                transposed=transposed,
+                separable=False,
+                dtype=dtype,
+            )
+        return coder.nps.ResidualBlock(
+            input_transform,
+            coder.nn.Sequential(
+                _conv_block(
+                    coder,
+                    dim=dim,
+                    in_channels=in_channels,
+                    out_channels=channels,
+                    kernel=kernel,
+                    stride=stride,
+                    activation=activation,
+                    preactivation=preactivation,
+                    separable=separable,
+                    residual=False,
+                    transposed=transposed,
+                    dtype=dtype,
+                ),
+                activation,
+                _conv(
+                    coder,
+                    dim=dim,
+                    in_channels=channels,
+                    out_channels=channels,
+                    kernel=1,
+                    stride=1,
+                    separable=False,
+                    transposed=False,
+                    dtype=dtype,
+                ),
+            ),
+            _conv(
+                coder,
+                dim=dim,
+                in_channels=channels,
+                out_channels=out_channels,
+                kernel=1,
+                stride=1,
+                separable=False,
+                transposed=False,
+                dtype=dtype,
+            ),
+        )
+
+    if isinstance(kernel, tuple):
+        nk = len(kernel)
+        return coder.nn.Sequential(
+            *(
+                _conv_block(
+                    coder,
+                    dim=dim,
+                    in_channels=i,
+                    out_channels=o,
+                    kernel=k,
+                    stride=s,
+                    activation=activation,
+                    preactivation=p,
+                    separable=separable,
+                    residual=False,
+                    transposed=t,
+                    dtype=dtype,
+                )
+                for i, o, k, s, p, t in zip(
+                    (in_channels,) + (channels,) * (nk - 1),
+                    (channels,) * (nk - 1) + (out_channels,),
+                    kernel,
+                    (1,) * (nk - 1) + (stride,),
+                    (preactivation,) + (True,) * (nk - 1),
+                    (False,) * (nk - 1) + (transposed,),
+                )
+            )
+        )
+
+    if separable:
+        return coder.nn.Sequential(
+            *((activation,) if preactivation else ()),
+            _conv(
+                coder,
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=in_channels,
+                kernel=kernel,
+                stride=stride,
+                separable=True,
+                transposed=transposed,
+                dtype=dtype,
+            ),
+            _conv(
+                coder,
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel=1,
+                stride=1,
+                separable=False,
+                transposed=False,
+                dtype=dtype,
+            ),
+        )
+    else:
+        return coder.nn.Sequential(
+            *((activation,) if preactivation else ()),
+            _conv(
+                coder,
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel=kernel,
+                stride=stride,
+                separable=False,
+                transposed=transposed,
+                dtype=dtype,
+            ),
+        )
+
+
+def _conv(
+    coder,
+    *,
+    dim,
+    kernel,
+    stride,
+    in_channels,
+    out_channels,
+    separable,
+    transposed,
+    dtype,
+):
+    output_padding = {}
+    if transposed:
+        Conv = getattr(coder.nn, f"ConvTransposed{dim}d")
+        if stride > 1:
+            output_padding = {"output_padding": stride // 2}
+    else:
+        Conv = getattr(coder.nn, f"Conv{dim}d")
+    return Conv(
+        in_channels=in_channels,
+        out_channels=out_channels,
+        kernel=kernel,
+        stride=stride,
+        **output_padding,
+        groups=in_channels if separable else 1,
+        dtype=dtype,
+    )
