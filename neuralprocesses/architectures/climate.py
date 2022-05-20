@@ -84,8 +84,8 @@ def construct_climate_convgnp_mlp(
 @register_model
 def construct_climate_convgnp_multires(
     width_lr=128,
-    width_mr=128,
-    width_hr=128,
+    width_mr=32,
+    width_hr=32,
     width_bridge=32,
     lr_deg=0.75,
     mr_deg=0.75 / 7.5,
@@ -99,8 +99,8 @@ def construct_climate_convgnp_multires(
     Args:
         width_lr (int, optional): Width of the low-resolution residual network. Defaults
             to 128.
-        width_mr (int, optional): Width of the medium-resolution UNet. Defaults to 128.
-        width_hr (int, optional): Width of the high-resolution UNet. Defaults to 128.
+        width_mr (int, optional): Width of the medium-resolution UNet. Defaults to 32.
+        width_hr (int, optional): Width of the high-resolution UNet. Defaults to 32.
         width_bridge (int, optional): Number of channels to pass between the
             resolutions. Defaults to 32.
         lr_deg (float, optional): Resolution of the low-resolution grid. Defaults to
@@ -172,7 +172,8 @@ def construct_climate_convgnp_multires(
         in_channels=(1 + 1) + (1 + 1) + width_bridge,
         # Four channels should give a TF of at least one.
         channels=(width_hr,) * 4,
-        out_channels=likelihood_in_channels,
+        # Number of channels to go into the MLP at the end:
+        out_channels=128,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
         dtype=dtype,
@@ -265,6 +266,11 @@ def construct_climate_convgnp_multires(
         nps.RepeatForAggregateInputs(
             nps.Chain(
                 nps.SetConv(scale=hr_deg, dtype=dtype),
+                nps.MLP(
+                    in_dim=128,
+                    layers=(128, 128, 128),
+                    out_dim=likelihood_in_channels,
+                ),
                 selector,
             )
         ),

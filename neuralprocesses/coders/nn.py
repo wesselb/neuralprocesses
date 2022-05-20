@@ -20,29 +20,11 @@ class Linear:
         dtype (dtype, optional): Data type.
 
     Attributes:
-        linear (object): Linear layer.
+        net (object): Linear layer.
     """
 
     def __init__(self, in_channels, out_channels, dtype):
-        self.linear = self.nn.Linear(in_channels, out_channels, dtype=dtype)
-
-
-@_dispatch
-def code(coder: Linear, xz, z: B.Numeric, x, **kw_args):
-    d = data_dims(xz)
-
-    # Construct permutation to switch the channel dimension and the last dimension.
-    switch = list(range(B.rank(z)))
-    switch[-d - 1], switch[-1] = switch[-1], switch[-d - 1]
-
-    # Switch, apply linear layer after compressing the batch dimensions, and switch
-    # again.
-    z = B.transpose(z, perm=switch)
-    z, uncompress = compress_batch_dimensions(z, 2)
-    z = uncompress(coder.linear(z))
-    z = B.transpose(z, perm=switch)
-
-    return xz, z
+        self.net = self.nn.Linear(in_channels, out_channels, dtype=dtype)
 
 
 @register_module
@@ -75,15 +57,11 @@ class MLP:
         # Check that one of the two specifications is given.
         layers_given = layers is not None
         num_layers_given = num_layers is not None and width is not None
-        if (
-            layers_given
-            and num_layers_given
-            or (not layers_given and not num_layers_given)
-        ):
+        if not (layers_given or num_layers_given):
             raise ValueError(
                 f"Must specify either `layers` or `num_layers` and `width`."
             )
-        # Make sure that `layers` is specified.
+        # Make sure that `layers` is a tuple of various widths.
         if not layers_given and num_layers_given:
             layers = (width,) * num_layers
 
@@ -104,11 +82,28 @@ class MLP:
             self.net = self.nn.Sequential(*net)
 
     def __call__(self, x):
-        x, uncompress = compress_batch_dimensions(x, 2)
         x = B.transpose(x)
-        x = self.net(x)
+        x, uncompress = compress_batch_dimensions(x, 1)
+        x = uncompress(self.net(x))
         x = B.transpose(x)
-        return uncompress(x)
+        return x
+
+
+@_dispatch
+def code(coder: Union[Linear, MLP], xz, z: B.Numeric, x, **kw_args):
+    d = data_dims(xz)
+
+    # Construct permutation to switch the channel dimension and the last dimension.
+    switch = list(range(B.rank(z)))
+    switch[-d - 1], switch[-1] = switch[-1], switch[-d - 1]
+
+    # Switch, apply network after compressing the batch dimensions, and switch back.
+    z = B.transpose(z, perm=switch)
+    z, uncompress = compress_batch_dimensions(z, 1)
+    z = uncompress(coder.net(z))
+    z = B.transpose(z, perm=switch)
+
+    return xz, z
 
 
 @register_module
