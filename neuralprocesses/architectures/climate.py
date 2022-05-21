@@ -49,7 +49,6 @@ def construct_climate_convgnp_mlp(
         residual=True,
         dtype=dtype,
     )
-    assert conv_lr.kernel == 3
 
     encoder = nps.Chain(
         nps.RestructureParallel(("station", "grid", "elev_grid"), ("grid",)),
