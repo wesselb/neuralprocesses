@@ -1,13 +1,15 @@
 import math
+from functools import partial
 from typing import Tuple, Union, Optional
 
 import lab as B
+from plum import convert
 
 from .. import _dispatch
 from ..datadims import data_dims
-from ..util import register_module, compress_batch_dimensions
+from ..util import register_module, compress_batch_dimensions, with_first_last
 
-__all__ = ["Linear", "MLP", "UNet", "ConvNet", "ResidualBlock"]
+__all__ = ["Linear", "MLP", "UNet", "ConvNet", "Conv", "ResidualBlock"]
 
 
 @register_module
@@ -83,8 +85,9 @@ class MLP:
 
     def __call__(self, x):
         x = B.transpose(x)
-        x, uncompress = compress_batch_dimensions(x, 1)
-        x = uncompress(self.net(x))
+        x, uncompress = compress_batch_dimensions(x, 2)
+        x = self.net(x)
+        x = uncompress(x)
         x = B.transpose(x)
         return x
 
@@ -97,10 +100,11 @@ def code(coder: Union[Linear, MLP], xz, z: B.Numeric, x, **kw_args):
     switch = list(range(B.rank(z)))
     switch[-d - 1], switch[-1] = switch[-1], switch[-d - 1]
 
-    # Switch, apply network after compressing the batch dimensions, and switch back.
+    # Switch, compress, apply network, uncompress, and undo switch.
     z = B.transpose(z, perm=switch)
-    z, uncompress = compress_batch_dimensions(z, 1)
-    z = uncompress(coder.net(z))
+    z, uncompress = compress_batch_dimensions(z, 2)
+    z = coder.net(z)
+    z = uncompress(z)
     z = B.transpose(z, perm=switch)
 
     return xz, z
@@ -116,9 +120,13 @@ class UNet:
         out_channels (int): Number of output channels.
         channels (tuple[int], optional): Channels of every layer of the UNet.
             Defaults to six layers each with 64 channels.
-        unet_kernels (int or tuple[int], optional): Sizes of the kernels. Defaults to
-            `5`.
+        kernels (int or tuple[int], optional): Sizes of the kernels. Defaults to `5`.
+        strides (int or tuple[int], optional): Strides. Defaults to `2`.
         activations (object or tuple[object], optional): Activation functions.
+        separable (bool, optional): Use depthwise separable convolutions. Defaults to
+            `False`.
+        residual (bool, optional): Make residual convolutional blocks. Defaults to
+            `False`.
         resize_convs (bool, optional): Use resize convolutions rather than
             transposed convolutions. Defaults to `False`.
         resize_conv_interp_method (str, optional): Interpolation method for the
@@ -128,6 +136,7 @@ class UNet:
     Attributes:
         dim (int): Dimensionality.
         kernels (tuple[int]): Sizes of the kernels.
+        strides (tuple[int]): Strides.
         activations (tuple[function]): Activation functions.
         num_halving_layers (int): Number of layers with striding equal to two.
         receptive_fields (list[float]): Receptive field for every intermediate value.
@@ -142,8 +151,11 @@ class UNet:
         in_channels: int,
         out_channels: int,
         channels: Tuple[int, ...] = (8, 16, 16, 32, 32, 64),
-        kernels: Union[int, Tuple[int, ...]] = 5,
+        kernels: Union[int, Tuple[Union[int, Tuple[int, ...]], ...]] = 5,
+        strides: Union[int, Tuple[int, ...]] = 2,
         activations: Union[None, object, Tuple[object, ...]] = None,
+        separable: bool = False,
+        residual: bool = False,
         resize_convs: bool = False,
         resize_conv_interp_method: str = "nearest",
         dtype=None,
@@ -159,6 +171,17 @@ class UNet:
                 f"the length of `channels` ({len(channels)})."
             )
         self.kernels = kernels
+
+        # If `strides` is an integer, repeat it for every layer.
+        # TODO: Change the default so that the first stride is 1.
+        if not isinstance(strides, (tuple, list)):
+            strides = (strides,) * len(channels)
+        elif len(strides) != len(channels):
+            raise ValueError(
+                f"Length of `strides` ({len(strides)}) must equal "
+                f"the length of `channels` ({len(channels)})."
+            )
+        self.strides = strides
 
         # Default to ReLUs. Moreover, if `activations` is an activation function, repeat
         # it for every layer.
@@ -178,99 +201,160 @@ class UNet:
         # Compute receptive field at all stages of the model.
         self.receptive_fields = [1]
         # Forward pass:
-        for kernel in self.kernels:
+        for stride, kernel in zip(self.strides, self.kernels):
+            # Deal with composite kernels:
+            if isinstance(kernel, tuple):
+                kernel = kernel[0] + sum([k - 1 for k in kernel])
             after_conv = self.receptive_fields[-1] + (kernel - 1)
-            if after_conv % 2 == 0:
-                # If even, then subsample.
-                self.receptive_fields.append(after_conv // 2)
+            if stride > 1:
+                if after_conv % 2 == 0:
+                    # If even, then subsample.
+                    self.receptive_fields.append(after_conv // 2)
+                else:
+                    # If odd, then average pool.
+                    self.receptive_fields.append((after_conv + 1) // 2)
             else:
-                # If odd, then average pool.
-                self.receptive_fields.append((after_conv + 1) // 2)
+                self.receptive_fields.append(after_conv)
         # Backward pass:
-        for kernel in reversed(self.kernels):
-            after_interp = self.receptive_fields[-1] * 2 - 1
-            self.receptive_fields.append(after_interp + (kernel - 1))
+        for stride, kernel in zip(reversed(self.strides), reversed(self.kernels)):
+            # Deal with composite kernels:
+            if isinstance(kernel, tuple):
+                kernel = kernel[0] + sum([k - 1 for k in kernel])
+            if stride > 1:
+                after_interp = self.receptive_fields[-1] * 2 - 1
+                self.receptive_fields.append(after_interp + (kernel - 1))
+            else:
+                self.receptive_fields.append(self.receptive_fields[-1] + (kernel - 1))
         self.receptive_field = self.receptive_fields[-1]
 
-        Conv = getattr(self.nn, f"Conv{dim}d")
-        ConvTranspose = getattr(self.nn, f"ConvTransposed{dim}d")
-        UpSampling = getattr(self.nn, f"UpSampling{dim}d")
-        AvgPool = getattr(self.nn, f"AvgPool{dim}d")
+        # If none of the fancy features are used, use the standard `self.nn.Conv` for
+        # compatibility with trained models. For the same reason we also don't use the
+        #   `activation` keyword.
+        # TODO: In the future, use `self.nps.Conv` everywhere and use the `activation`
+        #   keyword.
+        if residual or separable or any(isinstance(k, tuple) for k in kernels):
+            Conv = partial(
+                self.nps.Conv,
+                dim=dim,
+                residual=residual,
+                separable=separable,
+            )
+        else:
 
-        # Final linear layer:
-        self.final_linear = Conv(
+            def Conv(*, stride=1, transposed=False, **kw_args):
+                if transposed and stride > 1:
+                    kw_args["output_padding"] = stride // 2
+                return self.nn.Conv(
+                    dim=dim,
+                    stride=stride,
+                    transposed=transposed,
+                    **kw_args,
+                )
+
+        def construct_before_turn_layer(i):
+            # Determine the configuration of the layer.
+            ci = ((in_channels,) + tuple(channels))[i]
+            co = channels[i]
+            k = self.kernels[i]
+            s = self.strides[i]
+
+            if s == 1:
+                # Just a regular convolutional layer.
+                return Conv(
+                    in_channels=ci,
+                    out_channels=co,
+                    kernel=k,
+                    dtype=dtype,
+                )
+            else:
+                # This is a downsampling layer.
+                if self.receptive_fields[i] % 2 == 1:
+                    # Perform average pooling if the previous receptive field is odd.
+                    return self.nn.Sequential(
+                        Conv(
+                            in_channels=ci,
+                            out_channels=co,
+                            kernel=k,
+                            stride=1,
+                            dtype=dtype,
+                        ),
+                        self.nn.AvgPool(
+                            dim=dim,
+                            kernel=s,
+                            stride=s,
+                            dtype=dtype,
+                        ),
+                    )
+                else:
+                    # Perform subsampling if the previous receptive field is even.
+                    return Conv(
+                        in_channels=ci,
+                        out_channels=co,
+                        kernel=k,
+                        stride=s,
+                        dtype=dtype,
+                    )
+
+        def construct_after_turn_layer(i):
+            # Determine the configuration of the layer.
+            if i == len(channels) - 1:
+                # No skip connection yet.
+                ci = channels[i]
+            else:
+                # Add the skip connection.
+                ci = 2 * channels[i]
+            co = ((channels[0],) + tuple(channels))[i]
+            k = self.kernels[i]
+            s = self.strides[i]
+
+            if s == 1:
+                # Just a regular convolutional layer.
+                return Conv(
+                    in_channels=ci,
+                    out_channels=co,
+                    kernel=k,
+                    dtype=dtype,
+                )
+            else:
+                # This is an upsampling layer.
+                if resize_convs:
+                    return self.nn.Sequential(
+                        self.nn.UpSampling(
+                            dim=dim,
+                            size=s,
+                            interp_method=resize_conv_interp_method,
+                            dtype=dtype,
+                        ),
+                        Conv(
+                            in_channels=ci,
+                            out_channels=co,
+                            kernel=k,
+                            stride=1,
+                            dtype=dtype,
+                        ),
+                    )
+                else:
+                    return Conv(
+                        in_channels=ci,
+                        out_channels=co,
+                        kernel=k,
+                        stride=s,
+                        transposed=True,
+                        dtype=dtype,
+                    )
+
+        self.before_turn_layers = self.nn.ModuleList(
+            [construct_before_turn_layer(i) for i in range(len(channels))]
+        )
+        self.after_turn_layers = self.nn.ModuleList(
+            [construct_after_turn_layer(i) for i in range(len(channels))]
+        )
+        self.final_linear = self.nn.Conv(
+            dim=dim,
             in_channels=channels[0],
             out_channels=out_channels,
             kernel=1,
             dtype=dtype,
-        )
-
-        # Before turn layers:
-        self.before_turn_layers = self.nn.ModuleList(
-            [
-                (
-                    # Perform average pooling if the previous receptive field is odd.
-                    self.nn.Sequential(
-                        Conv(
-                            in_channels=((in_channels,) + channels)[i],
-                            out_channels=channels[i],
-                            kernel=self.kernels[i],
-                            stride=1,
-                            dtype=dtype,
-                        ),
-                        AvgPool(kernel=2, stride=2, dtype=dtype),
-                    )
-                    if self.receptive_fields[i] % 2 == 1
-                    # Perform subsampling if the previous receptive field is even.
-                    else Conv(
-                        in_channels=((in_channels,) + channels)[i],
-                        out_channels=channels[i],
-                        kernel=self.kernels[i],
-                        stride=2,
-                        dtype=dtype,
-                    )
-                )
-                for i in range(len(channels))
-            ]
-        )
-
-        # After turn layers:
-
-        def get_num_in_channels(i):
-            if i == len(channels) - 1:
-                # No skip connection yet.
-                return channels[i]
-            else:
-                # Add the skip connection.
-                return 2 * channels[i]
-
-        def after_turn_layer(i):
-            if resize_convs:
-                return self.nn.Sequential(
-                    UpSampling(
-                        interp_method=resize_conv_interp_method,
-                        dtype=dtype,
-                    ),
-                    Conv(
-                        in_channels=get_num_in_channels(i),
-                        out_channels=((channels[0],) + channels)[i],
-                        kernel=self.kernels[i],
-                        stride=1,
-                        dtype=dtype,
-                    ),
-                )
-            else:
-                return ConvTranspose(
-                    in_channels=get_num_in_channels(i),
-                    out_channels=((channels[0],) + channels)[i],
-                    kernel=self.kernels[i],
-                    stride=2,
-                    output_padding=1,
-                    dtype=dtype,
-                )
-
-        self.after_turn_layers = self.nn.ModuleList(
-            [after_turn_layer(i) for i in range(len(channels))]
         )
 
     def __call__(self, x):
@@ -306,9 +390,11 @@ class ConvNet:
         out_channels (int): Number of output channels.
         channels (int): Number of channels at every intermediate layer.
         num_layers (int): Number of layers.
-        points_per_unit (float): Density of the discretisation corresponding to the
-            inputs.
-        receptive_field (float): Desired receptive field.
+        points_per_unit (float, optional): Density of the discretisation corresponding
+            to the inputs.
+        receptive_field (float, optional): Desired receptive field.
+        kernel (int, optional): Kernel size. If set, then this overrides the computation
+            done by `points_per_unit` and `receptive_field`.
         separable (bool, optional): Use depthwise separable convolutions. Defaults
             to `True`.
         dtype (dtype, optional): Data type.
@@ -328,111 +414,47 @@ class ConvNet:
         out_channels: int,
         channels: int,
         num_layers: int,
-        points_per_unit: float,
-        receptive_field: float,
+        kernel: Optional[int] = None,
+        points_per_unit: Optional[float] = 1,
+        receptive_field: Optional[float] = None,
         separable: bool = True,
         residual: bool = False,
         dtype=None,
     ):
         self.dim = dim
 
+        if kernel is None:
+            # Compute kernel size.
+            receptive_points = receptive_field * points_per_unit
+            kernel = math.ceil(1 + (receptive_points - 1) / num_layers)
+            kernel = kernel + 1 if kernel % 2 == 0 else kernel  # Make kernel size odd.
+            self.kernel = kernel  # Store it for reference.
+        else:
+            # Compute the receptive field size.
+            receptive_points = kernel + num_layers * (kernel - 1)
+            receptive_field = receptive_points / points_per_unit
+
         # Make it a drop-in substitute for :class:`UNet`.
         self.num_halving_layers = 0
         self.receptive_field = receptive_field
 
-        # Compute kernel size.
-        receptive_points = receptive_field * points_per_unit
-        kernel = math.ceil(1 + (receptive_points - 1) / num_layers)
-        kernel = kernel + 1 if kernel % 2 == 0 else kernel  # Make kernel size odd.
-        self.kernel = kernel  # Store it for reference.
-
         # Construct basic building blocks.
         activation = self.nn.ReLU()
-        self._base_conv = getattr(self.nn, f"Conv{dim}d")
 
-        layers = [
-            self._pointwise(
-                in_channels=in_channels,
-                out_channels=channels,
-                dtype=dtype,
-            )
-        ]
-        for i in range(num_layers):
-            last = i + 1 == num_layers
-            if residual:
-                layers.append(
-                    self.nps.ResidualBlock(
-                        self._conv(
-                            in_channels=channels,
-                            out_channels=channels,
-                            kernel=kernel,
-                            separable=separable,
-                            activation=activation,
-                            dtype=dtype,
-                        ),
-                        self._pointwise(
-                            in_channels=channels,
-                            out_channels=channels,
-                            dtype=dtype,
-                        ),
-                        self._pointwise(
-                            in_channels=channels,
-                            out_channels=out_channels if last else channels,
-                            dtype=dtype,
-                        ),
-                        activation,
-                    )
-                )
-            else:
-                layers.append(
-                    self._conv(
-                        in_channels=channels,
-                        out_channels=out_channels if last else channels,
-                        kernel=kernel,
-                        separable=separable,
-                        activation=activation,
-                        dtype=dtype,
-                    )
-                )
-        self.conv_net = self.nn.Sequential(*layers)
-
-    def _conv(self, *, in_channels, out_channels, kernel, separable, activation, dtype):
-        if separable:
-            return self.nn.Sequential(
-                activation,
-                # Construct depthwise separable convolution by setting
-                # `groups=channels`.
-                self._base_conv(
-                    in_channels=in_channels,
-                    out_channels=in_channels,
+        self.conv_net = self.nn.Sequential(
+            *(
+                self.nps.Conv(
+                    dim=dim,
+                    in_channels=in_channels if first else channels,
+                    out_channels=out_channels if last else channels,
                     kernel=kernel,
-                    groups=in_channels,
+                    activation=None if first else activation,
+                    separable=separable,
+                    residual=residual,
                     dtype=dtype,
-                ),
-                self._pointwise(
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    dtype=dtype,
-                ),
+                )
+                for first, last, _ in with_first_last(range(num_layers))
             )
-        else:
-            return self.nn.Sequential(
-                activation,
-                self._base_conv(
-                    in_channels=channels,
-                    out_channels=channels,
-                    kernel=kernel,
-                    dtype=dtype,
-                ),
-            )
-
-    def _pointwise(self, *, in_channels, out_channels, dtype):
-        # Construct a pointwise linear layer by setting `kernel=1`.
-        return self._base_conv(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel=1,
-            dtype=dtype,
         )
 
     def __call__(self, x):
@@ -441,26 +463,249 @@ class ConvNet:
 
 
 @register_module
+class Conv:
+    """A flexible standard convolutional block.
+
+    Args:
+        dim (int): Dimensionality.
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        kernel (int or tuple[int]): Kernel size(s). If it is a `tuple`, layers with
+            those kernel sizes will be put in sequence.
+        stride (int, optional): Stride.
+        transposed (bool, optional): Transposed convolution. Defaults to `False`.
+        separable (bool, optional): Use depthwise separable convolutions. Defaults to
+            `False`.
+        residual (bool, optional): Make a residual block. Defaults to `False`.
+        dtype (dtype, optional): Data type.
+
+    Attributes:
+        dim (int): Dimensionality.
+        net (object): Network.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        in_channels: int,
+        out_channels: int,
+        kernel: Union[int, Tuple[int, ...]],
+        stride: int = 1,
+        transposed: bool = False,
+        activation=None,
+        separable: bool = False,
+        residual: bool = False,
+        dtype=None,
+    ):
+        self.dim = dim
+
+        if residual:
+            self.net = self._init_residual(
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel=kernel,
+                stride=stride,
+                transposed=transposed,
+                activation=activation,
+                separable=separable,
+                dtype=dtype,
+            )
+        else:
+            if separable:
+                self.net = self._init_separable_conv(
+                    dim=dim,
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel=kernel,
+                    stride=stride,
+                    transposed=transposed,
+                    activation=activation,
+                    dtype=dtype,
+                )
+            else:
+                self.net = self._init_conv(
+                    dim=dim,
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    groups=1,
+                    kernel=kernel,
+                    stride=stride,
+                    transposed=transposed,
+                    activation=activation,
+                    dtype=dtype,
+                )
+
+    def _init_conv(
+        self,
+        dim,
+        in_channels,
+        out_channels,
+        groups,
+        kernel,
+        stride,
+        transposed,
+        activation,
+        dtype,
+    ):
+        channels = min(in_channels, out_channels)
+
+        # Determine the output padding.
+        if transposed and stride > 1:
+            if stride % 2 == 0:
+                output_padding = {"output_padding": stride // 2}
+            else:
+                raise RuntimeError(
+                    "Can only set the output padding correctly for `stride`s "
+                    "which are a multiple of two."
+                )
+        else:
+            output_padding = {}
+
+        # Prepend the activation, if one is given.
+        if activation:
+            net = [activation]
+        else:
+            net = []
+
+        # If `kernel` is a `tuple`, concatenate so many layers.
+        net.extend(
+            [
+                self.nn.Conv(
+                    dim=dim,
+                    in_channels=in_channels if first else channels,
+                    out_channels=out_channels if last else channels,
+                    groups=groups,
+                    kernel=k,
+                    stride=stride if last else 1,
+                    transposed=transposed if last else 1,
+                    **(output_padding if last else {}),
+                    dtype=dtype,
+                )
+                for first, last, k in with_first_last(convert(kernel, tuple))
+            ]
+        )
+
+        return self.nn.Sequential(*net)
+
+    def _init_separable_conv(
+        self,
+        dim,
+        in_channels,
+        out_channels,
+        kernel,
+        stride,
+        transposed,
+        activation,
+        dtype,
+    ):
+        return self.nn.Sequential(
+            self._init_conv(
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=in_channels,
+                groups=in_channels,
+                kernel=kernel,
+                stride=stride,
+                transposed=transposed,
+                activation=activation,
+                dtype=dtype,
+            ),
+            self._init_conv(
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                groups=1,
+                kernel=1,
+                stride=1,
+                transposed=False,
+                activation=None,
+                dtype=dtype,
+            ),
+        )
+
+    def _init_residual(
+        self,
+        dim,
+        in_channels,
+        out_channels,
+        kernel,
+        stride,
+        transposed,
+        activation,
+        separable,
+        dtype,
+    ):
+        channels = min(in_channels, out_channels)
+        if in_channels == channels and stride == 1:
+            # The input can be directly passed to the output.
+            input_transform = lambda x: x
+        else:
+            # The input cannot be directly passed to the output, so we use an additional
+            # linear layer.
+            input_transform = self._init_conv(
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=channels,
+                groups=1,
+                kernel=1,
+                stride=stride,
+                transposed=transposed,
+                activation=None,
+                dtype=dtype,
+            )
+        return self.nps.ResidualBlock(
+            input_transform,
+            self.nps.Conv(
+                dim=dim,
+                in_channels=in_channels,
+                out_channels=channels,
+                kernel=kernel,
+                stride=stride,
+                transposed=transposed,
+                activation=activation,
+                separable=separable,
+                residual=False,
+                dtype=dtype,
+            ),
+            self._init_conv(
+                dim=dim,
+                in_channels=channels,
+                out_channels=out_channels,
+                groups=1,
+                kernel=1,
+                stride=1,
+                transposed=False,
+                # TODO: Make this activation configurable.
+                activation=self.nn.ReLU(),
+                dtype=dtype,
+            ),
+        )
+
+    def __call__(self, x):
+        x, uncompress = compress_batch_dimensions(x, self.dim + 1)
+        return uncompress(self.net(x))
+
+
+@register_module
 class ResidualBlock:
     """Block of a residual network.
 
     Args:
-        layer1 (object): First linear layer.
-        layer2 (object): Second linear layer.
-        layer_post (object): Linear layer after the addition.
-        activation (object): Activation function.
+        layer1 (object): Layer in the first branch.
+        layer2 (object): Layer in the second branch.
+        layer_post (object): Layer after adding the output of the two branches.
+
+    Attributes:
+        layer1 (object): Layer in the first branch.
+        layer2 (object): Layer in the second branch.
+        layer_post (object): Layer after adding the output of the two branches.
     """
 
-    def __init__(self, layer1, layer2, layer_post, activation):
+    def __init__(self, layer1, layer2, layer_post):
         self.layer1 = layer1
         self.layer2 = layer2
         self.layer_post = layer_post
-        self.activation = activation
 
     def __call__(self, x):
-        y = self.activation(x)
-        y = self.layer1(y)
-        y = self.activation(y)
-        y = self.layer2(y)
-        x = x + y
-        return self.layer_post(x)
+        return self.layer_post(self.layer1(x) + self.layer2(x))

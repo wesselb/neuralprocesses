@@ -31,8 +31,11 @@ class TruncatedGeometric(AbstractDistribution):
 
     def sample(self, state, dtype, *shape):
         dtype_float = B.promote_dtypes(dtype, np.float16)
-        realisations = B.range(dtype, self.lower, self.upper)
-        lam = B.cast(dtype_float, B.log(self.factor) / (self.upper - self.lower))
-        lam = B.to_active_device(lam)
-        probs = B.exp(-lam * B.cast(dtype_float, realisations))
+        realisations = B.range(dtype, self.lower, self.upper + 1)
+        if self.upper > self.lower:
+            lam = B.cast(dtype_float, B.log(self.factor) / (self.upper - self.lower))
+            lam = B.to_active_device(lam)
+            probs = B.exp(-lam * B.cast(dtype_float, realisations))
+        else:
+            probs = B.to_active_device(B.ones(dtype_float, 1))
         return B.choice(state, realisations, *shape, p=probs)

@@ -45,9 +45,7 @@ def construct_climate_convgnp_mlp(
         channels=width_lr,
         out_channels=128,
         num_layers=6,
-        # Force kernel size 3.
-        receptive_field=9.5,
-        points_per_unit=1 / lr_deg,
+        kernel=3,
         residual=True,
         dtype=dtype,
     )
@@ -84,9 +82,9 @@ def construct_climate_convgnp_mlp(
 @register_model
 def construct_climate_convgnp_multires(
     width_lr=128,
-    width_mr=32,
-    width_hr=32,
-    width_bridge=32,
+    width_mr=64,
+    width_hr=64,
+    width_bridge=64,
     lr_deg=0.75,
     mr_deg=0.75 / 7.5,
     hr_deg=0.75 / 75,
@@ -129,13 +127,10 @@ def construct_climate_convgnp_multires(
         channels=width_lr,
         out_channels=width_bridge,
         num_layers=6,
-        # Force kernel size 3.
-        receptive_field=9.5,
-        points_per_unit=1 / lr_deg,
+        kernel=3,
         residual=True,
         dtype=dtype,
     )
-    assert conv_lr.kernel == 3
     disc_lr = nps.Discretisation(
         points_per_unit=1 / lr_deg,
         multiple=1,
@@ -150,13 +145,13 @@ def construct_climate_convgnp_multires(
         # Stations, HR elevation, and low-resolution output:
         in_channels=(1 + 1) + (1 + 1) + width_bridge,
         # Four channels should give a TF of at least ten.
-        channels=(width_mr,) * 4,
+        channels=(width_mr, width_mr, width_mr, 2 * width_mr, 2 * width_hr),
+        strides=(1, 2, 2, 2, 2),
         out_channels=width_bridge,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
         dtype=dtype,
     )
-    assert conv_mr.receptive_field * mr_deg >= 10
     disc_mr = nps.Discretisation(
         points_per_unit=1 / mr_deg,
         multiple=2**conv_mr.num_halving_layers,
@@ -171,18 +166,19 @@ def construct_climate_convgnp_multires(
         # Stations, HR elevation, and medium-resolution output:
         in_channels=(1 + 1) + (1 + 1) + width_bridge,
         # Four channels should give a TF of at least one.
-        channels=(width_hr,) * 4,
+        channels=(width_hr, width_hr, width_hr, 2 * width_hr),
+        strides=(1, 2, 2, 2),
         out_channels=width_hr,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
         dtype=dtype,
     )
-    assert conv_hr.receptive_field * hr_deg >= 1
+    assert conv_hr.receptive_field * hr_deg >= 0.5
     disc_hr = nps.Discretisation(
         points_per_unit=1 / hr_deg,
         multiple=2**conv_hr.num_halving_layers,
         # Use a margin of half the lower bound on the RF.
-        margin=0.5,
+        margin=0.25,
         dim=2,
     )
 

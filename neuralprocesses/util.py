@@ -23,6 +23,7 @@ __all__ = [
     "split_dimension",
     "merge_dimensions",
     "select",
+    "with_first_last",
 ]
 
 
@@ -224,3 +225,51 @@ def select(z, i, axis):
     index = [slice(None, None, None) for _ in range(B.rank(z))]
     index[axis] = slice(i, i + 1, None)
     return z[index]
+
+
+def with_first_last(xs):
+    """Return a generator which indicates whether the returned element is the first or
+    last.
+
+    Args:
+        xs: Generator to wrap.
+
+    Yields:
+        bool: Element is first.
+        bool: Element is last.
+        object: Element.
+    """
+    state = {"first": True}
+
+    def first():
+        if state["first"]:
+            state["first"] = False
+            return True
+        else:
+            return False
+
+    prev = None
+    have_prev = False
+
+    cur = None
+    have_cur = False
+
+    for x in xs:
+        cur = x
+        have_cur = True
+
+        if not have_prev:
+            # We will need a `prev`, but there is no `prev` yet. Take the current one as
+            # `prev` and skip to the next iteration.
+            prev = cur
+            have_prev = True
+            continue
+
+        # We currently have available `prev` and `cur`. We will return `prev` and,
+        # after the loop has finished, return `cur` as the last one.
+        yield first(), False, prev
+
+        prev = cur
+
+    if have_cur:
+        yield first(), True, cur

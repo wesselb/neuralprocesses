@@ -309,18 +309,22 @@ class Interface:
         """
         return tf.keras.layers.Dense(dim_out, input_shape=(None, dim_in), dtype=dtype)
 
+    Conv = staticmethod(ConvNd)
     Conv1d = partial(ConvNd, dim=1)
     Conv2d = partial(ConvNd, dim=2)
     Conv3d = partial(ConvNd, dim=3)
 
+    UpSampling = staticmethod(UpSamplingNd)
     UpSampling1d = partial(UpSamplingNd, dim=1)
     UpSampling2d = partial(UpSamplingNd, dim=2)
     UpSampling3d = partial(UpSamplingNd, dim=3)
 
-    ConvTransposed1d = partial(ConvNd, dim=1, transposed=True)
-    ConvTransposed2d = partial(ConvNd, dim=2, transposed=True)
-    ConvTransposed3d = partial(ConvNd, dim=3, transposed=True)
+    ConvTransposed = partial(ConvNd, transposed=True)
+    ConvTransposed1d = partial(ConvNd, transposed=True, dim=1)
+    ConvTransposed2d = partial(ConvNd, transposed=True, dim=2)
+    ConvTransposed3d = partial(ConvNd, transposed=True, dim=3)
 
+    AvgPool = staticmethod(AvgPoolNd)
     AvgPool1d = partial(AvgPoolNd, dim=1)
     AvgPool2d = partial(AvgPoolNd, dim=2)
     AvgPool3d = partial(AvgPoolNd, dim=3)

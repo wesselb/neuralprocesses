@@ -15,12 +15,11 @@ def create_init(module):
 
 
 def create_tf_call(module):
-    def call(self, x, training=False):
-        args = convert(x, tuple)  # Deal with multiple arguments passed as a tuple.
+    def call(self, *args, training=False, **kw_args):
         try:
-            return module.__call__(self, *args, training=training)
+            return module.__call__(self, *args, training=training, **kw_args)
         except TypeError:
-            return module.__call__(self, *args)
+            return module.__call__(self, *args, **kw_args)
 
     return call
 
@@ -29,7 +28,11 @@ for module in modules:
     globals()[module.__name__] = type(
         module.__name__,
         (module, Module),
-        {"__init__": create_init(module), "call": create_tf_call(module)},
+        {
+            "__init__": create_init(module),
+            "__call__": create_tf_call(module),
+            "call": create_tf_call(module),
+        },
     )
 
 
