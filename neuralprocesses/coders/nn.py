@@ -656,7 +656,7 @@ class Conv:
             )
         return self.nps.ResidualBlock(
             input_transform,
-            nps.Sequential(
+            self.nn.Sequential(
                 self.nps.Conv(
                     dim=dim,
                     in_channels=in_channels,
