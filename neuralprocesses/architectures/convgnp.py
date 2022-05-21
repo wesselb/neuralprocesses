@@ -333,7 +333,7 @@ def construct_convgnp(
     model = nps.Model(
         nps.FunctionalCoder(
             disc,
-            conv.Chain(
+            nps.Chain(
                 nps.PrependDensityChannel(),
                 _convgnp_construct_encoder_setconvs(
                     nps,
