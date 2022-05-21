@@ -520,10 +520,11 @@ def main(**kw_args):
 
         if not args.ar or args.also_ar:
             # Make some plots.
+            gen = gen_cv()
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
                     model,
-                    gen_cv,
+                    gen,
                     path=wd.file(f"evaluate-{i + 1:03d}.pdf"),
                     config=config,
                 )
@@ -540,10 +541,11 @@ def main(**kw_args):
             args.model in {"cnp", "acnp", "convcnp"} or args.ar or args.also_ar
         ):
             # Make some plots.
+            gen = gen_cv()
             for i in range(args.evaluate_num_plots):
                 exp.visualise(
                     model,
-                    gen_cv,
+                    gen,
                     path=wd.file(f"evaluate-ar-{i + 1:03d}.pdf"),
                     config=config,
                     predict=nps.ar_predict,
