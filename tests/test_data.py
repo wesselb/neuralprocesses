@@ -120,7 +120,7 @@ def _bcn_form(x: tuple):
 @pytest.mark.xfail()
 @pytest.mark.parametrize("subset", ["train", "cv", "eval"])
 @pytest.mark.parametrize("context_sample", [False, True])
-@pytest.mark.parametrize("target_square", [0, 2])
+@pytest.mark.parametrize("target_square", [0, 5])
 @pytest.mark.parametrize("target_elev", [False, True])
 def test_temperature(
     nps,
@@ -131,9 +131,9 @@ def test_temperature(
 ):
     gen = nps.TemperatureGenerator(
         nps.dtype,
-        seed=1,
         batch_size=16,
         context_sample=context_sample,
+        context_sample_factor=10,
         target_min=15,
         target_square=target_square,
         target_elev=target_elev,
