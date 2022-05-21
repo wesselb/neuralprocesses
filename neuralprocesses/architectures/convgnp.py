@@ -293,10 +293,10 @@ def construct_convgnp(
                 dim=dim_x,
                 in_channels=lv_in_channels,
                 out_channels=lv_out_channels,
-                channels=dws_channels,
-                num_layers=dws_layers,
+                channels=conv_channels,
+                num_layers=conv_layers,
                 points_per_unit=points_per_unit,
-                receptive_field=dws_receptive_field,
+                receptive_field=conv_receptive_field,
                 separable="sep" in conv_arch,
                 residual="res" in conv_arch,
                 dtype=dtype,
@@ -308,15 +308,15 @@ def construct_convgnp(
             dim=dim_x,
             in_channels=in_channels,
             out_channels=out_channels,
-            channels=dws_channels,
-            num_layers=dws_layers,
+            channels=conv_channels,
+            num_layers=conv_layers,
             points_per_unit=points_per_unit,
-            receptive_field=dws_receptive_field,
+            receptive_field=conv_receptive_field,
             separable="sep" in conv_arch,
             residual="res" in conv_arch,
             dtype=dtype,
         )
-        receptive_field = dws_receptive_field
+        receptive_field = conv_receptive_field
     else:
         raise ValueError(f'Architecture "{conv_arch}" invalid.')
 
@@ -333,7 +333,7 @@ def construct_convgnp(
     model = nps.Model(
         nps.FunctionalCoder(
             disc,
-            nps.Chain(
+            conv.Chain(
                 nps.PrependDensityChannel(),
                 _convgnp_construct_encoder_setconvs(
                     nps,
