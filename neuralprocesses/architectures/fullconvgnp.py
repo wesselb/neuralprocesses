@@ -25,12 +25,13 @@ def construct_fullconvgnp(
     conv_arch="unet",
     unet_channels=(64,) * 6,
     unet_kernels=5,
+    unet_strides=2,
     unet_activations=None,
     unet_resize_convs=False,
     unet_resize_conv_interp_method="nearest",
-    dws_receptive_field=None,
-    dws_layers=6,
-    dws_channels=64,
+    conv_receptive_field=None,
+    conv_layers=6,
+    conv_channels=64,
     kernel_factor=2,
     dim_lv=0,
     encoder_scales=None,
@@ -62,22 +63,24 @@ def construct_fullconvgnp(
         margin (float, optional): Margin of the internal discretisation. Defaults to
             0.1.
         conv_arch (str, optional): Convolutional architecture to use. Must be one of
-            `"unet"` or `"dws"`. Defaults to `"unet"`.
+            `"unet[-res][-sep]"` or `"conv[-res][-sep]"`. Defaults to `"unet"`.
         unet_channels (tuple[int], optional): Channels of every layer of the UNet.
             Defaults to six layers each with 64 channels.
         unet_kernels (int or tuple[int], optional): Sizes of the kernels in the UNet.
             Defaults to 5.
+        unet_strides (int or tuple[int], optional): Strides in the UNet. Defaults to 2.
         unet_activations (object or tuple[object], optional): Activation functions
             used by the UNet.
         unet_resize_convs (bool, optional): Use resize convolutions rather than
             transposed convolutions in the UNet. Defaults to `False`.
         unet_resize_conv_interp_method (str, optional): Interpolation method for the
-            resize convolutions in the UNet. Can be set to "bilinear". Defaults
+            resize convolutions in the UNet. Can be set to `"bilinear"`. Defaults
             to "nearest".
-        dws_receptive_field (float, optional): Receptive field of the DWS architecture.
-            Must be specified if `conv_arch` is set to "dws".
-        dws_layers (int, optional): Layers of the DWS architecture. Defaults to 8.
-        dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
+        conv_receptive_field (float, optional): Receptive field of the standard
+            architecture. Must be specified if `conv_arch` is set to `"conv"`.
+        conv_layers (int, optional): Layers of the standard architecture. Defaults to 8.
+        conv_channels (int, optional): Channels of the standard architecture. Defaults to
+            64.
         kernel_factor (int, optional): Factor to reduce the number of channel of the
             kernel CNN architecture and the kernel points per unit by. Set to 1 to
             put the architecture for the kernel on equal footing with the architecture
@@ -85,9 +88,9 @@ def construct_fullconvgnp(
         dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         encoder_scales (float or tuple[float], optional): Initial value for the length
             scales of the set convolutions for the context sets embeddings. Defaults
-            to `2 / points_per_unit`.
+            to `1 / points_per_unit`.
         decoder_scale (float, optional): Initial value for the length scale of the
-            set convolution in the decoder. Defaults to `2 / points_per_unit`.
+            set convolution in the decoder. Defaults to `1 / points_per_unit`.
         divide_by_density (bool, optional): Divide by the density channel. Defaults
             to `True`.
         epsilon (float, optional): Epsilon added by the set convolutions before
@@ -116,21 +119,24 @@ def construct_fullconvgnp(
     _convgnp_resolve_architecture(
         conv_arch,
         unet_channels,
-        dws_channels,
-        dws_receptive_field,
+        conv_channels,
+        conv_receptive_field,
     )
 
     # Construct the core CNN architectures of the model.
-    if conv_arch == "unet":
+    if "unet" in conv_arch:
         conv_mean = nps.UNet(
             dim=dim_x,
             in_channels=conv_in_channels,
             out_channels=2 * dim_yt,  # Mean and noise
             channels=unet_channels,
             kernels=unet_kernels,
+            strides=unet_strides,
             activations=unet_activations,
             resize_convs=unet_resize_convs,
             resize_conv_interp_method=unet_resize_conv_interp_method,
+            separable="sep" in conv_arch,
+            residual="res" in conv_arch,
             dtype=dtype,
         )
         conv_kernel = nps.UNet(
@@ -141,21 +147,26 @@ def construct_fullconvgnp(
             # Keep the parameters in check.
             channels=tuple(int(n / kernel_factor) for n in unet_channels),
             kernels=unet_kernels,
+            strides=unet_strides,
             activations=unet_activations,
             resize_convs=unet_resize_convs,
             resize_conv_interp_method=unet_resize_conv_interp_method,
+            separable="sep" in conv_arch,
+            residual="res" in conv_arch,
             dtype=dtype,
         )
         receptive_field = conv_mean.receptive_field / points_per_unit
-    elif conv_arch == "dws":
+    elif "conv" in conv_arch:
         conv_mean = nps.ConvNet(
             dim=dim_x,
             in_channels=conv_in_channels,
             out_channels=2 * dim_yt,  # Mean and noise
-            channels=dws_channels,
-            num_layers=dws_layers,
+            channels=conv_channels,
+            num_layers=conv_layers,
             points_per_unit=points_per_unit,
-            receptive_field=dws_receptive_field,
+            receptive_field=conv_receptive_field,
+            separable="sep" in conv_arch,
+            residual="res" in conv_arch,
             dtype=dtype,
         )
         conv_kernel = nps.ConvNet(
@@ -163,13 +174,15 @@ def construct_fullconvgnp(
             in_channels=conv_in_channels + 1,  # Add identity channel.
             # We need covariance matrices for every pair of outputs.
             out_channels=dim_yt * dim_yt,
-            channels=int(dws_channels / kernel_factor),  # Keep the parameters in check.
-            num_layers=dws_layers,
+            channels=int(conv_channels / kernel_factor),  # Keep the parameters in check.
+            num_layers=conv_layers,
             points_per_unit=points_per_unit / kernel_factor,  # Keep memory in control.
-            receptive_field=dws_receptive_field,
+            receptive_field=conv_receptive_field,
+            separable="sep" in conv_arch,
+            residual="res" in conv_arch,
             dtype=dtype,
         )
-        receptive_field = dws_receptive_field
+        receptive_field = conv_receptive_field
     else:
         raise ValueError(f'Architecture "{conv_arch}" invalid.')
 

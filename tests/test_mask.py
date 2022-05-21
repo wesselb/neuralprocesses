@@ -10,10 +10,10 @@ def test_convgnp_mask(nps):
     model = nps.construct_convgnp(
         num_basis_functions=16,
         points_per_unit=16,
-        conv_arch="dws",
-        dws_receptive_field=0.5,
-        dws_layers=1,
-        dws_channels=1,
+        conv_arch="conv",
+        conv_receptive_field=0.5,
+        conv_layers=1,
+        conv_channels=1,
         # Dividing by the density channel makes the forward very sensitive to the
         # numerics.
         divide_by_density=False,

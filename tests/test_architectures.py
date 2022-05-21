@@ -12,22 +12,28 @@ def generate_conv_arch_variations(configs):
     for config in configs:
         for variation in [
             {
+                # Standard UNet:
+                "conv_arch": "unet",
                 "unet_channels": (4, 8),
                 "unet_kernels": (3, 5),
+                "unet_strides": (2, 2),
                 "unet_activations": (B.relu, B.tanh),
                 "unet_resize_convs": False,
             },
             {
+                # Fancy UNet:
+                "conv_arch": "unet",
                 "unet_channels": (4, 8),
-                "unet_kernels": (3, 5),
+                "unet_kernels": ((3, 3), 5),
+                "unet_strides": (1, 2),
                 "unet_activations": (B.relu, B.tanh),
                 "unet_resize_convs": True,
             },
             {
-                "conv_arch": "dws",
-                "dws_channels": 8,
-                "dws_layers": 2,
-                "dws_receptive_field": 2,
+                "conv_arch": "conv",
+                "conv_channels": 8,
+                "conv_layers": 2,
+                "conv_receptive_field": 2,
             },
         ]:
             varied_configs.append(dict(config, **variation))

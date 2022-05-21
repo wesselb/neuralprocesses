@@ -22,15 +22,15 @@ def _convgnp_init_dims(dim_yc, dim_yt, dim_y):
 def _convgnp_resolve_architecture(
     conv_arch,
     unet_channels,
-    dws_channels,
-    dws_receptive_field,
+    conv_channels,
+    conv_receptive_field,
 ):
-    if conv_arch == "unet":
+    if "unet" in conv_arch:
         conv_out_channels = unet_channels[0]
-    elif conv_arch == "dws":
-        conv_out_channels = dws_channels
-        if dws_receptive_field is None:
-            raise ValueError(f"Must specify `dws_receptive_field`.")
+    elif "conv" in conv_arch:
+        conv_out_channels = conv_channels
+        if conv_receptive_field is None:
+            raise ValueError(f"Must specify `conv_receptive_field`.")
     else:
         raise ValueError(f'Architecture "{conv_arch}" invalid.')
     return conv_out_channels
@@ -48,7 +48,7 @@ def _convgnp_construct_encoder_setconvs(
     if encoder_scales is not None:
         encoder_scales = init_factor * encoder_scales
     else:
-        encoder_scales = 2 / disc.points_per_unit
+        encoder_scales = 1 / disc.points_per_unit
     # Ensure that there is one for every context set.
     if not isinstance(encoder_scales, (tuple, list)):
         encoder_scales = (encoder_scales,) * len(dim_yc)
@@ -66,7 +66,7 @@ def _convgnp_construct_decoder_setconv(
     if decoder_scale is not None:
         decoder_scale = init_factor * decoder_scale
     else:
-        decoder_scale = 2 / disc.points_per_unit
+        decoder_scale = 1 / disc.points_per_unit
     return nps.SetConv(decoder_scale, dtype=dtype)
 
 
@@ -90,12 +90,13 @@ def construct_convgnp(
     conv_arch="unet",
     unet_channels=(64,) * 6,
     unet_kernels=5,
+    unet_strides=2,
     unet_activations=None,
     unet_resize_convs=False,
     unet_resize_conv_interp_method="nearest",
-    dws_receptive_field=None,
-    dws_layers=6,
-    dws_channels=64,
+    conv_receptive_field=None,
+    conv_layers=6,
+    conv_channels=64,
     num_basis_functions=64,
     dim_lv=0,
     lv_likelihood="het",
@@ -133,22 +134,24 @@ def construct_convgnp(
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank".
             Defaults to `"lowrank"`.
         conv_arch (str, optional): Convolutional architecture to use. Must be one of
-            `"unet"` or `"dws"`. Defaults to `"unet"`.
+            `"unet[-res][-sep]"` or `"conv[-res][-sep]"`. Defaults to `"unet"`.
         unet_channels (tuple[int], optional): Channels of every layer of the UNet.
             Defaults to six layers each with 64 channels.
         unet_kernels (int or tuple[int], optional): Sizes of the kernels in the UNet.
             Defaults to 5.
+        unet_strides (int or tuple[int], optional): Strides in the UNet. Defaults to 2.
         unet_activations (object or tuple[object], optional): Activation functions
             used by the UNet.
         unet_resize_convs (bool, optional): Use resize convolutions rather than
             transposed convolutions in the UNet. Defaults to `False`.
         unet_resize_conv_interp_method (str, optional): Interpolation method for the
-            resize convolutions in the UNet. Can be set to "bilinear". Defaults
+            resize convolutions in the UNet. Can be set to `"bilinear"`. Defaults
             to "nearest".
-        dws_receptive_field (float, optional): Receptive field of the DWS architecture.
-            Must be specified if `conv_arch` is set to "dws".
-        dws_layers (int, optional): Layers of the DWS architecture. Defaults to 8.
-        dws_channels (int, optional): Channels of the DWS architecture. Defaults to 64.
+        conv_receptive_field (float, optional): Receptive field of the standard
+            architecture. Must be specified if `conv_arch` is set to `"conv"`.
+        conv_layers (int, optional): Layers of the standard architecture. Defaults to 8.
+        conv_channels (int, optional): Channels of the standard architecture. Defaults to
+            64.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to `512`.
         dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
@@ -156,9 +159,9 @@ def construct_convgnp(
             `"het"` or `"lowrank"`. Defaults to `"het"`.
         encoder_scales (float or tuple[float], optional): Initial value for the length
             scales of the set convolutions for the context sets embeddings. Defaults
-            to `2 / points_per_unit`.
+            to `1 / points_per_unit`.
         decoder_scale (float, optional): Initial value for the length scale of the
-            set convolution in the decoder. Defaults to `2 / points_per_unit`.
+            set convolution in the decoder. Defaults to `1 / points_per_unit`.
         aux_t_mlp_layers (tuple[int], optional): Widths of the layers of the MLP
             for the target-specific auxiliary variable. Defaults to three layers of
             width 128.
@@ -204,8 +207,8 @@ def construct_convgnp(
     conv_out_channels = _convgnp_resolve_architecture(
         conv_arch,
         unet_channels,
-        dws_channels,
-        dws_receptive_field,
+        conv_channels,
+        conv_receptive_field,
     )
 
     # If `dim_aux_t` is given, contruct an MLP which will use the auxiliary
@@ -250,7 +253,7 @@ def construct_convgnp(
     else:
         in_channels = conv_in_channels
         out_channels = conv_out_channels  # These must be equal!
-    if conv_arch == "unet":
+    if "unet" in conv_arch:
         if dim_lv > 0:
             lv_conv = nps.UNet(
                 dim=dim_x,
@@ -258,9 +261,12 @@ def construct_convgnp(
                 out_channels=lv_out_channels,
                 channels=unet_channels,
                 kernels=unet_kernels,
+                strides=unet_strides,
                 activations=unet_activations,
                 resize_convs=unet_resize_convs,
                 resize_conv_interp_method=unet_resize_conv_interp_method,
+                separable="sep" in conv_arch,
+                residual="res" in conv_arch,
                 dtype=dtype,
             )
         else:
@@ -272,13 +278,16 @@ def construct_convgnp(
             out_channels=out_channels,
             channels=unet_channels,
             kernels=unet_kernels,
+            strides=unet_strides,
             activations=unet_activations,
             resize_convs=unet_resize_convs,
             resize_conv_interp_method=unet_resize_conv_interp_method,
+            separable="sep" in conv_arch,
+            residual="res" in conv_arch,
             dtype=dtype,
         )
         receptive_field = conv.receptive_field / points_per_unit
-    elif conv_arch == "dws":
+    elif "conv" in conv_arch:
         if dim_lv > 0:
             lv_conv = nps.ConvNet(
                 dim=dim_x,
@@ -288,6 +297,8 @@ def construct_convgnp(
                 num_layers=dws_layers,
                 points_per_unit=points_per_unit,
                 receptive_field=dws_receptive_field,
+                separable="sep" in conv_arch,
+                residual="res" in conv_arch,
                 dtype=dtype,
             )
         else:
@@ -301,6 +312,8 @@ def construct_convgnp(
             num_layers=dws_layers,
             points_per_unit=points_per_unit,
             receptive_field=dws_receptive_field,
+            separable="sep" in conv_arch,
+            residual="res" in conv_arch,
             dtype=dtype,
         )
         receptive_field = dws_receptive_field

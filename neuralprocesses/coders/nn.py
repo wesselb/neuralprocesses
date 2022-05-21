@@ -138,7 +138,7 @@ class UNet:
         kernels (tuple[int]): Sizes of the kernels.
         strides (tuple[int]): Strides.
         activations (tuple[function]): Activation functions.
-        num_halving_layers (int): Number of layers with striding equal to two.
+        num_halving_layers (int): Number of layers with stride equal to two.
         receptive_fields (list[float]): Receptive field for every intermediate value.
         receptive_field (float): Receptive field of the model.
         before_turn_layers (list[module]): Layers before the U-turn.

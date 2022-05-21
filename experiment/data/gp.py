@@ -13,7 +13,10 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
     config["dim_y"] = args.dim_y
 
     # Architecture choices specific for the GP experiments:
-    config["dws_receptive_field"] = 4
+    # TODO: We should use a stride of 1 in the first layer, but for compatibility
+    #    reasons with the models we already trained, we keep it like this.
+    config["unet_strides"] = (2,) * 6
+    config["conv_receptive_field"] = 4
     config["margin"] = 0.1
     if args.dim_x == 1:
         config["points_per_unit"] = 64

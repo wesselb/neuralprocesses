@@ -88,8 +88,9 @@ def construct_climate_convgnp_multires(
     lr_deg=0.75,
     mr_deg=0.75 / 7.5,
     hr_deg=0.75 / 75,
-    dtype=None,
+    mlp=False,
     likelihood="het",
+    dtype=None,
     nps=nps,
 ):
     """Construct a multiresolution ConvGNP model for climate downscaling.
@@ -107,6 +108,7 @@ def construct_climate_convgnp_multires(
             0.1.
         hr_deg (float, optional): Resolution of the high-resolution grid. Defaults to
             0.01.
+        mlp (bool, optional): Use an extra MLP at the end. Defaults to `False`.
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank".
             Defaults to `"lowrank"`.
         dtype (dtype, optional): Data type.
@@ -118,6 +120,18 @@ def construct_climate_convgnp_multires(
         num_basis_functions=64,
         dtype=dtype,
     )
+
+    # Resolve the MLP.
+    if mlp:
+        conv_hr_out_channels = width_hr
+        mlp = nps.MLP(
+            in_dim=width_hr,
+            layers=(128, 128, 128),
+            out_dim=likelihood_in_channels,
+        )
+    else:
+        conv_hr_out_channels = likelihood_in_channels
+        mlp = lambda x: x
 
     # Low-resolution CNN:
     conv_lr = nps.ConvNet(
@@ -168,7 +182,7 @@ def construct_climate_convgnp_multires(
         # Four channels should give a TF of at least one.
         channels=(width_hr, width_hr, width_hr, 2 * width_hr),
         strides=(1, 2, 2, 2),
-        out_channels=width_hr,
+        out_channels=conv_hr_out_channels,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
         dtype=dtype,
@@ -261,11 +275,7 @@ def construct_climate_convgnp_multires(
         nps.RepeatForAggregateInputs(
             nps.Chain(
                 nps.SetConv(scale=hr_deg, dtype=dtype),
-                nps.MLP(
-                    in_dim=width_hr,
-                    layers=(128, 128, 128),
-                    out_dim=likelihood_in_channels,
-                ),
+                mlp,
                 selector,
             )
         ),

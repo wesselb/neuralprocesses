@@ -304,7 +304,7 @@ class TemperatureGenerator(DataGenerator):
                 )
 
                 # Only stop sampling if the minimum number of targets was selected.
-                if B.sum(mask) >= self.target_min:
+                if B.jit_to_numpy(B.sum(mask)) >= self.target_min:
                     b["xc_s_outside_square"] = B.take(b["xt"], ~mask, axis=-1)
                     b["yc_s_outside_square"] = B.take(b["yt"], ~mask, axis=-1)
                     b["xt"] = B.take(b["xt"], mask, axis=-1)

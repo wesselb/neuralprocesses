@@ -346,14 +346,14 @@ encoder = nps.FunctionalCoder(
     disc,
     nps.Chain(
         nps.PrependDensityChannel(),
-        nps.SetConv(scale=2 / disc.points_per_unit),
+        nps.SetConv(scale=1 / disc.points_per_unit),
         nps.DivideByFirstChannel(),
         nps.DeterministicLikelihood(),
     ),
 )
 decoder = nps.Chain(
     unet,
-    nps.SetConv(scale=2 / disc.points_per_unit),
+    nps.SetConv(scale=1 / disc.points_per_unit),
     nps.LowRankGaussianLikelihood(512),
 )
 convgnp = nps.Model(encoder, decoder)
@@ -406,10 +406,10 @@ encoder = nps.FunctionalCoder(
     nps.Chain(
         nps.PrependDensityChannel(),
         # Use a separate set conv for every context set. Here we initialise the length
-        # scales of these set convs both to `2 / disc.points_per_unit`.
+        # scales of these set convs both to `1 / disc.points_per_unit`.
         nps.Parallel(
-            nps.SetConv(scale=2 / disc.points_per_unit),
-            nps.SetConv(scale=2 / disc.points_per_unit),
+            nps.SetConv(scale=1 / disc.points_per_unit),
+            nps.SetConv(scale=1 / disc.points_per_unit),
         ),
         nps.DivideByFirstChannel(),
         # Concatenate the encodings of the context sets.
@@ -419,7 +419,7 @@ encoder = nps.FunctionalCoder(
 )
 decoder = nps.Chain(
     unet,
-    nps.SetConv(scale=2 / disc.points_per_unit),
+    nps.SetConv(scale=1 / disc.points_per_unit),
     # `nps.Augment` will concatenate any auxiliary information to the current encoding
     # before proceedings.
     nps.Augment(
