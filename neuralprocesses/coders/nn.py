@@ -656,17 +656,32 @@ class Conv:
             )
         return self.nps.ResidualBlock(
             input_transform,
-            self.nps.Conv(
-                dim=dim,
-                in_channels=in_channels,
-                out_channels=channels,
-                kernel=kernel,
-                stride=stride,
-                transposed=transposed,
-                activation=activation,
-                separable=separable,
-                residual=False,
-                dtype=dtype,
+            nps.Sequential(
+                self.nps.Conv(
+                    dim=dim,
+                    in_channels=in_channels,
+                    out_channels=channels,
+                    kernel=kernel,
+                    stride=stride,
+                    transposed=transposed,
+                    activation=activation,
+                    separable=separable,
+                    residual=False,
+                    dtype=dtype,
+                ),
+                self.nn.ReLU(),
+                self._init_conv(
+                    dim=dim,
+                    in_channels=channels,
+                    out_channels=out_channels,
+                    groups=1,
+                    kernel=1,
+                    stride=1,
+                    transposed=False,
+                    # TODO: Make this activation configurable.
+                    activation=self.nn.ReLU(),
+                    dtype=dtype,
+                ),
             ),
             self._init_conv(
                 dim=dim,
@@ -676,8 +691,7 @@ class Conv:
                 kernel=1,
                 stride=1,
                 transposed=False,
-                # TODO: Make this activation configurable.
-                activation=self.nn.ReLU(),
+                activation=None,
                 dtype=dtype,
             ),
         )
