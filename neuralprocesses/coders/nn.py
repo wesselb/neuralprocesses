@@ -673,7 +673,7 @@ class Conv:
                 self._init_conv(
                     dim=dim,
                     in_channels=channels,
-                    out_channels=out_channels,
+                    out_channels=channels,
                     groups=1,
                     kernel=1,
                     stride=1,
