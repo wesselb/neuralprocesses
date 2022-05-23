@@ -13,7 +13,7 @@ __all__ = ["TemperatureGenerator"]
 
 
 class _TemperatureData:
-    def __init__(self, data_path, data_task, interpolate_yt_elev_from_grid):
+    def __init__(self, data_path, data_task, context_elev_hr, target_elev_interpolate):
         if data_task not in {"germany", "europe", "value"}:
             raise ValueError(
                 f'`data_task` must be one of "germany", "europe", or "value".'
@@ -163,30 +163,31 @@ class _TemperatureData:
         self.xt_elev = self.xt_elev[:, :, mask]
         self.yt_elev = self.yt_elev[:, :, mask]
 
-        # Load the high-resolution elevation data.
-        elev_hr = netCDF4.Dataset(f"{data_path}/elev_data_1km/data.nc")
-        elev_hr_lons = elev_hr["X"][:].data
-        elev_hr_lats = elev_hr["Y"][:].data
+        if context_elev_hr:
+            # Load the high-resolution elevation data.
+            elev_hr = netCDF4.Dataset(f"{data_path}/elev_data_1km/data.nc")
+            elev_hr_lons = elev_hr["X"][:].data
+            elev_hr_lats = elev_hr["Y"][:].data
 
-        # Select the relevant latitudes, longitudes, and elevation.
-        lons_mask = (lons[0] <= elev_hr_lons) & (elev_hr_lons < lons[1])
-        lats_mask = (lats[0] <= elev_hr_lats) & (elev_hr_lats < lats[1])
-        elev_hr = elev_hr["topo"][lats_mask, lons_mask]
-        # Extract the data, construct the mask, and save it. Note that a `False` in
-        # `elev.mask` means that a data point is present!
-        elev_hr_mask = B.broadcast_to(~elev_hr.mask, *B.shape(elev_hr.data))
-        elev_hr_data = elev_hr.data
-        elev_hr_data[elev_hr_mask == 0] = 0
-        self.xc_elev_hr = (
-            elev_hr_lons[lons_mask][None, None, :],
-            elev_hr_lats[lats_mask][None, None, :],
-        )
-        # The high-resolution elevation is lat-lon form, so we need to transpose. This
-        # is relatively safe, because the code will break if we get this wrong.
-        self.yc_elev_hr = B.transpose(elev_hr_data)[None, None, :]
-        self.yc_elev_hr_mask = B.transpose(elev_hr_mask)[None, None, :]
+            # Select the relevant latitudes, longitudes, and elevation.
+            lons_mask = (lons[0] <= elev_hr_lons) & (elev_hr_lons < lons[1])
+            lats_mask = (lats[0] <= elev_hr_lats) & (elev_hr_lats < lats[1])
+            elev_hr = elev_hr["topo"][lats_mask, lons_mask]
+            # Extract the data, construct the mask, and save it. Note that a `False` in
+            # `elev.mask` means that a data point is present!
+            elev_hr_mask = B.broadcast_to(~elev_hr.mask, *B.shape(elev_hr.data))
+            elev_hr_data = elev_hr.data
+            elev_hr_data[elev_hr_mask == 0] = 0
+            self.xc_elev_hr = (
+                elev_hr_lons[lons_mask][None, None, :],
+                elev_hr_lats[lats_mask][None, None, :],
+            )
+            # The high-resolution elevation is lat-lon form, so we need to transpose.
+            # This is relatively safe, because the code will break if we get this wrong.
+            self.yc_elev_hr = B.transpose(elev_hr_data)[None, None, :]
+            self.yc_elev_hr_mask = B.transpose(elev_hr_mask)[None, None, :]
 
-        if interpolate_yt_elev_from_grid:
+        if target_elev_interpolate:
             # First, we reshape the grid data in a form that `griddata` expects.
             z = self.yc_elev_hr[0, 0]
             x = B.flatten(self.xc_elev_hr[0])
@@ -215,6 +216,9 @@ class TemperatureGenerator(DataGenerator):
             context and target, emphasise the lower numbers more. This factor is the
             probability of the lowest number divided by the probability of the highest
             number.
+        context_elev_hr (bool, optional): Load the high-resolution elevation data as
+            a context set. If set to `False`, that context set will be `(None, None)`.
+            Defaults to `True`.
         target_min (int, optional): Minimum number of target points. Defaults to 5.
         target_square (float, optional): Size of the square of target points to sample.
             Defaults to not sampling a square.
@@ -257,6 +261,7 @@ class TemperatureGenerator(DataGenerator):
         batch_size=16,
         context_sample=False,
         context_sample_factor=10,
+        context_elev_hr=True,
         target_min=5,
         target_square=0.0,
         target_elev=False,
@@ -269,6 +274,7 @@ class TemperatureGenerator(DataGenerator):
     ):
         self.context_sample = context_sample
         self.context_sample_factor = context_sample_factor
+        self.context_elev_hr = context_elev_hr
         self.target_min = target_min
         self.target_square = target_square
         self.target_elev = target_elev
@@ -276,15 +282,15 @@ class TemperatureGenerator(DataGenerator):
         self.passes = passes
 
         # Load data if it isn't yet loaded.
-        cache_key = (data_task, target_elev_interpolate)
+        cache_key = (data_task, context_elev_hr, target_elev_interpolate)
         try:
             data = TemperatureGenerator._data_cache[cache_key]
         except KeyError:
-            print("Miss!")
             TemperatureGenerator._data_cache[cache_key] = _TemperatureData(
                 data_path=data_path,
                 data_task=data_task,
-                interpolate_yt_elev_from_grid=target_elev_interpolate,
+                context_elev_hr=context_elev_hr,
+                target_elev_interpolate=target_elev_interpolate,
             )
             data = TemperatureGenerator._data_cache[cache_key]
 
@@ -294,9 +300,10 @@ class TemperatureGenerator(DataGenerator):
             n = data.yc_grid_train.shape[0]
             self._xc_grid = data.xc_grid
             self._yc_grid = data.yc_grid_train[data.train_mask[:n]]
-            self._xc_elev_hr = data.xc_elev_hr
-            self._yc_elev_hr = data.yc_elev_hr
-            self._yc_elev_hr_mask = data.yc_elev_hr_mask
+            if context_elev_hr:
+                self._xc_elev_hr = data.xc_elev_hr
+                self._yc_elev_hr = data.yc_elev_hr
+                self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xc_elev_station = data.xt_elev
             self._yc_elev_station = data.yt_elev
             self._xt = data.xt[:, :, data.train_stations]
@@ -310,9 +317,10 @@ class TemperatureGenerator(DataGenerator):
             n = data.yc_grid_train.shape[0]
             self._xc_grid = data.xc_grid
             self._yc_grid = data.yc_grid_train[data.cv_mask[:n]]
-            self._xc_elev_hr = data.xc_elev_hr
-            self._yc_elev_hr = data.yc_elev_hr
-            self._yc_elev_hr_mask = data.yc_elev_hr_mask
+            if context_elev_hr:
+                self._xc_elev_hr = data.xc_elev_hr
+                self._yc_elev_hr = data.yc_elev_hr
+                self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xc_elev_station = data.xt_elev
             self._yc_elev_station = data.yt_elev
             self._xt = data.xt[:, :, data.cv_stations]
@@ -325,9 +333,10 @@ class TemperatureGenerator(DataGenerator):
             self._times = data.times[data.eval_mask]
             self._xc_grid = data.xc_grid
             self._yc_grid = data.yc_grid_eval
-            self._xc_elev_hr = data.xc_elev_hr
-            self._yc_elev_hr = data.yc_elev_hr
-            self._yc_elev_hr_mask = data.yc_elev_hr_mask
+            if context_elev_hr:
+                self._xc_elev_hr = data.xc_elev_hr
+                self._yc_elev_hr = data.yc_elev_hr
+                self._yc_elev_hr_mask = data.yc_elev_hr_mask
             self._xc_elev_station = data.xt_elev
             self._yc_elev_station = data.yt_elev
             self._xt = data.xt[:, :, data.eval_stations]
@@ -365,22 +374,27 @@ class TemperatureGenerator(DataGenerator):
             i = self._inds[0]
             self._inds = self._inds[1:]
 
-            tasks.append(
-                {
-                    "xc_grid_lons": self._xc_grid[0],
-                    "xc_grid_lats": self._xc_grid[1],
-                    "yc_grid": self._yc_grid[i : i + 1],
-                    "xc_elev_hr_lons": self._xc_elev_hr[0],
-                    "xc_elev_hr_lats": self._xc_elev_hr[1],
-                    "yc_elev_hr": self._yc_elev_hr,
-                    "yc_elev_hr_mask": self._yc_elev_hr_mask,
-                    "xc_elev_station": self._xc_elev_station,
-                    "yc_elev_station": self._yc_elev_station,
-                    "xt": self._xt,
-                    "yt": self._yt[i : i + 1],
-                    "yt_elev": self._yt_elev,
-                }
-            )
+            task = {
+                "xc_grid_lons": self._xc_grid[0],
+                "xc_grid_lats": self._xc_grid[1],
+                "yc_grid": self._yc_grid[i : i + 1],
+                "xc_elev_station": self._xc_elev_station,
+                "yc_elev_station": self._yc_elev_station,
+                "xt": self._xt,
+                "yt": self._yt[i : i + 1],
+                "yt_elev": self._yt_elev,
+            }
+            if self.context_elev_hr:
+                task = dict(
+                    task,
+                    **{
+                        "xc_elev_hr_lons": self._xc_elev_hr[0],
+                        "xc_elev_hr_lats": self._xc_elev_hr[1],
+                        "yc_elev_hr": self._yc_elev_hr,
+                        "yc_elev_hr_mask": self._yc_elev_hr_mask,
+                    },
+                )
+            tasks.append(task)
 
         def _concat(*xs):
             if all(id(xs[0]) == id(x) for x in xs):
@@ -496,8 +510,12 @@ class TemperatureGenerator(DataGenerator):
             ((b["xc_grid_lons"], b["xc_grid_lats"]), b["yc_grid"]),
             # For the elevation, use a helpful normalisation.
             (
-                (b["xc_elev_hr_lons"], b["xc_elev_hr_lats"]),
-                Masked(b["yc_elev_hr"] / 100, b["yc_elev_hr_mask"]),
+                (
+                    (b["xc_elev_hr_lons"], b["xc_elev_hr_lats"]),
+                    Masked(b["yc_elev_hr"] / 100, b["yc_elev_hr_mask"]),
+                )
+                if self.context_elev_hr
+                else (None, None)
             ),
             (b["xc_elev_station"], b["yc_elev_station"] / 100),
         ]

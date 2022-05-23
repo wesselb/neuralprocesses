@@ -46,14 +46,17 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         config["plot"] = {}
 
     if task == "germany":
+        context_elev_hr = True
         data_task_train = "germany"
         data_task_cv = "germany"
         data_task_eval = "germany"
     elif task == "europe":
+        context_elev_hr = False
         data_task_train = "europe"
         data_task_cv = "europe"
         data_task_eval = "value"
     elif task == "value":
+        context_elev_hr = False
         data_task_train = "value"
         data_task_cv = "value"
         data_task_eval = "value"
@@ -66,6 +69,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         batch_size=args.batch_size,
         context_sample=context_sample,
         context_sample_factor=100,
+        context_elev_hr=context_elev_hr,
         target_min=10,
         target_square=target_square,
         target_elev=target_elev,
@@ -79,6 +83,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         batch_size=args.batch_size,
         context_sample=context_sample,
         context_sample_factor=100,
+        context_elev_hr=context_elev_hr,
         target_min=1,
         target_square=target_square,
         target_elev=target_elev,
@@ -96,6 +101,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
                 seed=30,
                 batch_size=args.batch_size,
                 context_sample=False,
+                context_elev_hr=context_elev_hr,
                 target_min=1,
                 target_square=3 if "eval-square" in args.experiment_setting else 0,
                 target_elev=target_elev,
@@ -112,6 +118,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
                 batch_size=args.batch_size,
                 context_sample=True,
                 context_sample_factor=100,
+                context_elev_hr=context_elev_hr,
                 target_min=1,
                 target_square=3 if "eval-square" in args.experiment_setting else 0,
                 target_elev=target_elev,
