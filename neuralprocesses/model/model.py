@@ -90,7 +90,9 @@ class Model:
     def __call__(
         self,
         state: B.RandomState,
-        contexts: List[Tuple[Union[B.Numeric, tuple], Union[B.Numeric, Masked]]],
+        contexts: List[
+            Tuple[Union[None, B.Numeric, tuple], Union[None, B.Numeric, Masked]],
+        ],
         xt,
         **kw_args,
     ):
@@ -104,7 +106,9 @@ class Model:
     @_dispatch
     def __call__(
         self,
-        contexts: List[Tuple[Union[B.Numeric, tuple], Union[B.Numeric, Masked]]],
+        contexts: List[
+            Tuple[Union[None, B.Numeric, tuple], Union[None, B.Numeric, Masked]]
+        ],
         xt,
         **kw_args,
     ):
