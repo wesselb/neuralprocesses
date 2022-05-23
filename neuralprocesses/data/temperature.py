@@ -13,11 +13,38 @@ __all__ = ["TemperatureGenerator"]
 
 
 class _TemperatureData:
-    def __init__(self, data_path, interpolate_yt_elev_from_grid=False):
+    def __init__(self, data_path, data_task, interpolate_yt_elev_from_grid=False):
+        if data_task not in {"germany", "europe", "value"}:
+            raise ValueError(
+                f'`data_task` must be one of "germany", "europe", or "value".'
+            )
+
         # Load the data splits.
-        self.train_stations = np.load(f"{data_path}/data/train_inds.npy")[100:]
-        self.cv_stations = np.load(f"{data_path}/data/train_inds.npy")[:100]
-        self.eval_stations = np.load(f"{data_path}/data/test_inds.npy")
+        if data_task == "germany":
+            # For Germany, the split is predetermined.
+            self.train_stations = np.load(f"{data_path}/data/train_inds.npy")[100:]
+            self.cv_stations = np.load(f"{data_path}/data/train_inds.npy")[:100]
+            self.eval_stations = np.load(f"{data_path}/data/test_inds.npy")
+        elif data_task == "value":
+            # For VALUE, we evaluate on the same stations that we train on, so there
+            # is no split.
+            self.train_stations = slice(None, None, None)
+            self.cv_stations = slice(None, None, None)
+            self.eval_stations = slice(None, None, None)
+        elif data_task == "europe":
+            # For the variant of VALUE, we train on different stations. In that case,
+            # we also choose our cross-validation set to also be on different stations.
+            # This split, however, is not predetermined, so we choose a random one here.
+            n = 3043
+            n_train = int(n * 0.85)
+            # The seed below should not be altered!
+            _, perm = B.randperm(B.create_random_state(np.int64, seed=99), np.int64, n)
+            self.train_stations = perm[:n_train]
+            self.cv_stations = perm[n_train:]
+            self.eval_stations = slice(None, None, None)
+        else:  # pragma: no cover
+            # This can never be reached.
+            raise RuntimeError(f'Bad data task "{data_task}".')
 
         # Load times associated with the data.
         self.times = pd.date_range("1979-01-01", "2009-01-01")[:-1]
@@ -27,40 +54,88 @@ class _TemperatureData:
         self.eval_mask = pd.Timestamp("2003-01-01") <= self.times
 
         # Load the gridded data and transpose into the right form.
-        # NOTE: `x_context.py` is stored with a transpose off.
-        self.xc_grid = np.load(f"{data_path}/data/context/x_context.npy")
-        # Here we correct for the transpose off:
-        self.xc_grid = (self.xc_grid[0, :, 0:1], self.xc_grid[:, 0, 1:2])
-        self.xc_grid = (self.xc_grid[0].T[None, :, :], self.xc_grid[1].T[None, :, :])
-        self.yc_grid_train = np.memmap(
-            f"{data_path}/data/context/y_context_training_mmap.dat",
-            dtype="float32",
-            mode="r",
-            shape=(8766, 25, 87, 50),
-        )
-        self.yc_grid_eval = np.memmap(
-            f"{data_path}/data/context/y_context_val_mmap.dat",
-            dtype="float32",
-            mode="r",
-            shape=(2192, 25, 87, 50),
-        )
+        if data_task == "germany":
+            # NOTE: `x_context.py` is stored with a transpose off.
+            self.xc_grid = np.load(f"{data_path}/data/context/x_context.npy")
+            # Here we correct for the transpose off. Note the colon comes second in the
+            # longitudes and first in the latitudes.
+            self.xc_grid = (
+                self.xc_grid[0, :, 0:1].T[None, :, :],
+                self.xc_grid[:, 0, 1:2].T[None, :, :],
+            )
+            self.yc_grid_train = np.memmap(
+                f"{data_path}/data/context/y_context_training_mmap.dat",
+                dtype="float32",
+                mode="r",
+                shape=(8766, 25, 87, 50),
+            )
+            self.yc_grid_eval = np.memmap(
+                f"{data_path}/data/context/y_context_val_mmap.dat",
+                dtype="float32",
+                mode="r",
+                shape=(2192, 25, 87, 50),
+            )
+        elif data_task in {"europe", "value"}:
+            self.xc_grid = np.load(
+                f"{data_path}/data/context/x_context_coarse_final.npy"
+            )
+            self.xc_grid = (
+                self.xc_grid[:, 0, 0:1].T[None, :, :],
+                self.xc_grid[0, :, 1:2].T[None, :, :],
+            )
+            self.yc_grid = np.load(
+                f"{data_path}/data/context/y_context_coarse_final.npy",
+                mmap_mode="r",
+            )
+            self.yc_grid_train = self.yc_grid[self.train_mask | self.cv_mask, ...]
+            self.yc_grid_train = self.yc_grid[self.eval_mask, ...]
+        else:  # pragma: no cover
+            # This can never be reached.
+            raise RuntimeError(f'Bad data task "{data_task}".')
 
         # Load targets and transpose into the right form.
-        self.xt = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
-        self.xt = self.xt.T[None, :, :]
-        self.yt = np.load(f"{data_path}/data/target/tmax_all_y_target.npy")
-        self.yt = self.yt[:, None, :]
+        if data_task in {"germany", "europe"}:
+            self.xt = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
+            self.xt = self.xt.T[None, :, :]
+            self.yt = np.load(f"{data_path}/data/target/tmax_all_y_target.npy")
+            self.yt = self.yt[:, None, :]
 
-        # Load elevation at targets and transpose into the right form.
-        self.xt_elev = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
-        self.xt_elev = self.xt_elev.T[None, :, :]
-        self.yt_elev = np.load(f"{data_path}/data/elevation/elev_tmax_all.npy")
-        # We just use the elevation and ignore the other two features.
-        self.yt_elev = self.yt_elev.T[None, :1, :]
+            # Load elevation at targets and transpose into the right form.
+            self.xt_elev = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
+            self.xt_elev = self.xt_elev.T[None, :, :]
+            self.yt_elev = np.load(f"{data_path}/data/elevation/elev_tmax_all.npy")
+            # We just use the elevation and ignore the other two features.
+            self.yt_elev = self.yt_elev.T[None, :1, :]
+        elif data_task == "value":
+            self.xt = np.load(f"{data_path}/data/target/value_x_target.npy")
+            self.xt = self.xt.T[None, :, :]
+            self.yt = np.load(f"{data_path}/data/target/tmax_value_y_target.npy")
+            self.yt = self.yt[:, None, :]
 
-        # Select the relevant subset for Germany.
-        lons = (6, 16)
-        lats = (47, 55)
+            # Load elevation at targets and transpose into the right form.
+            self.xt_elev = np.load(f"{data_path}/data/target/value_x_target.npy")
+            self.xt_elev = self.xt_elev.T[None, :, :]
+            self.yt_elev = np.load(f"{data_path}/data/elevation/elev_value.npy")
+            # We just use the elevation and ignore the other two features.
+            self.yt_elev = self.yt_elev.T[None, :1, :]
+        else:  # pragma: no cover
+            # This can never be reached.
+            raise RuntimeError(f'Bad data task "{data_task}".')
+
+        # Select the relevant subset of the data.
+        if data_task == "germany":
+            # For Germany, these bounds are chosen to match the predetermined train-test
+            # split. The bounds can therefore not be altered!
+            lons = (6, 16)
+            lats = (47, 55)
+        elif data_task in {"europe", "value"}:
+            # These bounds must cover all target stations; otherwise, the train-test
+            # split will not line up.
+            lons = (-15, 35)
+            lats = (35, 72)
+        else:  # pragma: no cover
+            # This can never be reached.
+            raise RuntimeError(f'Bad data task "{data_task}".')
 
         # Process the grids.
         lon_mask = lons[0] <= self.xc_grid[0][0, 0, :]
@@ -185,6 +260,7 @@ class TemperatureGenerator(DataGenerator):
         subset="train",
         passes=1,
         device="cpu",
+        data_task="germany",
         data_path="climate_data",
     ):
         self.context_sample = context_sample
@@ -198,7 +274,8 @@ class TemperatureGenerator(DataGenerator):
         # Load data if it isn't yet loaded.
         if TemperatureGenerator._data is None:
             TemperatureGenerator._data = _TemperatureData(
-                data_path,
+                data_path=data_path,
+                data_task=data_task,
                 interpolate_yt_elev_from_grid=target_elev_interpolate,
             )
         data = TemperatureGenerator._data
