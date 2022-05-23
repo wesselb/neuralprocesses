@@ -213,6 +213,8 @@ class TemperatureGenerator(DataGenerator):
             self._xc_elev_hr = data.xc_elev_hr
             self._yc_elev_hr = data.yc_elev_hr
             self._yc_elev_hr_mask = data.yc_elev_hr_mask
+            self._xc_elev_station = data.xt_elev
+            self._yc_elev_station = data.yt_elev
             self._xt = data.xt[:, :, data.train_stations]
             self._yt = data.yt[:, :, data.train_stations][data.train_mask]
             self._xt_elev = data.xt_elev[:, :, data.train_stations]
@@ -227,6 +229,8 @@ class TemperatureGenerator(DataGenerator):
             self._xc_elev_hr = data.xc_elev_hr
             self._yc_elev_hr = data.yc_elev_hr
             self._yc_elev_hr_mask = data.yc_elev_hr_mask
+            self._xc_elev_station = data.xt_elev
+            self._yc_elev_station = data.yt_elev
             self._xt = data.xt[:, :, data.cv_stations]
             self._yt = data.yt[:, :, data.cv_stations][data.cv_mask]
             self._xt_elev = data.xt_elev[:, :, data.cv_stations]
@@ -240,6 +244,8 @@ class TemperatureGenerator(DataGenerator):
             self._xc_elev_hr = data.xc_elev_hr
             self._yc_elev_hr = data.yc_elev_hr
             self._yc_elev_hr_mask = data.yc_elev_hr_mask
+            self._xc_elev_station = data.xt_elev
+            self._yc_elev_station = data.yt_elev
             self._xt = data.xt[:, :, data.eval_stations]
             self._yt = data.yt[:, :, data.eval_stations][data.eval_mask]
             self._xt_elev = data.xt_elev[:, :, data.eval_stations]
@@ -284,6 +290,8 @@ class TemperatureGenerator(DataGenerator):
                     "xc_elev_hr_lats": self._xc_elev_hr[1],
                     "yc_elev_hr": self._yc_elev_hr,
                     "yc_elev_hr_mask": self._yc_elev_hr_mask,
+                    "xc_elev_station": self._xc_elev_station,
+                    "yc_elev_station": self._yc_elev_station,
                     "xt": self._xt,
                     "yt": self._yt[i : i + 1],
                     "yt_elev": self._yt_elev,
@@ -406,6 +414,7 @@ class TemperatureGenerator(DataGenerator):
                 (b["xc_elev_hr_lons"], b["xc_elev_hr_lats"]),
                 Masked(b["yc_elev_hr"], b["yc_elev_hr_mask"]),
             ),
+            (b["xc_elev_station"], b["yc_elev_station"]),
         ]
 
         # Append the elevation as auxiliary information, if asked for.
