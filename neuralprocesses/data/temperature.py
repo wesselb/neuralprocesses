@@ -13,7 +13,7 @@ __all__ = ["TemperatureGenerator"]
 
 
 class _TemperatureData:
-    def __init__(self, data_path, data_task, interpolate_yt_elev_from_grid=False):
+    def __init__(self, data_path, data_task, interpolate_yt_elev_from_grid):
         if data_task not in {"germany", "europe", "value"}:
             raise ValueError(
                 f'`data_task` must be one of "germany", "europe", or "value".'
@@ -88,7 +88,7 @@ class _TemperatureData:
                 mmap_mode="r",
             )
             self.yc_grid_train = self.yc_grid[self.train_mask | self.cv_mask, ...]
-            self.yc_grid_train = self.yc_grid[self.eval_mask, ...]
+            self.yc_grid_eval = self.yc_grid[self.eval_mask, ...]
         else:  # pragma: no cover
             # This can never be reached.
             raise RuntimeError(f'Bad data task "{data_task}".')
@@ -111,6 +111,12 @@ class _TemperatureData:
             self.xt = self.xt.T[None, :, :]
             self.yt = np.load(f"{data_path}/data/target/tmax_value_y_target.npy")
             self.yt = self.yt[:, None, :]
+            mask = (
+                # The target values go up to 2011, but we only need up to 2009.
+                pd.date_range("1979-01-01", "2011-01-01")[:-1]
+                < pd.Timestamp("2009-01-01")
+            )
+            self.yt = self.yt[mask]
 
             # Load elevation at targets and transpose into the right form.
             self.xt_elev = np.load(f"{data_path}/data/target/value_x_target.npy")
@@ -216,9 +222,7 @@ class TemperatureGenerator(DataGenerator):
             auxiliary information. Defaults to `False`.
         target_elev_interpolate (bool, optional): Estimate the elevation at the target
             inputs by bilinearly interpolating the elevation on the high-resolution
-            1 km grid. Note that the loaded data is cached, which means that setting
-            this to `True` affects all data generators constructed after this. Defaults
-            to `False`.
+            1 km grid. Defaults to `False`.
         subset (str, optional): Subset of the data. Must be one of `"train"`, `"cv"` or
             `"eval"`. Defaults to `"train"`.
         passes (int, optional): How many times to cycle through the data in an epoch.
@@ -244,7 +248,7 @@ class TemperatureGenerator(DataGenerator):
         device (str): Device.
     """
 
-    _data = None
+    _data_cache = {}
 
     def __init__(
         self,
@@ -272,13 +276,17 @@ class TemperatureGenerator(DataGenerator):
         self.passes = passes
 
         # Load data if it isn't yet loaded.
-        if TemperatureGenerator._data is None:
-            TemperatureGenerator._data = _TemperatureData(
+        cache_key = (data_task, target_elev_interpolate)
+        try:
+            data = TemperatureGenerator._data_cache[cache_key]
+        except KeyError:
+            print("Miss!")
+            TemperatureGenerator._data_cache[cache_key] = _TemperatureData(
                 data_path=data_path,
                 data_task=data_task,
                 interpolate_yt_elev_from_grid=target_elev_interpolate,
             )
-        data = TemperatureGenerator._data
+            data = TemperatureGenerator._data_cache[cache_key]
 
         if subset == "train":
             num_tasks = data.train_mask.sum()

@@ -94,17 +94,17 @@ def test_predefined_gens(nps, gen, dim_x, dim_y):
 
 
 @_dispatch
-def _within_germany(x: B.Numeric):
-    return _lons_lats_within_germany(x[:, 0, :], x[:, 1, :])
+def _centred_around_europe(x: B.Numeric):
+    return _lons_lats_centred_around_europe(x[:, 0, :], x[:, 1, :])
 
 
 @_dispatch
-def _within_germany(x: tuple):
-    return _lons_lats_within_germany(x[0], x[1])
+def _centred_around_europe(x: tuple):
+    return _lons_lats_centred_around_europe(x[0], x[1])
 
 
-def _lons_lats_within_germany(lons, lats):
-    return (6 <= B.mean(lons) <= 16) and (47 <= B.mean(lats) <= 55)
+def _lons_lats_centred_around_europe(lons, lats):
+    return (-10 <= B.mean(lons) <= 30) and (40 <= B.mean(lats) <= 70)
 
 
 @_dispatch
@@ -118,12 +118,14 @@ def _bcn_form(x: tuple):
 
 
 @pytest.mark.xfail()
+@pytest.mark.parametrize("data_task", ["germany", "europe", "value"])
 @pytest.mark.parametrize("subset", ["train", "cv", "eval"])
 @pytest.mark.parametrize("context_sample", [False, True])
-@pytest.mark.parametrize("target_square", [0, 5])
+@pytest.mark.parametrize("target_square", [0, 10])
 @pytest.mark.parametrize("target_elev", [False, True])
 def test_temperature(
     nps,
+    data_task,
     subset,
     context_sample,
     target_square,
@@ -134,9 +136,10 @@ def test_temperature(
         batch_size=16,
         context_sample=context_sample,
         context_sample_factor=10,
-        target_min=15,
+        target_min=3,
         target_square=target_square,
         target_elev=target_elev,
+        data_task=data_task,
         subset=subset,
     )
     batch = gen.generate_batch()
@@ -149,7 +152,7 @@ def test_temperature(
         yc = yc.y
         assert B.shape(xc, -1) > 0
         assert B.shape(yc, -1) > 0
-        assert _within_germany(xc)
+        assert _centred_around_europe(xc)
     else:
         assert B.shape(xc, -1) == 0
         assert B.shape(yc, -1) == 0
@@ -158,14 +161,22 @@ def test_temperature(
     xc, yc = batch["contexts"][1]  # Gridded data
     assert _bcn_form(xc)
     assert _bcn_form(yc)
-    assert _within_germany(xc)
+    assert _centred_around_europe(xc)
 
     xc, yc = batch["contexts"][2]  # Gridded elevation
     assert isinstance(yc, Masked)  # Gridded elevation is masked to deal with NaNs.
     yc = yc.y
     assert _bcn_form(xc)
     assert _bcn_form(yc)
-    assert _within_germany(xc)
+    assert _centred_around_europe(xc)
+
+    xc, yc = batch["contexts"][3]  # Station elevation
+    assert _bcn_form(xc)
+    assert _bcn_form(yc)
+    assert _centred_around_europe(xc)
+    # Station elevations must be like the gridded elevation. E.g., this check that
+    # they are normalised similarly.
+    assert B.abs(B.mean(yc) - B.mean(batch["contexts"][2][1].y)) < 2
 
     # Check the targets.
     xt, yt = batch["xt"], batch["yt"]
@@ -174,16 +185,16 @@ def test_temperature(
         assert isinstance(xt, AugmentedInput)
         assert _bcn_form(xt.x)
         assert _bcn_form(xt.augmentation)
-        assert B.shape(xt.x, -1) >= 15
+        assert B.shape(xt.x, -1) >= 3
         assert B.shape(xt.x, -1) == B.shape(xt.augmentation, -1)
-        assert _within_germany(xt.x)
+        assert _centred_around_europe(xt.x)
     else:
         assert not isinstance(xt, AugmentedInput)
         assert _bcn_form(xt)
-        assert B.shape(xt, -1) >= 15
-        assert _within_germany(xt)
+        assert B.shape(xt, -1) >= 3
+        assert _centred_around_europe(xt)
     assert _bcn_form(yt)
-    assert B.shape(yt, -1) >= 15
+    assert B.shape(yt, -1) >= 3
 
     # Check that all targets lie in the same square.
     if target_square > 0:
