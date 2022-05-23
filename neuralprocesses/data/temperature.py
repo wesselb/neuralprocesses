@@ -2,6 +2,7 @@ import lab as B
 import netCDF4
 import numpy as np
 import pandas as pd
+from scipy.interpolate import griddata
 
 from .data import DataGenerator
 from ..augment import AugmentedInput
@@ -12,7 +13,7 @@ __all__ = ["TemperatureGenerator"]
 
 
 class _TemperatureData:
-    def __init__(self, data_path):
+    def __init__(self, data_path, interpolate_yt_elev_from_grid=False):
         # Load the data splits.
         self.train_stations = np.load(f"{data_path}/data/train_inds.npy")[100:]
         self.cv_stations = np.load(f"{data_path}/data/train_inds.npy")[:100]
@@ -53,8 +54,9 @@ class _TemperatureData:
         # Load elevation at targets and transpose into the right form.
         self.xt_elev = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
         self.xt_elev = self.xt_elev.T[None, :, :]
-        self.yt_elev = np.load(f"{data_path}/data/elevation/elev_tmax_all.npy")
-        self.yt_elev = self.yt_elev.T[None, :, :]
+        if not interpolate_yt_elev_from_grid:
+            self.yt_elev = np.load(f"{data_path}/data/elevation/elev_tmax_all.npy")
+            self.yt_elev = self.yt_elev.T[None, :, :]
 
         # Select the relevant subset for Germany.
         lons = (6, 16)
@@ -101,8 +103,30 @@ class _TemperatureData:
         # The high-resolution elevation is lat-lon form, so we need to transpose. This
         # is relatively safe, because the code will break if we get this wrong.
         # Moreover, normalise by 100 to stabilise initialisation.
-        self.yc_elev_hr = B.t(elev_hr_data)[None, None, :] / 100
-        self.yc_elev_hr_mask = B.t(elev_hr_mask)[None, None, :]
+        self.yc_elev_hr = B.transpose(elev_hr_data)[None, None, :] / 100
+        self.yc_elev_hr_mask = B.transpose(elev_hr_mask)[None, None, :]
+
+        if interpolate_yt_elev_from_grid:
+            # First, we reshape the grid data in a form that `griddata` expects.
+            z = self.yc_elev_hr[0, 0]
+            x = B.flatten(self.xc_elev_hr[0])
+            y = B.flatten(self.xc_elev_hr[1])
+            x = B.broadcast_to(x[:, None], *B.shape(z))
+            y = B.broadcast_to(y[None, :], *B.shape(z))
+            xy = B.stack(B.flatten(x), B.flatten(y), axis=1)
+            # Perform bilinear interpolation to `self.xt_elev`.
+            self.yt_elev = griddata(
+                xy,
+                B.flatten(z),
+                B.transpose(self.xt_elev[0]),
+            )[None, None, :]
+            # Concatenate zeros to fill in the two features.
+            self.yt_elev = B.concat(
+                self.yt_elev,
+                B.zeros(self.yt_elev),
+                B.zero(self.yt_elev),
+                axis=-2,
+            )
 
 
 class TemperatureGenerator(DataGenerator):
@@ -304,7 +328,7 @@ class TemperatureGenerator(DataGenerator):
                 )
 
                 # Only stop sampling if the minimum number of targets was selected.
-                if B.jit_to_numpy(B.sum(mask)) >= self.target_min:
+                if B.sum(B.cast(B.dtype_float(mask), mask)) >= self.target_min:
                     b["xc_s_outside_square"] = B.take(b["xt"], ~mask, axis=-1)
                     b["yc_s_outside_square"] = B.take(b["yt"], ~mask, axis=-1)
                     b["xt"] = B.take(b["xt"], mask, axis=-1)
