@@ -144,7 +144,7 @@ def construct_fullconvgnp(
             in_channels=conv_in_channels + 1,  # Add identity channel.
             # We need covariance matrices for every pair of outputs.
             out_channels=dim_yt * dim_yt,
-            # Keep the parameters in check.
+            # Keep the number of parameters in check.
             channels=tuple(int(n / kernel_factor) for n in unet_channels),
             kernels=unet_kernels,
             strides=unet_strides,
@@ -174,7 +174,8 @@ def construct_fullconvgnp(
             in_channels=conv_in_channels + 1,  # Add identity channel.
             # We need covariance matrices for every pair of outputs.
             out_channels=dim_yt * dim_yt,
-            channels=int(conv_channels / kernel_factor),  # Keep the parameters in check.
+            # Keep the number of parameters in check.
+            channels=int(conv_channels / kernel_factor),
             num_layers=conv_layers,
             points_per_unit=points_per_unit / kernel_factor,  # Keep memory in control.
             receptive_field=conv_receptive_field,
