@@ -203,6 +203,10 @@ def construct_climate_convgnp_multires(
         dim=2,
     )
 
+    # Create some set convolutions that we'll reuse:
+    mr_hr_set_conv = nps.SetConv(scale=hr_deg, dtype=dtype)
+    hr_hr_set_conv = nps.SetConv(scale=hr_deg, dtype=dtype)
+
     encoder = nps.Chain(
         nps.RestructureParallel(
             ("station", "grid", "elev_grid", "elev_station"),
@@ -235,8 +239,10 @@ def construct_climate_convgnp_multires(
                     nps.PrependDensityChannel(),
                     nps.Parallel(
                         nps.SetConv(scale=mr_deg, dtype=dtype),
-                        nps.SetConv(scale=hr_deg, dtype=dtype),
-                        nps.SetConv(scale=hr_deg, dtype=dtype),
+                        # We'll use the same set convolution twice to ensure that the
+                        # length scale are coupled.
+                        mr_hr_set_conv,
+                        mr_hr_set_conv,
                     ),
                     # Merge the encodings of the high-resolution elevation grid and the
                     # elevation at the stations.
@@ -262,8 +268,10 @@ def construct_climate_convgnp_multires(
                     nps.PrependDensityChannel(),
                     nps.Parallel(
                         nps.SetConv(scale=hr_deg, dtype=dtype),
-                        nps.SetConv(scale=hr_deg, dtype=dtype),
-                        nps.SetConv(scale=hr_deg, dtype=dtype),
+                        # We'll use the same set convolution twice to ensure that the
+                        # length scale are coupled.
+                        hr_hr_set_conv,
+                        hr_hr_set_conv,
                     ),
                     # Merge the encodings of the high-resolution elevation grid and the
                     # elevation at the stations.
