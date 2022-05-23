@@ -44,6 +44,11 @@ def batch_index(t: list, index):
 
 
 @_dispatch
+def batch_index(_: None, index):
+    return None
+
+
+@_dispatch
 def batch_index(xt: AggregateInput, index):
     return AggregateInput(*((batch_index(xti, index), i) for xti, i in xt))
 
