@@ -102,8 +102,7 @@ class _TemperatureData:
         )
         # The high-resolution elevation is lat-lon form, so we need to transpose. This
         # is relatively safe, because the code will break if we get this wrong.
-        # Moreover, normalise by 100 to stabilise initialisation.
-        self.yc_elev_hr = B.transpose(elev_hr_data)[None, None, :] / 100
+        self.yc_elev_hr = B.transpose(elev_hr_data)[None, None, :]
         self.yc_elev_hr_mask = B.transpose(elev_hr_mask)[None, None, :]
 
         if interpolate_yt_elev_from_grid:
