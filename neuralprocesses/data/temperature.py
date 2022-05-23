@@ -409,11 +409,12 @@ class TemperatureGenerator(DataGenerator):
         b["contexts"] = [
             (b["xc_s"], b["yc_s"]),
             ((b["xc_grid_lons"], b["xc_grid_lats"]), b["yc_grid"]),
+            # For the elevation, use a helpful normalisation.
             (
                 (b["xc_elev_hr_lons"], b["xc_elev_hr_lats"]),
-                Masked(b["yc_elev_hr"], b["yc_elev_hr_mask"]),
+                Masked(b["yc_elev_hr"] / 100, b["yc_elev_hr_mask"]),
             ),
-            (b["xc_elev_station"], b["yc_elev_station"]),
+            (b["xc_elev_station"], b["yc_elev_station"] / 100),
         ]
 
         # Append the elevation as auxiliary information, if asked for.
