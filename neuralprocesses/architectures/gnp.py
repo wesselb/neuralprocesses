@@ -141,7 +141,7 @@ def construct_gnp(
                     for dim_yci in dim_yc
                 ),
             ),
-            nps.Materialise(),
+            nps.Concatenate(),
             nps.MLP(
                 in_dim=dim_embedding * len(dim_yc),
                 out_dim=lv_mlp_out_channels,
@@ -170,7 +170,7 @@ def construct_gnp(
         ),
     )
     decoder = nps.Chain(
-        nps.Materialise(),
+        nps.Concatenate(),
         nps.RepeatForAggregateInputs(
             nps.Chain(
                 nps.MLP(

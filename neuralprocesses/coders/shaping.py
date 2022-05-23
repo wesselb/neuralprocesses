@@ -5,7 +5,17 @@ from ..datadims import data_dims
 from ..parallel import Parallel
 from ..util import register_module, split
 
-__all__ = ["Splitter", "RestructureParallel"]
+__all__ = ["Identity", "Splitter", "RestructureParallel"]
+
+
+@register_module
+class Identity:
+    """Identity coder."""
+
+
+@_dispatch
+def code(coder: Identity, xz, z, x, **kw_args):
+    return xz, z
 
 
 @register_module

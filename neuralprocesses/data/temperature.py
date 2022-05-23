@@ -54,9 +54,9 @@ class _TemperatureData:
         # Load elevation at targets and transpose into the right form.
         self.xt_elev = np.load(f"{data_path}/data/target/tmax_all_x_target.npy")
         self.xt_elev = self.xt_elev.T[None, :, :]
-        if not interpolate_yt_elev_from_grid:
-            self.yt_elev = np.load(f"{data_path}/data/elevation/elev_tmax_all.npy")
-            self.yt_elev = self.yt_elev.T[None, :, :]
+        self.yt_elev = np.load(f"{data_path}/data/elevation/elev_tmax_all.npy")
+        # We just use the elevation and ignore the other two features.
+        self.yt_elev = self.yt_elev.T[None, :1, :]
 
         # Select the relevant subset for Germany.
         lons = (6, 16)
@@ -120,13 +120,6 @@ class _TemperatureData:
                 B.flatten(z),
                 B.transpose(self.xt_elev[0]),
             )[None, None, :]
-            # Concatenate zeros to fill in the two features.
-            self.yt_elev = B.concat(
-                self.yt_elev,
-                B.zeros(self.yt_elev),
-                B.zero(self.yt_elev),
-                axis=-2,
-            )
 
 
 class TemperatureGenerator(DataGenerator):
@@ -147,6 +140,11 @@ class TemperatureGenerator(DataGenerator):
             Defaults to not sampling a square.
         target_elev (bool, optional): Append the elevation at the target inputs as
             auxiliary information. Defaults to `False`.
+        target_elev_interpolate (bool, optional): Estimate the elevation at the target
+            inputs by bilinearly interpolating the elevation on the high-resolution
+            1 km grid. Note that the loaded data is cached, which means that setting
+            this to `True` affects all data generators constructed after this. Defaults
+            to `False`.
         subset (str, optional): Subset of the data. Must be one of `"train"`, `"cv"` or
             `"eval"`. Defaults to `"train"`.
         passes (int, optional): How many times to cycle through the data in an epoch.
@@ -184,6 +182,7 @@ class TemperatureGenerator(DataGenerator):
         target_min=5,
         target_square=0.0,
         target_elev=False,
+        target_elev_interpolate=False,
         subset="train",
         passes=1,
         device="cpu",
@@ -199,7 +198,10 @@ class TemperatureGenerator(DataGenerator):
 
         # Load data if it isn't yet loaded.
         if TemperatureGenerator._data is None:
-            TemperatureGenerator._data = _TemperatureData(data_path)
+            TemperatureGenerator._data = _TemperatureData(
+                data_path,
+                interpolate_yt_elev_from_grid=target_elev_interpolate,
+            )
         data = TemperatureGenerator._data
 
         if subset == "train":

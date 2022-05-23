@@ -343,7 +343,7 @@ def construct_convgnp(
                     dtype,
                 ),
                 _convgnp_optional_division_by_density(nps, divide_by_density, epsilon),
-                nps.Materialise(),
+                nps.Concatenate(),
                 lv_conv,
                 encoder_likelihood,
             ),

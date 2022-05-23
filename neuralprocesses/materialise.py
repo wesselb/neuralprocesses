@@ -7,16 +7,19 @@ from .datadims import data_dims
 from .parallel import Parallel
 from .util import register_module
 
-__all__ = ["Materialise"]
+__all__ = ["Materialise", "Concatenate", "Sum"]
 
 
 @register_module
-class Materialise:
-    """Materialise an aggregate encoding."""
+class Concatenate:
+    """Materialise an aggregate encoding by concatenating."""
+
+
+Materialise = Concatenate  #: Alias of `.Concatenate` for backward compatibility.
 
 
 @_dispatch
-def code(coder: Materialise, xz, z, x, **kw_args):
+def code(coder: Concatenate, xz, z, x, **kw_args):
     return _merge(xz), _repeat_concat(data_dims(xz), z)
 
 
@@ -177,3 +180,23 @@ def _repeat_concat(dims, z1: Aggregate, z2):
 @_dispatch
 def _repeat_concat(dims, z1, z2: Aggregate):
     return Aggregate(*(_repeat_concat(dims, z1, z2i) for z2i in z2))
+
+
+@register_module
+class Sum:
+    """Materialise an aggregate encoding by summing."""
+
+
+@_dispatch
+def code(coder: Sum, xz, z, x, **kw_args):
+    return _merge(xz), _sum(z)
+
+
+@_dispatch
+def _sum(z: B.Numeric):
+    return z
+
+
+@_dispatch
+def _sum(zs: Parallel):
+    return sum(zs, 0)

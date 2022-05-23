@@ -51,8 +51,11 @@ def construct_climate_convgnp_mlp(
     )
 
     encoder = nps.Chain(
-        nps.RestructureParallel(("station", "grid", "elev_grid"), ("grid",)),
-        nps.Materialise(),
+        nps.RestructureParallel(
+            ("station", "grid", "elev_grid", "elev_station"),
+            ("grid",),
+        ),
+        nps.Concatenate(),
         nps.DeterministicLikelihood(),
     )
 
@@ -63,8 +66,8 @@ def construct_climate_convgnp_mlp(
                 nps.SetConv(scale=lr_deg, dtype=dtype),
                 nps.Augment(
                     nps.MLP(
-                        in_dim=128 + 3,
-                        layers=(128 + 3, 128, 128),
+                        in_dim=128 + 1,
+                        layers=(128 + 1, 128, 128),
                         out_dim=likelihood_in_channels,
                         dtype=dtype,
                     ),
@@ -92,15 +95,15 @@ def construct_climate_convgnp_multires(
     dtype=None,
     nps=nps,
 ):
-    """Construct a multiresolution ConvGNP model for climate downscaling.
+    """Construct a multi-resolution ConvGNP model for climate downscaling and fusion.
 
     Args:
         width_lr (int, optional): Width of the low-resolution residual network. Defaults
             to 128.
-        width_mr (int, optional): Width of the medium-resolution UNet. Defaults to 32.
-        width_hr (int, optional): Width of the high-resolution UNet. Defaults to 32.
+        width_mr (int, optional): Width of the medium-resolution UNet. Defaults to 64.
+        width_hr (int, optional): Width of the high-resolution UNet. Defaults to 64.
         width_bridge (int, optional): Number of channels to pass between the
-            resolutions. Defaults to 32.
+            resolutions. Defaults to 64.
         lr_deg (float, optional): Resolution of the low-resolution grid. Defaults to
             0.75.
         mr_deg (float, optional): Resolution of the medium-resolution grid. Defaults to
@@ -130,7 +133,7 @@ def construct_climate_convgnp_multires(
         )
     else:
         conv_hr_out_channels = likelihood_in_channels
-        mlp = lambda x: x
+        mlp = nps.Identity()
 
     # Low-resolution CNN:
     conv_lr = nps.ConvNet(
@@ -157,14 +160,17 @@ def construct_climate_convgnp_multires(
         dim=2,
         # Stations, HR elevation, and low-resolution output:
         in_channels=(1 + 1) + (1 + 1) + width_bridge,
-        # Four channels should give a TF of at least ten.
+        # Four striding channels should give a TF of at least ten.
         channels=(width_mr, width_mr, width_mr, 2 * width_mr, 2 * width_hr),
+        # The first stride is set to 1 to ensure a convolutional layer at the highest
+        # resolution.
         strides=(1, 2, 2, 2, 2),
         out_channels=width_bridge,
         resize_convs=True,
         resize_conv_interp_method="bilinear",
         dtype=dtype,
     )
+    assert conv_mr.receptive_field * mr_deg >= 10
     disc_mr = nps.Discretisation(
         points_per_unit=1 / mr_deg,
         multiple=2**conv_mr.num_halving_layers,
@@ -178,8 +184,10 @@ def construct_climate_convgnp_multires(
         dim=2,
         # Stations, HR elevation, and medium-resolution output:
         in_channels=(1 + 1) + (1 + 1) + width_bridge,
-        # Four channels should give a TF of at least one.
+        # Three striding channels should give a RF of at least 0.5.
         channels=(width_hr, width_hr, width_hr, 2 * width_hr),
+        # The first stride is set to 1 to ensure a convolutional layer at the highest
+        # resolution.
         strides=(1, 2, 2, 2),
         out_channels=conv_hr_out_channels,
         resize_convs=True,
@@ -197,11 +205,11 @@ def construct_climate_convgnp_multires(
 
     encoder = nps.Chain(
         nps.RestructureParallel(
-            ("station", "grid", "elev_grid"),
+            ("station", "grid", "elev_grid", "elev_station"),
             (
                 ("grid",),
-                ("station", "elev_grid"),
-                ("station", "elev_grid"),
+                ("station", "elev_grid", "elev_station"),
+                ("station", "elev_grid", "elev_station"),
             ),
         ),
         nps.Parallel(
@@ -214,7 +222,7 @@ def construct_climate_convgnp_multires(
                         nps.SetConv(scale=lr_deg, dtype=dtype),
                     ),
                     nps.DivideByFirstChannel(),
-                    nps.Materialise(),
+                    nps.Concatenate(),
                     nps.DeterministicLikelihood(),
                 ),
                 # Let the discretisation target both the context and target inputs.
@@ -228,9 +236,20 @@ def construct_climate_convgnp_multires(
                     nps.Parallel(
                         nps.SetConv(scale=mr_deg, dtype=dtype),
                         nps.SetConv(scale=hr_deg, dtype=dtype),
+                        nps.SetConv(scale=hr_deg, dtype=dtype),
+                    ),
+                    # Merge the encodings of the high-resolution elevation grid and the
+                    # elevation at the stations.
+                    nps.RestructureParallel(
+                        ("station", "elev_grid", "elev_station"),
+                        ("station", ("elev_grid", "elev_station")),
+                    ),
+                    nps.Parallel(
+                        nps.Identity(),
+                        nps.Sum(),
                     ),
                     nps.DivideByFirstChannel(),
-                    nps.Materialise(),
+                    nps.Concatenate(),
                     nps.DeterministicLikelihood(),
                 ),
                 # Let the discretisation only target the target inputs.
@@ -244,9 +263,20 @@ def construct_climate_convgnp_multires(
                     nps.Parallel(
                         nps.SetConv(scale=hr_deg, dtype=dtype),
                         nps.SetConv(scale=hr_deg, dtype=dtype),
+                        nps.SetConv(scale=hr_deg, dtype=dtype),
+                    ),
+                    # Merge the encodings of the high-resolution elevation grid and the
+                    # elevation at the stations.
+                    nps.RestructureParallel(
+                        ("station", "elev_grid", "elev_station"),
+                        ("station", ("elev_grid", "elev_station")),
+                    ),
+                    nps.Parallel(
+                        nps.Identity(),
+                        nps.Sum(),
                     ),
                     nps.DivideByFirstChannel(),
-                    nps.Materialise(),
+                    nps.Concatenate(),
                     nps.DeterministicLikelihood(),
                 ),
                 # Let the discretisation only target the target inputs.
@@ -258,8 +288,8 @@ def construct_climate_convgnp_multires(
     decoder = nps.Chain(
         nps.Parallel(
             conv_lr,
-            lambda x: x,
-            lambda x: x,
+            nps.Identity(),
+            nps.Identity(),
         ),
         nps.RestructureParallel(("lr", "mr", "hr"), (("lr", "mr"), "hr")),
         nps.Parallel(
@@ -267,7 +297,7 @@ def construct_climate_convgnp_multires(
                 nps.Fuse(nps.SetConv(scale=lr_deg, dtype=dtype)),
                 conv_mr,
             ),
-            lambda x: x,
+            nps.Identity(),
         ),
         nps.Fuse(nps.SetConv(scale=mr_deg, dtype=dtype)),
         conv_hr,

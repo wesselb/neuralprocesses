@@ -413,7 +413,7 @@ encoder = nps.FunctionalCoder(
         ),
         nps.DivideByFirstChannel(),
         # Concatenate the encodings of the context sets.
-        nps.Materialise(),
+        nps.Concatenate(),
         nps.DeterministicLikelihood(),
     ),
 )

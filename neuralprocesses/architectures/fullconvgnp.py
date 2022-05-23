@@ -222,7 +222,7 @@ def construct_fullconvgnp(
                             divide_by_density,
                             epsilon,
                         ),
-                        nps.Materialise(),
+                        nps.Concatenate(),
                         nps.DeterministicLikelihood(),
                     ),
                 ),
@@ -246,7 +246,7 @@ def construct_fullconvgnp(
                                 divide_by_density,
                                 epsilon,
                             ),
-                            nps.Materialise(),
+                            nps.Concatenate(),
                             # We only need the identity channel once, so insert it after
                             # materialising.
                             nps.PrependIdentityChannel(),

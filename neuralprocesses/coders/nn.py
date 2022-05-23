@@ -433,6 +433,7 @@ class ConvNet:
             # Compute the receptive field size.
             receptive_points = kernel + num_layers * (kernel - 1)
             receptive_field = receptive_points / points_per_unit
+            self.kernel = kernel
 
         # Make it a drop-in substitute for :class:`UNet`.
         self.num_halving_layers = 0
