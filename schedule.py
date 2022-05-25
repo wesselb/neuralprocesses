@@ -237,6 +237,21 @@ async def main():
                 f"elbo --num-samples 5",
             ]
         ]
+    elif args.collection == "eeg-conditional":
+        # Don't run the FullConvGNP here. It's too expensive. We'll do it separately.
+        commands = [
+            f"python train.py --data eeg --model {model}"
+            for model in ["convcnp", "convgnp", "acnp"]
+        ]
+    elif args.collection == "eeg-latent-variable":
+        commands = [
+            f"python train.py --data eeg --model {model} --objective {objective}"
+            for model in ["anp", "convnp"]
+            for objective in [
+                f"loglik --num-samples 20",
+                f"elbo --num-samples 5",
+            ]
+        ]
     elif args.collection == "temperature-convcnp-mlp":
         # Run `europe` and `value` for all five folds, but run `germany` only for the
         # last fold.
