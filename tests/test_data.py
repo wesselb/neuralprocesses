@@ -1,10 +1,12 @@
 import lab as B
 import pytest
+import numpy as np
 from plum import Dispatcher
 from neuralprocesses.augment import AugmentedInput
 from neuralprocesses.mask import Masked
 
-from .util import nps  # noqa
+
+from .util import nps, remote_xfail  # noqa
 
 
 _dispatch = Dispatcher()
@@ -104,7 +106,7 @@ def _centred_around_europe(x: tuple):
 
 
 def _lons_lats_centred_around_europe(lons, lats):
-    return (-10 <= B.mean(lons) <= 30) and (40 <= B.mean(lats) <= 70)
+    return (-20 <= B.mean(lons) <= 40) and (40 <= B.mean(lats) <= 75)
 
 
 @_dispatch
@@ -117,16 +119,14 @@ def _bcn_form(x: tuple):
     return all(_bcn_form(xi) for xi in x)
 
 
-@pytest.mark.xfail()
+@remote_xfail
 @pytest.mark.parametrize("data_task", ["germany", "europe", "value"])
-@pytest.mark.parametrize("subset", ["train", "cv", "eval"])
 @pytest.mark.parametrize("context_sample", [False, True])
 @pytest.mark.parametrize("target_square", [0, 10])
 @pytest.mark.parametrize("target_elev", [False, True])
 def test_temperature(
     nps,
     data_task,
-    subset,
     context_sample,
     target_square,
     target_elev,
@@ -139,8 +139,9 @@ def test_temperature(
         target_min=3,
         target_square=target_square,
         target_elev=target_elev,
+        subset="train",
         data_task=data_task,
-        subset=subset,
+        data_fold=1,
     )
     batch = gen.generate_batch()
 
@@ -202,3 +203,34 @@ def test_temperature(
             assert isinstance(xt, AugmentedInput)
             xt = xt.x
         assert B.max(B.pw_dists(B.transpose(xt))) <= B.sqrt(2) * target_square
+
+
+@remote_xfail
+@pytest.mark.parametrize("data_task", ["germany", "europe", "value"])
+def test_temperature_splitting(nps, data_task):
+    # Check that the subsets and folds correctly divide things up.
+    eval_masks = []
+
+    for fold in [1, 2, 3, 4, 5]:
+        masks = []
+        for subset in ["train", "cv", "eval"]:
+            masks.append(
+                nps.TemperatureGenerator(
+                    nps.dtype,
+                    subset=subset,
+                    data_task=data_task,
+                    data_fold=fold,
+                )._mask
+            )
+            if subset == "eval":
+                eval_masks.append(masks[-1])
+
+        # Check current subsets.
+        assert (masks[0] | masks[1] | masks[2]).all()
+        assert ~(masks[0] & masks[1]).any()
+        assert ~(masks[1] & masks[2]).any()
+        assert ~(masks[0] & masks[2]).any()
+
+    # Check folds.
+    assert np.logical_or.reduce(eval_masks).all()
+    assert ~np.logical_and.reduce(eval_masks).any()

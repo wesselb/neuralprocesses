@@ -13,7 +13,9 @@ __all__ = ["TemperatureGenerator"]
 
 
 class _TemperatureData:
-    def __init__(self, data_path, data_task, context_elev_hr, target_elev_interpolate):
+    def __init__(
+        self, data_path, data_task, data_fold, context_elev_hr, target_elev_interpolate
+    ):
         if data_task not in {"germany", "europe", "value"}:
             raise ValueError(
                 f'`data_task` must be one of "germany", "europe", or "value".'
@@ -21,7 +23,8 @@ class _TemperatureData:
 
         # Load the data splits.
         if data_task == "germany":
-            # For Germany, the split is predetermined.
+            # For Germany, the split is predetermined. We agree to use the first 100
+            # indices for cross-validation.
             self.train_stations = np.load(f"{data_path}/data/train_inds.npy")[100:]
             self.cv_stations = np.load(f"{data_path}/data/train_inds.npy")[:100]
             self.eval_stations = np.load(f"{data_path}/data/test_inds.npy")
@@ -33,11 +36,13 @@ class _TemperatureData:
             self.eval_stations = slice(None, None, None)
         elif data_task == "europe":
             # For the variant of VALUE, we train on different stations. In that case,
-            # we also choose our cross-validation set to also be on different stations.
+            # we choose our cross-validation set to also be on different stations.
             # This split, however, is not predetermined, so we choose a random one here.
             n = 3043
             n_train = int(n * 0.85)
-            # The seed below should not be altered!
+            # The seed below should not be altered! NumPy's `RandomState` policy says
+            # that this should always produce the exact same permutation for the same
+            # seed.
             _, perm = B.randperm(B.create_random_state(np.int64, seed=99), np.int64, n)
             self.train_stations = perm[:n_train]
             self.cv_stations = perm[n_train:]
@@ -47,11 +52,26 @@ class _TemperatureData:
             raise RuntimeError(f'Bad data task "{data_task}".')
 
         # Load times associated with the data.
+        if data_fold not in {1, 2, 3, 4, 5}:
+            raise ValueError("`data_fold` must be a number between 1 and 5.")
         self.times = pd.date_range("1979-01-01", "2009-01-01")[:-1]
-        self.train_mask = self.times < pd.Timestamp("2000-01-01")
-        self.cv_mask = pd.Timestamp("2000-01-01") <= self.times
-        self.cv_mask &= self.times < pd.Timestamp("2003-01-01")
-        self.eval_mask = pd.Timestamp("2003-01-01") <= self.times
+        _pdt = pd.Timestamp
+        folds = [
+            (_pdt("1979-01-01") <= self.times) & (self.times < _pdt("1985-01-01")),
+            (_pdt("1985-01-01") <= self.times) & (self.times < _pdt("1991-01-01")),
+            (_pdt("1991-01-01") <= self.times) & (self.times < _pdt("1997-01-01")),
+            (_pdt("1997-01-01") <= self.times) & (self.times < _pdt("2003-01-01")),
+            (_pdt("2003-01-01") <= self.times) & (self.times < _pdt("2009-01-01")),
+        ]
+        # `data_fold` starts at 1 rather than 0.
+        train_folds = [fold for i, fold in enumerate(folds) if i != data_fold - 1]
+        self.train_mask = np.logical_or.reduce(train_folds)
+        self.eval_mask = folds[data_fold - 1]
+        # Take the last 1000 days (a little under three years) for cross-validation.
+        inds = set(np.where(self.train_mask)[0][-1000:])
+        self.cv_mask = np.array([i in inds for i in range(len(self.train_mask))])
+        # Cancel the cross-validation in the training mask.
+        self.train_mask = self.train_mask & ~self.cv_mask
 
         # Load the gridded data and transpose into the right form.
         if data_task == "germany":
@@ -75,6 +95,7 @@ class _TemperatureData:
                 mode="r",
                 shape=(2192, 25, 87, 50),
             )
+            self.yc_grid = B.concat(self.yc_grid_train, self.yc_grid_eval, axis=0)
         elif data_task in {"europe", "value"}:
             self.xc_grid = np.load(
                 f"{data_path}/data/context/x_context_coarse_final.npy"
@@ -87,8 +108,6 @@ class _TemperatureData:
                 f"{data_path}/data/context/y_context_coarse_final.npy",
                 mmap_mode="r",
             )
-            self.yc_grid_train = self.yc_grid[self.train_mask | self.cv_mask, ...]
-            self.yc_grid_eval = self.yc_grid[self.eval_mask, ...]
         else:  # pragma: no cover
             # This can never be reached.
             raise RuntimeError(f'Bad data task "{data_task}".')
@@ -134,11 +153,13 @@ class _TemperatureData:
             # split. The bounds can therefore not be altered!
             lons = (6, 16)
             lats = (47, 55)
+            assert_no_data_lost = False
         elif data_task in {"europe", "value"}:
             # These bounds must cover all target stations; otherwise, the train-test
             # split will not line up.
-            lons = (-15, 35)
-            lats = (35, 72)
+            lons = (-24, 40)
+            lats = (35, 75)
+            assert_no_data_lost = True
         else:  # pragma: no cover
             # This can never be reached.
             raise RuntimeError(f'Bad data task "{data_task}".')
@@ -148,16 +169,19 @@ class _TemperatureData:
         lon_mask &= self.xc_grid[0][0, 0, :] < lons[1]
         lat_mask = lats[0] <= self.xc_grid[1][0, 0, :]
         lat_mask &= self.xc_grid[1][0, 0, :] <= lats[1]
+        if assert_no_data_lost and (B.any(~lon_mask) or B.any(~lat_mask)):
+            raise AssertionError("Longtitude and latitude bounds are too tight.")
         self.xc_grid = (
             self.xc_grid[0][:, :, lon_mask],
             self.xc_grid[1][:, :, lat_mask],
         )
-        self.yc_grid_train = self.yc_grid_train[:, :, lon_mask, :][:, :, :, lat_mask]
-        self.yc_grid_eval = self.yc_grid_eval[:, :, lon_mask, :][:, :, :, lat_mask]
+        self.yc_grid = self.yc_grid[:, :, lon_mask, :][:, :, :, lat_mask]
 
         # Process the elevations and the targets.
         mask = (lons[0] <= self.xt[0, 0, :]) & (self.xt[0, 0, :] < lons[1])
         mask &= (lats[0] <= self.xt[0, 1, :]) & (self.xt[0, 1, :] < lats[1])
+        if assert_no_data_lost and B.any(~mask):
+            raise AssertionError("Longtitude and latitude bounds are too tight.")
         self.xt = self.xt[:, :, mask]
         self.yt = self.yt[:, :, mask]
         self.xt_elev = self.xt_elev[:, :, mask]
@@ -231,8 +255,11 @@ class TemperatureGenerator(DataGenerator):
             `"eval"`. Defaults to `"train"`.
         passes (int, optional): How many times to cycle through the data in an epoch.
             Defaults to 1.
-        device (str, optional): Device. Defaults to `"cpu"`.
+        data_task (str, optional): Task. Must be one of `"germany"`, `"europe"`, or
+            `"value"`. Defaults to `"germany"`.
+        data_fold (int, optional): Fold. Must be a number between 1 and 5. Defauls to 5.
         data_path (str, optional): Path to the data. Defaults to `"climate_data"`.
+        device (str, optional): Device. Defaults to `"cpu"`.
 
     Attributes:
         dtype (dtype): Data type.
@@ -270,6 +297,7 @@ class TemperatureGenerator(DataGenerator):
         passes=1,
         device="cpu",
         data_task="germany",
+        data_fold=5,
         data_path="climate_data",
     ):
         self.context_sample = context_sample
@@ -282,70 +310,46 @@ class TemperatureGenerator(DataGenerator):
         self.passes = passes
 
         # Load data if it isn't yet loaded.
-        cache_key = (data_task, context_elev_hr, target_elev_interpolate)
+        cache_key = (data_task, data_fold, context_elev_hr, target_elev_interpolate)
         try:
             data = TemperatureGenerator._data_cache[cache_key]
         except KeyError:
             TemperatureGenerator._data_cache[cache_key] = _TemperatureData(
                 data_path=data_path,
                 data_task=data_task,
+                data_fold=data_fold,
                 context_elev_hr=context_elev_hr,
                 target_elev_interpolate=target_elev_interpolate,
             )
             data = TemperatureGenerator._data_cache[cache_key]
 
         if subset == "train":
-            num_tasks = data.train_mask.sum()
-            self._times = data.times[data.train_mask]
-            n = data.yc_grid_train.shape[0]
-            self._xc_grid = data.xc_grid
-            self._yc_grid = data.yc_grid_train[data.train_mask[:n]]
-            if context_elev_hr:
-                self._xc_elev_hr = data.xc_elev_hr
-                self._yc_elev_hr = data.yc_elev_hr
-                self._yc_elev_hr_mask = data.yc_elev_hr_mask
-            self._xc_elev_station = data.xt_elev
-            self._yc_elev_station = data.yt_elev
-            self._xt = data.xt[:, :, data.train_stations]
-            self._yt = data.yt[:, :, data.train_stations][data.train_mask]
-            self._xt_elev = data.xt_elev[:, :, data.train_stations]
-            self._yt_elev = data.yt_elev[:, :, data.train_stations]
-
+            mask = data.train_mask
+            stations = data.train_stations
         elif subset == "cv":
-            num_tasks = data.cv_mask.sum()
-            self._times = data.times[data.cv_mask]
-            n = data.yc_grid_train.shape[0]
-            self._xc_grid = data.xc_grid
-            self._yc_grid = data.yc_grid_train[data.cv_mask[:n]]
-            if context_elev_hr:
-                self._xc_elev_hr = data.xc_elev_hr
-                self._yc_elev_hr = data.yc_elev_hr
-                self._yc_elev_hr_mask = data.yc_elev_hr_mask
-            self._xc_elev_station = data.xt_elev
-            self._yc_elev_station = data.yt_elev
-            self._xt = data.xt[:, :, data.cv_stations]
-            self._yt = data.yt[:, :, data.cv_stations][data.cv_mask]
-            self._xt_elev = data.xt_elev[:, :, data.cv_stations]
-            self._yt_elev = data.yt_elev[:, :, data.cv_stations]
-
+            mask = data.cv_mask
+            stations = data.cv_stations
         elif subset == "eval":
-            num_tasks = data.eval_mask.sum()
-            self._times = data.times[data.eval_mask]
-            self._xc_grid = data.xc_grid
-            self._yc_grid = data.yc_grid_eval
-            if context_elev_hr:
-                self._xc_elev_hr = data.xc_elev_hr
-                self._yc_elev_hr = data.yc_elev_hr
-                self._yc_elev_hr_mask = data.yc_elev_hr_mask
-            self._xc_elev_station = data.xt_elev
-            self._yc_elev_station = data.yt_elev
-            self._xt = data.xt[:, :, data.eval_stations]
-            self._yt = data.yt[:, :, data.eval_stations][data.eval_mask]
-            self._xt_elev = data.xt_elev[:, :, data.eval_stations]
-            self._yt_elev = data.yt_elev[:, :, data.eval_stations]
-
+            mask = data.eval_mask
+            stations = data.eval_stations
         else:
             raise ValueError(f'Invalid subset "{subset}".')
+
+        num_tasks = mask.sum()
+        self._mask = mask
+        self._times = data.times[mask]
+        self._xc_grid = data.xc_grid
+        self._yc_grid = data.yc_grid[mask]
+        if context_elev_hr:
+            self._xc_elev_hr = data.xc_elev_hr
+            self._yc_elev_hr = data.yc_elev_hr
+            self._yc_elev_hr_mask = data.yc_elev_hr_mask
+        self._xc_elev_station = data.xt_elev
+        self._yc_elev_station = data.yt_elev
+        self._xt = data.xt[:, :, stations]
+        self._yt = data.yt[:, :, stations][mask]
+        self._xt_elev = data.xt_elev[:, :, stations]
+        self._yt_elev = data.yt_elev[:, :, stations]
 
         super().__init__(dtype, seed, num_tasks, batch_size, device)
 
