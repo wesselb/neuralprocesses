@@ -1,5 +1,6 @@
 from typing import Union
 
+import socket
 import lab as B
 import neuralprocesses
 import pytest
@@ -8,7 +9,7 @@ import torch
 from numpy.testing import assert_allclose
 from plum import Dispatcher
 
-__all__ = ["approx", "nps", "generate_data"]
+__all__ = ["approx", "nps", "generate_data", "remote_xfail"]
 
 _dispatch = Dispatcher()
 
@@ -60,3 +61,9 @@ def generate_data(nps, batch_size=4, dim_x=1, dim_y=1, n_context=5, n_target=7):
     xt = B.randn(nps.dtype, batch_size, dim_x, n_target)
     yt = B.randn(nps.dtype, batch_size, dim_y, n_target)
     return xc, yc, xt, yt
+
+
+if socket.gethostname() == "Wessels-Crib":
+    remote_xfail = lambda f: f  #: `xfail` only on CI.
+else:
+    remote_xfail = pytest.mark.xfail  #: `xfail` only on CI.
