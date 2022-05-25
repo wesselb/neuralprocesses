@@ -226,8 +226,8 @@ class PredPreyGenerator(DataGenerator):
             x_lynx = B.tile(B.transpose(x_lynx)[None, :, :], self.batch_size, 1, 1)
 
             # Sample data.
-            y_hare = _predprey_select_from_traj(x_all, y_all, x_hare[0, 0])
-            y_lynx = _predprey_select_from_traj(x_all, y_all, x_lynx[0, 0])
+            y_hare = _predprey_select_from_traj(x_all, y_all[:, 0:1, :], x_hare[0, 0])
+            y_lynx = _predprey_select_from_traj(x_all, y_all[:, 1:2, :], x_lynx[0, 0])
 
             self.state, batch = apply_task(
                 self.state,
