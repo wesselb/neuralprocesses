@@ -549,7 +549,7 @@ class Conv:
         activation,
         dtype,
     ):
-        channels = min(in_channels, out_channels)
+        intermediate_channels = min(in_channels, out_channels)
 
         # Determine the output padding.
         if transposed and stride > 1:
@@ -574,8 +574,8 @@ class Conv:
             [
                 self.nn.Conv(
                     dim=dim,
-                    in_channels=in_channels if first else channels,
-                    out_channels=out_channels if last else channels,
+                    in_channels=in_channels if first else intermediate_channels,
+                    out_channels=out_channels if last else intermediate_channels,
                     groups=groups,
                     kernel=k,
                     stride=stride if last else 1,
@@ -637,8 +637,8 @@ class Conv:
         separable,
         dtype,
     ):
-        channels = min(in_channels, out_channels)
-        if in_channels == channels and stride == 1:
+        intermediate_channels = min(in_channels, out_channels)
+        if in_channels == intermediate_channels and stride == 1:
             # The input can be directly passed to the output.
             input_transform = lambda x: x
         else:
@@ -647,7 +647,7 @@ class Conv:
             input_transform = self._init_conv(
                 dim=dim,
                 in_channels=in_channels,
-                out_channels=channels,
+                out_channels=intermediate_channels,
                 groups=1,
                 kernel=1,
                 stride=stride,
@@ -661,7 +661,7 @@ class Conv:
                 self.nps.Conv(
                     dim=dim,
                     in_channels=in_channels,
-                    out_channels=channels,
+                    out_channels=intermediate_channels,
                     kernel=kernel,
                     stride=stride,
                     transposed=transposed,
@@ -673,8 +673,8 @@ class Conv:
                 self.nn.ReLU(),
                 self._init_conv(
                     dim=dim,
-                    in_channels=channels,
-                    out_channels=channels,
+                    in_channels=intermediate_channels,
+                    out_channels=intermediate_channels,
                     groups=1,
                     kernel=1,
                     stride=1,
@@ -686,7 +686,7 @@ class Conv:
             ),
             self._init_conv(
                 dim=dim,
-                in_channels=channels,
+                in_channels=intermediate_channels,
                 out_channels=out_channels,
                 groups=1,
                 kernel=1,
