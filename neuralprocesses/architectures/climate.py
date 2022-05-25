@@ -31,11 +31,13 @@ def construct_climate_convgnp_mlp(
             Defaults to `"lowrank"`.
         dtype (dtype, optional): Data type.
     """
+    mlp_width = 128
+
     likelihood_in_channels, selector, likelihood = construct_likelihood(
         nps,
         spec=likelihood,
         dim_y=1,
-        num_basis_functions=64,
+        num_basis_functions=mlp_width,
         dtype=dtype,
     )
 
@@ -43,8 +45,8 @@ def construct_climate_convgnp_mlp(
         dim=2,
         in_channels=25,
         channels=width_lr,
-        out_channels=128,
-        num_layers=6,
+        out_channels=mlp_width,
+        num_layers=1 + 6,  # The first layer will run at width `in_channels=25`.
         kernel=3,
         residual=True,
         dtype=dtype,
@@ -66,8 +68,8 @@ def construct_climate_convgnp_mlp(
                 nps.SetConv(scale=lr_deg, dtype=dtype),
                 nps.Augment(
                     nps.MLP(
-                        in_dim=128 + 1,
-                        layers=(128 + 1, 128, 128),
+                        in_dim=mlp_width + 1,
+                        layers=(mlp_width + 1, mlp_width, mlp_width),
                         out_dim=likelihood_in_channels,
                         dtype=dtype,
                     ),
