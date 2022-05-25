@@ -1,13 +1,11 @@
 import lab as B
-import pytest
 import numpy as np
+import pytest
 from plum import Dispatcher
+
 from neuralprocesses.augment import AugmentedInput
 from neuralprocesses.mask import Masked
-
-
 from .util import nps, remote_xfail  # noqa
-
 
 _dispatch = Dispatcher()
 
@@ -23,10 +21,10 @@ def dim_y(request):
 
 
 @pytest.fixture(
-    params=["eq", "matern", "weakly-periodic", "sawtooth", "mixture", "predprey"],
+    params=["eq", "matern", "weakly-periodic", "sawtooth", "mixture"],
     scope="module",
 )
-def gen(request, nps, dim_x, dim_y):
+def predefined_gen(request, nps, dim_x, dim_y):
     gens = nps.construct_predefined_gens(
         nps.dtype,
         x_range_context=(0, 1),
@@ -35,23 +33,12 @@ def gen(request, nps, dim_x, dim_y):
         dim_y=dim_y,
         batch_size=4,
     )
-    if dim_x == 1 and dim_y == 2:
-        gens["predprey"] = nps.PredPreyGenerator(
-            nps.dtype,
-            dist_x_context=nps.UniformContinuous(0, 1),
-            dist_x_target=nps.UniformContinuous(1, 2),
-            batch_size=4,
-        )
-    try:
-        return gens[request.param]
-    except KeyError:
-        # TODO: Can we silently skip tests?
-        pytest.skip()
+    return gens[request.param]
 
 
-def test_predefined_gens(nps, gen, dim_x, dim_y):
+def test_predefined_gens(nps, predefined_gen, dim_x, dim_y):
     # Limit the epoch to 10 batches.
-    for _, batch in zip(range(10), gen.epoch()):
+    for _, batch in zip(range(10), predefined_gen.epoch()):
 
         # Unpack batch.
         cs = batch["contexts"]
@@ -65,18 +52,22 @@ def test_predefined_gens(nps, gen, dim_x, dim_y):
             assert B.shape(xc, 0, 1) == (4, dim_x)
             assert B.shape(yc, 0, 1) == (4, 1)
             assert B.all(0 <= xc) and B.all(xc <= 1)
+            assert B.dtype(xc) == nps.dtype
 
             # Check the outputs.
             assert B.shape(xc, 2) == B.shape(yc, 2)
+            assert B.dtype(yc) == nps.dtype
 
         if dim_y == 1:
             # Check the target inputs.
             nt = B.shape(xt, 2)
             assert B.shape(xt, 0, 1) == (4, dim_x)
             assert B.all(1 <= xt) and B.all(xt <= 2)
+            assert B.dtype(xt) == nps.dtype
 
             # Check the target outputs.
             assert B.shape(yt) == (4, 1, nt)
+            assert B.dtype(yt) == nps.dtype
         else:
             # Check the target inputs.
             assert isinstance(xt, nps.AggregateInput)
@@ -86,6 +77,7 @@ def test_predefined_gens(nps, gen, dim_x, dim_y):
                 assert i == i_expected
                 assert B.shape(xti, 0, 1) == (4, dim_x)
                 assert B.all(1 <= xti) and B.all(xti <= 2)
+                assert B.dtype(xti) == nps.dtype
                 nts.append(B.shape(xti, 2))
 
             # Check the target outputs.
@@ -93,6 +85,38 @@ def test_predefined_gens(nps, gen, dim_x, dim_y):
             assert len(yt) == dim_y
             for nti, yti in zip(nts, yt):
                 assert B.shape(yti) == (4, 1, nti)
+                assert B.dtype(yti) == nps.dtype
+
+
+@pytest.mark.parametrize(
+    "mode", ["interpolation", "forecasting", "reconstruction", "random"]
+)
+@pytest.mark.parametrize("generator", ["PredPreyGenerator", "PredPreyRealGenerator"])
+def test_predprey(nps, generator, mode):
+    g = getattr(nps, generator)(nps.dtype, mode=mode)
+    batch = g.generate_batch()
+
+    # Check context sets.
+    for xc, yc in batch["contexts"]:
+        assert B.shape(xc, -1) > 0
+        assert B.dtype(xc) == nps.dtype
+        assert B.shape(yc, -1) > 0
+        assert B.dtype(yc) == nps.dtype
+
+    # Check target inputs.
+    for xti, i in batch["xt"]:
+        assert B.dtype(xti) == nps.dtype
+
+    # Check target outputs.
+    for yti in batch["yt"]:
+        assert B.dtype(yti) == nps.dtype
+
+
+@pytest.mark.parametrize("mode", ["interpolation", "forecasting", "reconstruction"])
+def test_predpreyreal(nps, mode):
+    g = nps.PredPreyRealGenerator(nps.dtype, mode=mode)
+    # For now just test that it can generate a batch.
+    g.generate_batch()
 
 
 @_dispatch
