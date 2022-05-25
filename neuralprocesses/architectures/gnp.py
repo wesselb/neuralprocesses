@@ -1,7 +1,6 @@
-import lab as B
-import neuralprocesses as nps  # This fixes inspection below.
 from plum import convert
 
+import neuralprocesses as nps  # This fixes inspection below.
 from .util import construct_likelihood, parse_transform
 from ..util import register_model
 
@@ -18,6 +17,7 @@ def construct_gnp(
     attention=False,
     attention_num_heads=8,
     num_enc_layers=3,
+    enc_same=False,
     num_dec_layers=6,
     width=512,
     likelihood="lowrank",
@@ -47,6 +47,9 @@ def construct_gnp(
             Defaults to `False`.
         attention_num_heads (int, optional): Number of heads. Defaults to `8`.
         num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 3.
+        enc_same (bool, optional): Use the same encoder for all context sets. This
+            only works if all context sets have the same dimensionality. Defaults to
+            `False`.
         num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
@@ -70,6 +73,13 @@ def construct_gnp(
     # Make sure that `dim_yt` is initialised.
     dim_yt = dim_yt or dim_y
 
+    # Check if `enc_same` can be used.
+    if enc_same and any(dim_yci != dim_yc[0] for dim_yci in dim_yc[1:]):
+        raise ValueError(
+            "Can only use the same encoder for all context sets if the context sets "
+            "are of the same dimensionality, but they are not."
+        )
+
     mlp_out_channels, selector, likelihood = construct_likelihood(
         nps,
         spec=likelihood,
@@ -80,18 +90,25 @@ def construct_gnp(
 
     # Construct the deterministic encoder.
     if attention:
+
+        def construct_attention(dim_yci):
+            return nps.Attention(
+                dim_x=dim_x,
+                dim_y=dim_yci,
+                dim_embedding=dim_embedding,
+                num_heads=attention_num_heads,
+                num_enc_layers=num_enc_layers,
+                dtype=dtype,
+            )
+
+        if enc_same:
+            block = construct_attention(dim_yc[0])
+
         det_encoder = nps.Parallel(
             *(
                 nps.Chain(
                     nps.RepeatForAggregateInputs(
-                        nps.Attention(
-                            dim_x=dim_x,
-                            dim_y=dim_yci,
-                            dim_embedding=dim_embedding,
-                            num_heads=attention_num_heads,
-                            num_enc_layers=num_enc_layers,
-                            dtype=dtype,
-                        ),
+                        block if enc_same else construct_attention(dim_yci)
                     ),
                     nps.DeterministicLikelihood(),
                 )
@@ -99,18 +116,23 @@ def construct_gnp(
             ),
         )
     else:
+
+        def construct_mlp(dim_yci):
+            return nps.MLP(
+                in_dim=dim_x + dim_yci,
+                out_dim=dim_embedding,
+                num_layers=num_enc_layers,
+                width=width,
+                dtype=dtype,
+            )
+
+        if enc_same:
+            block = construct_mlp(dim_yc[0])
+
         det_encoder = nps.Parallel(
             *(
                 nps.Chain(
-                    nps.DeepSet(
-                        nps.MLP(
-                            in_dim=dim_x + dim_yci,
-                            out_dim=dim_embedding,
-                            num_layers=num_enc_layers,
-                            width=width,
-                            dtype=dtype,
-                        )
-                    ),
+                    nps.DeepSet(block if enc_same else construct_mlp(dim_yci)),
                     nps.DeterministicLikelihood(),
                 )
                 for dim_yci in dim_yc
@@ -126,18 +148,23 @@ def construct_gnp(
             num_basis_functions=num_basis_functions,
             dtype=dtype,
         )
+
+        def construct_mlp(dim_yci):
+            return nps.MLP(
+                in_dim=dim_x + dim_yci,
+                out_dim=dim_embedding,
+                num_layers=num_enc_layers,
+                width=width,
+                dtype=dtype,
+            )
+
+        if enc_same:
+            block = construct_mlp(dim_yc[0])
+
         lv_encoder = nps.Chain(
             nps.Parallel(
                 *(
-                    nps.DeepSet(
-                        nps.MLP(
-                            in_dim=dim_x + dim_yci,
-                            out_dim=dim_embedding,
-                            num_layers=num_enc_layers,
-                            width=width,
-                            dtype=dtype,
-                        )
-                    )
+                    nps.DeepSet(block if enc_same else construct_mlp(dim_yci))
                     for dim_yci in dim_yc
                 ),
             ),
