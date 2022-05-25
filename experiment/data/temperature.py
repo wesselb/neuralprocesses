@@ -1,41 +1,82 @@
 from functools import partial
 
+import neuralprocesses.torch as nps
 import torch
 
-import neuralprocesses.torch as nps
 from .util import register_data
 
 __all__ = []
 
 
-def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
+def setup(
+    data_task,
+    data_fold,
+    args,
+    config,
+    *,
+    num_tasks_train,
+    num_tasks_cv,
+    num_tasks_eval,
+    device,
+):
     config["dim_x"] = 2
     config["dim_y"] = 1
 
-    if args.model == "convcnp-mlp":
-        config["model"] = nps.construct_climate_convgnp_mlp(likelihood="het")
+    if data_task == "germany":
+        context_elev_hr = True
+        data_task_train = "germany"
+        data_task_cv = "germany"
+        data_task_eval = "germany"
+        lr_deg = 0.75
+    elif data_task == "europe":
+        context_elev_hr = False
+        data_task_train = "europe"
+        data_task_cv = "europe"
+        data_task_eval = "value"
+        lr_deg = 2
+    elif data_task == "value":
+        context_elev_hr = False
+        data_task_train = "value"
+        data_task_cv = "value"
+        data_task_eval = "value"
+        lr_deg = 2
+    else:
+        raise ValueError(f'Bad task "{data_task}".')
+
+    if args.model in {"convcnp-mlp", "convgnp-mlp"}:
+        if args.model == "convcnp-mlp":
+            likelihood = "het"
+        elif args.model == "convgnp-mlp":
+            likelihood = "lowrank"
+        else:
+            raise RuntimeError("Could not determine likelihood.")
+        config["model"] = nps.construct_climate_convgnp_mlp(
+            lr_deg=lr_deg,
+            likelihood=likelihood,
+        )
         context_sample = False
         target_elev = True
         target_square = 0
         do_plot = False
-    elif args.model == "convgnp-mlp":
-        config["model"] = nps.construct_climate_convgnp_mlp(likelihood="lowrank")
-        context_sample = False
-        target_elev = True
-        target_square = 0
-        do_plot = False
-    elif args.model == "convcnp-multires":
-        config["model"] = nps.construct_climate_convgnp_multires(likelihood="het")
+        config["rate"] = 2.5e-5
+        config["epochs"] = 400
+    elif args.model in {"convcnp-multires", "convgnp-multires"}:
+        if args.model == "convcnp-multires":
+            likelihood = "het"
+        elif args.model == "convgnp-multires":
+            likelihood = "lowrank"
+        else:
+            raise RuntimeError("Could not determine likelihood.")
+        config["model"] = nps.construct_climate_convgnp_multires(
+            lr_deg=lr_deg,
+            likelihood=likelihood,
+        )
         context_sample = True
         target_elev = False
         target_square = 3
         do_plot = True
-    elif args.model == "convgnp-multires":
-        config["model"] = nps.construct_climate_convgnp_multires(likelihood="lowrank")
-        context_sample = True
-        target_elev = False
-        target_square = 3
-        do_plot = True
+        config["rate"] = 1e-5
+        config["epochs"] = 1000
     else:
         raise ValueError(f'Experiment does not yet support model "{args.model}".')
 
@@ -44,24 +85,6 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         config["plot"] = {2: {"range": ((6, 16), (47, 55))}}
     else:
         config["plot"] = {}
-
-    if task == "germany":
-        context_elev_hr = True
-        data_task_train = "germany"
-        data_task_cv = "germany"
-        data_task_eval = "germany"
-    elif task == "europe":
-        context_elev_hr = False
-        data_task_train = "europe"
-        data_task_cv = "europe"
-        data_task_eval = "value"
-    elif task == "value":
-        context_elev_hr = False
-        data_task_train = "value"
-        data_task_cv = "value"
-        data_task_eval = "value"
-    else:
-        raise ValueError(f'Bad task "{task}".')
 
     gen_train = nps.TemperatureGenerator(
         torch.float32,
@@ -75,6 +98,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         target_elev=target_elev,
         subset="train",
         data_task=data_task_train,
+        data_fold=data_fold,
         device=device,
     )
     gen_cv = lambda: nps.TemperatureGenerator(
@@ -89,6 +113,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         target_elev=target_elev,
         subset="cv",
         data_task=data_task_cv,
+        data_fold=data_fold,
         # Cycle over the data a few times to account for the random square sampling.
         passes=10 if target_square > 0 else 1,
         device=device,
@@ -107,6 +132,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
                 target_elev=target_elev,
                 subset="eval",
                 data_task=data_task_eval,
+                data_fold=data_fold,
                 device=device,
             ),
         ),
@@ -124,6 +150,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
                 target_elev=target_elev,
                 subset="eval",
                 data_task=data_task_eval,
+                data_fold=data_fold,
                 device=device,
             ),
         ),
@@ -131,6 +158,7 @@ def setup(task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
     return gen_train, gen_cv, gens_eval
 
 
-register_data("temperature-germany", partial(setup, "germany"))
-register_data("temperature-europe", partial(setup, "europe"))
-register_data("temperature-value", partial(setup, "value"))
+for i in [1, 2, 3, 4, 5]:
+    register_data(f"temperature-germany-{i}", partial(setup, "germany", i))
+    register_data(f"temperature-europe-{i}", partial(setup, "europe", i))
+    register_data(f"temperature-value-{i}", partial(setup, "value", i))
