@@ -155,31 +155,14 @@ async def main():
     # Parse arguments.
     parser = argparse.ArgumentParser()
     parser.add_argument("--gpu", type=int, default=0)
-    parser.add_argument(
-        "--data",
-        choices=[
-            "eq",
-            "matern",
-            "weakly-periodic",
-            "sawtooth",
-            "mixture",
-        ],
-    )
-    parser.add_argument("--dim-y", type=int)
-    parser.add_argument(
-        "--mode",
-        choices=[
-            "conditional",
-            "latent-variable",
-            "conditional-predprey",
-            "latent-variable-predprey",
-        ],
-        required=True,
-    )
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
+    parser.add_argument("--also-ar", action="store_true")
     parser.add_argument("--memory", type=int, default=11_019)
     parser.add_argument("--test", action="store_true")
+    parser.add_argument("--collection", type=str, required=True)
+    parser.add_argument("--collection-data", type=str)
+    parser.add_argument("--collection-dim-y", type=int)
     args = parser.parse_args()
 
     def with_gpu(c):
@@ -189,14 +172,13 @@ async def main():
     out.report_time = True
 
     # Determine the suite of experiments to run.
-    if args.mode == "conditional":
-        # Conditional models:
+    if args.collection == "synthetic-conditional":
         commands = [
             f"python train.py"
             f" --model {model}"
-            f" --data {args.data}"
+            f" --data {args.collection_data}"
             f" --dim-x {dim_x}"
-            f" --dim-y {args.dim_y}"
+            f" --dim-y {args.collection_dim_y}"
             for dim_x in [1, 2]
             for model in [
                 "cnp",
@@ -209,16 +191,15 @@ async def main():
             ]
             if not (dim_x == 2 and model == "fullconvgnp")
         ]
-    elif args.mode == "latent-variable":
-        # Latent-variable models:
+    elif args.collection == "synthetic-latent-variable":
         commands = (
             [
                 f"python train.py"
                 f" --model {model}"
                 f" --objective {objective}"
-                f" --data {args.data}"
+                f" --data {args.collection_data}"
                 f" --dim-x {dim_x}"
-                f" --dim-y {args.dim_y}"
+                f" --dim-y {args.collection_dim_y}"
                 for dim_x in [1, 2]
                 for model in ["np", "anp", "convnp"]
                 if not (model == "convnp" and dim_x == 2)
@@ -233,31 +214,51 @@ async def main():
                 f"python train.py"
                 f" --model convnp"
                 f" --objective {objective}"
-                f" --data {args.data}"
+                f" --data {args.collection_data}"
                 f" --dim-x 2"
-                f" --dim-y {args.dim_y}"
+                f" --dim-y {args.collection_dim_y}"
                 for objective in [
                     f"loglik --num-samples 5",
                     f"elbo --num-samples 1",
                 ]
             ]
         )
-    elif args.mode == "conditional-predprey":
+    elif args.collection == "predprey-conditional":
         commands = [
-            f"python train.py --data predprey --model {model} --rate 1e-4"
+            f"python train.py --data predprey --model {model}"
             for model in ["convcnp", "convgnp", "fullconvgnp", "acnp"]
         ]
-    elif args.mode == "latent-variable-predprey":
+    elif args.collection == "predprey-latent-variable":
         commands = [
-            f"python train.py --data predprey --model {model} --objective {objective} --rate 1e-4"
+            f"python train.py --data predprey --model {model} --objective {objective}"
             for model in ["anp", "convnp"]
             for objective in [
                 f"loglik --num-samples 20",
                 f"elbo --num-samples 5",
             ]
         ]
+    elif args.collection == "temperature-convcnp-mlp":
+        # Run `europe` and `value` for all five folds, but run `germany` only for the
+        # last fold.
+        commands = [
+            f"python train.py --data temperature-{task}-{fold} --model convcnp-mlp"
+            for task in ["europe", "value"]
+            for fold in [1, 2, 3, 4, 5]
+        ] + [
+            "python train.py --data temperature-germany-5 --model convcnp-mlp",
+        ]
+    elif args.collection == "temperature-convgnp-mlp":
+        # Run `europe` and `value` for all five folds, but run `germany` only for the
+        # last fold.
+        commands = [
+            f"python train.py --data temperature-{task}-{fold} --model convgnp-mlp"
+            for task in ["europe", "value"]
+            for fold in [1, 2, 3, 4, 5]
+        ] + [
+            "python train.py --data temperature-germany-5 --model convgnp-mlp",
+        ]
     else:
-        raise RuntimeError(f'Bad mode "{args.mode}".')
+        raise RuntimeError(f'Unknown collection "{args.collection}".')
 
     # If we're evaluating, simply append `--evaluate`, which runs both normal evaluation
     # and AR evaluation.
@@ -265,6 +266,8 @@ async def main():
         commands = [c + " --evaluate" for c in commands]
     if args.evaluate_last:
         commands = [c + " --evaluate-last" for c in commands]
+    if args.also_ar:
+        commands = [c + " --also-ar" for c in commands]
 
     # If we're testing, just list the commands and exit.
     if args.test:
