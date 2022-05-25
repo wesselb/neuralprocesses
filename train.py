@@ -1,9 +1,9 @@
 import argparse
 import os
 import sys
+import time
 import warnings
 from functools import partial
-import time
 
 import experiment as exp
 import lab as B
@@ -439,10 +439,18 @@ def main(**kw_args):
     else:
         config["fix_noise"] = False
 
-    # Ensure that the model is on the GPU and print some statistics.
+    # Ensure that the model is on the GPU and print the setup.
     model = model.to(device)
+    out.kv(
+        "Arguments",
+        {
+            attr: getattr(args, attr)
+            for attr in args.__dir__()
+            if not attr.startswith("_")
+        },
+    )
+    out.kv("Config", {k: "<custom>" if k == "model" else v for k, v in config.items()})
     out.kv("Number of parameters", nps.num_params(model))
-    out.kv("Config", config)
 
     # Setup training objective.
     if args.objective == "loglik":
