@@ -83,8 +83,8 @@ def main(**kw_args):
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--dim-x", type=int, default=1)
     parser.add_argument("--dim-y", type=int, default=1)
-    parser.add_argument("--epochs", type=int, default=100)
-    parser.add_argument("--rate", type=float, default=3e-4)
+    parser.add_argument("--epochs", type=int)
+    parser.add_argument("--rate", type=float)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument(
         "--model",
@@ -233,9 +233,12 @@ def main(**kw_args):
     # Maintain an explicit random state through the execution.
     state = B.create_random_state(torch.float32, seed=0)
 
-    # General architecture choices:
+    # General config.
     config = {
+        "epochs": None,
+        "rate": None,
         "epsilon": 1e-8,
+        "epsilon_start": 1e-2,
         "cholesky_retry_factor": 1e6,
         "width": 256,
         "dim_embedding": 256,
@@ -261,6 +264,11 @@ def main(**kw_args):
         num_tasks_eval=2**6 if args.evaluate_fast else 2**12,
         device=device,
     )
+
+    # Apply defaults for the number of epochs and the learning rate. The experiment
+    # is allowed to adjust these.
+    args.epochs = args.epochs or config["epochs"] or 100
+    args.rate = args.rate or config["rate"] or 3e-4
 
     # Set the regularisation based on the experiment settings.
     B.epsilon = config["epsilon"]
@@ -584,7 +592,7 @@ def main(**kw_args):
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
-        B.epsilon = 1e-2
+        B.epsilon = config["epsilon_start"]
 
         for i in range(start, args.epochs):
             with out.Section(f"Epoch {i + 1}"):
