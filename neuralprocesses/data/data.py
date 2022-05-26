@@ -5,11 +5,17 @@ import lab as B
 import numpy as np
 from plum import convert
 
-from ..aggregate import Aggregate, AggregateInput
+from ..aggregate import AggregateInput, Aggregate
 from ..dist import UniformDiscrete, UniformContinuous, AbstractDistribution
 from ..util import split
 
-__all__ = ["AbstractGenerator", "DataGenerator", "SyntheticGenerator", "new_batch"]
+__all__ = [
+    "AbstractGenerator",
+    "DataGenerator",
+    "SyntheticGenerator",
+    "new_batch",
+    "apply_task",
+]
 
 
 class AbstractGenerator(metaclass=abc.ABCMeta):
@@ -281,3 +287,88 @@ def new_batch(gen, dim_y, *, fix_x_across_batch=False, batch_size=None):
             batch["yt"] = _c(yts[0])
 
     return set_batch, xcs, xc, nc, xts, xt, nt
+
+
+def apply_task(state, dtype, int64, mode, xs, ys, num_target, forecast_start):
+    """Construct one of three tasks from data.
+
+    Important:
+        This assumes that, for every output, the inputs are the same for every element
+        in the batch.
+
+    Args:
+        state (random state): Random state.
+        dtype (dtype): Target dtype.
+        int64 (dtype): Integer version of `dtype` with 64 bits.
+        mode (str): Task. Must be one of `"interpolation"`, `"forecasting"`,
+            `"reconstruction"`, or `"random"`.
+        xs (list[tensor]): For every output, the inputs in `(b, 1, n)` form.
+        ys (list[tensor]): For every output, the outputs in `(b, 1, n)` form.
+        num_target (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
+            Distribution of the number of target data points, if applicable to the task.
+        forecast_start (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
+            Distribution of the start of the forecasting task.
+
+    Returns:
+        random state: Random state.
+        dict: Batch with the task applied.
+    """
+    if mode == "random":
+        state, coin = UniformDiscrete(1, 3).sample(state, int64)
+        if coin == 1:
+            mode = "interpolation"
+        elif coin == 2:
+            mode = "forecasting"
+        else:
+            mode = "reconstruction"
+
+    inds_c = []
+    inds_t = []
+
+    if mode == "interpolation":
+        # For every output, sample a number of context points separately.
+        for x in xs:
+            state, nt = num_target.sample(state, int64)
+            state, perm = B.randperm(state, int64, B.shape(x, -1))
+            inds_c.append(perm[nt:])
+            inds_t.append(perm[:nt])
+
+    elif mode == "forecasting":
+        # Sample a start time and predict all outputs from that point onwards.
+        state, start = forecast_start.sample(state, dtype)
+        for x in xs:
+            inds_c.append(x[0, 0] < start)
+            inds_t.append(x[0, 0] >= start)
+
+    elif mode == "reconstruction":
+        # Sample a start time and prediction one output from that point onwards. Flip a
+        # coin to decide which output to impute.
+        state, start = forecast_start.sample(state, dtype)
+        state, j = UniformDiscrete(0, len(ys) - 1).sample(state, int64)
+        for i, x in enumerate(xs):
+            if i == j:
+                # Prediction from `start` onwards.
+                inds_c.append(x[0, 0] < start)
+                inds_t.append(x[0, 0] >= start)
+            else:
+                # Predict nothing.
+                inds = B.range(int64, B.shape(x, -1))
+                inds_c.append(inds)
+                inds_t.append(inds[:0])
+
+    else:
+        raise ValueError(f'Bad mode "{mode}".')
+
+    return state, {
+        "contexts": [
+            (B.take(x, inds, axis=-1), B.take(y, inds, axis=-1))
+            for x, y, inds in zip(xs, ys, inds_c)
+        ],
+        "xt": AggregateInput(
+            *(
+                (B.take(x, inds, axis=-1), i)
+                for i, (x, inds) in enumerate(zip(xs, inds_t))
+            )
+        ),
+        "yt": Aggregate(*(B.take(y, inds, axis=-1) for y, inds in zip(ys, inds_t))),
+    }

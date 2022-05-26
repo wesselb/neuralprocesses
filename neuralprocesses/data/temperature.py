@@ -5,6 +5,7 @@ import pandas as pd
 from scipy.interpolate import griddata
 
 from .data import DataGenerator
+from .util import cache
 from ..augment import AugmentedInput
 from ..dist import TruncatedGeometric
 from ..mask import Masked
@@ -14,7 +15,12 @@ __all__ = ["TemperatureGenerator"]
 
 class _TemperatureData:
     def __init__(
-        self, data_path, data_task, data_fold, context_elev_hr, target_elev_interpolate
+        self,
+        data_path,
+        data_task,
+        data_fold,
+        context_elev_hr,
+        target_elev_interpolate,
     ):
         if data_task not in {"germany", "europe", "value"}:
             raise ValueError(
@@ -309,19 +315,13 @@ class TemperatureGenerator(DataGenerator):
         self._alternate_i = 0
         self.passes = passes
 
-        # Load data if it isn't yet loaded.
-        cache_key = (data_task, data_fold, context_elev_hr, target_elev_interpolate)
-        try:
-            data = TemperatureGenerator._data_cache[cache_key]
-        except KeyError:
-            TemperatureGenerator._data_cache[cache_key] = _TemperatureData(
-                data_path=data_path,
-                data_task=data_task,
-                data_fold=data_fold,
-                context_elev_hr=context_elev_hr,
-                target_elev_interpolate=target_elev_interpolate,
-            )
-            data = TemperatureGenerator._data_cache[cache_key]
+        data = TemperatureGenerator._load_data(
+            data_path=data_path,
+            data_task=data_task,
+            data_fold=data_fold,
+            context_elev_hr=context_elev_hr,
+            target_elev_interpolate=target_elev_interpolate,
+        )
 
         if subset == "train":
             mask = data.train_mask
@@ -355,6 +355,23 @@ class TemperatureGenerator(DataGenerator):
 
         # Setup the first shuffle.
         self.shuffle()
+
+    @staticmethod
+    @cache
+    def _load_data(
+        data_path,
+        data_task,
+        data_fold,
+        context_elev_hr,
+        target_elev_interpolate,
+    ):
+        return _TemperatureData(
+            data_path=data_path,
+            data_task=data_task,
+            data_fold=data_fold,
+            context_elev_hr=context_elev_hr,
+            target_elev_interpolate=target_elev_interpolate,
+        )
 
     def shuffle(self):
         """Shuffle the data, preparing for a new epoch."""

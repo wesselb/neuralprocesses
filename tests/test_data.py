@@ -88,14 +88,7 @@ def test_predefined_gens(nps, predefined_gen, dim_x, dim_y):
                 assert B.dtype(yti) == nps.dtype
 
 
-@pytest.mark.parametrize(
-    "mode", ["interpolation", "forecasting", "reconstruction", "random"]
-)
-@pytest.mark.parametrize("generator", ["PredPreyGenerator", "PredPreyRealGenerator"])
-def test_predprey(nps, generator, mode):
-    g = getattr(nps, generator)(nps.dtype, mode=mode)
-    batch = g.generate_batch()
-
+def check_batch_simple(nps, batch):
     # Check context sets.
     for xc, yc in batch["contexts"]:
         assert B.shape(xc, -1) > 0
@@ -112,11 +105,22 @@ def test_predprey(nps, generator, mode):
         assert B.dtype(yti) == nps.dtype
 
 
-@pytest.mark.parametrize("mode", ["interpolation", "forecasting", "reconstruction"])
-def test_predpreyreal(nps, mode):
-    g = nps.PredPreyRealGenerator(nps.dtype, mode=mode)
-    # For now just test that it can generate a batch.
-    g.generate_batch()
+@pytest.mark.parametrize(
+    "mode", ["interpolation", "forecasting", "reconstruction", "random"]
+)
+@pytest.mark.parametrize("generator", ["PredPreyGenerator", "PredPreyRealGenerator"])
+def test_predprey(nps, generator, mode):
+    g = getattr(nps, generator)(nps.dtype, mode=mode)
+    check_batch_simple(nps, g.generate_batch())
+
+
+@pytest.mark.parametrize(
+    "mode", ["interpolation", "forecasting", "reconstruction", "random"]
+)
+@pytest.mark.parametrize("subset", ["train", "cv", "eval"])
+def test_eeg(nps, mode, subset):
+    g = nps.EEGGenerator(nps.dtype, mode=mode, subset=subset)
+    check_batch_simple(nps, g.generate_batch())
 
 
 @_dispatch
