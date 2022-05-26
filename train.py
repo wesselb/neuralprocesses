@@ -81,6 +81,8 @@ def main(**kw_args):
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
     parser.add_argument("--subdir", type=str, nargs="*")
+    parser.add_argument("--device", type=str)
+    parser.add_argument("--gpu", type=int)
     parser.add_argument("--dim-x", type=int, default=1)
     parser.add_argument("--dim-y", type=int, default=1)
     parser.add_argument("--epochs", type=int)
@@ -126,7 +128,6 @@ def main(**kw_args):
         choices=exp.data,
         default="eq",
     )
-    parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
     parser.add_argument("--num-samples", type=int, default=20)
     parser.add_argument("--resume-at-epoch", type=int)
@@ -212,13 +213,15 @@ def main(**kw_args):
     )
 
     # Determine which device to use. Try to use a GPU if one is available.
-    if args.device is not None:
+    if args.device:
         device = args.device
+    elif args.gpu is not None:
+        device = f"cuda:{args.gpu}"
     elif torch.cuda.is_available():
         device = "cuda"
     else:
         device = "cpu"
-
+        
     B.set_global_device(device)
     # Maintain an explicit random state through the execution.
     state = B.create_random_state(torch.float32, seed=0)
