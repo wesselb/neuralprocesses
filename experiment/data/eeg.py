@@ -10,7 +10,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     # Task dimensions: one input variable (time) and seven output variables (channels)
     config["dim_x"] = 1
     config["dim_y"] = 7
-    config["rate"] = 1e-4
+    config["rate"] = 2e-4
     config["epochs"] = 200
 
     # Architecture choices specific for the EEG experiments:
@@ -23,7 +23,14 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["margin"] = 0.1
     config["conv_receptive_field"] = 1.0
     config["unet_strides"] = (1,) + (2,) * 5
-    config["unet_channels"] = (64,) * 6
+    # Increase the capacity of the ConvCNP, ConvGNP, and ConvNP to account for the many
+    # outputs. The FullConvGNP is already large enough...
+    if args.model in {"convcnp", "convgnp"}:
+        config["unet_channels"] = (128,) * 6
+    elif args.model == "convnp":
+        config["unet_channels"] = (96,) * 6
+    else:
+        config["unet_channels"] = (64,) * 6
     config["encoder_scales"] = 0.77 / 256
     config["fullconvgnp_kernel_factor"] = 1
 
@@ -35,6 +42,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         seed=0,
         batch_size=args.batch_size,
         num_tasks=num_tasks_train,
+        mode="random",
         subset="train",
         device=device,
     )
@@ -45,6 +53,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
             seed=20,
             batch_size=args.batch_size,
             num_tasks=num_tasks_cv,
+            mode="random",
             subset="cv",
             device=device,
         )
