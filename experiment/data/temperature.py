@@ -58,7 +58,7 @@ def setup(
         target_elev = True
         target_square = 0
         do_plot = False
-        config["rate"] = 2.5e-5
+        config["rate"] = 5e-5
         config["epochs"] = 400
     elif args.model in {"convcnp-multires", "convgnp-multires"}:
         if args.model == "convcnp-multires":
