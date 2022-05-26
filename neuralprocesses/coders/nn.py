@@ -204,7 +204,7 @@ class UNet:
         for stride, kernel in zip(self.strides, self.kernels):
             # Deal with composite kernels:
             if isinstance(kernel, tuple):
-                kernel = kernel[0] + sum([k - 1 for k in kernel])
+                kernel = kernel[0] + sum([k - 1 for k in kernel[1:]])
             after_conv = self.receptive_fields[-1] + (kernel - 1)
             if stride > 1:
                 if after_conv % 2 == 0:
@@ -219,7 +219,7 @@ class UNet:
         for stride, kernel in zip(reversed(self.strides), reversed(self.kernels)):
             # Deal with composite kernels:
             if isinstance(kernel, tuple):
-                kernel = kernel[0] + sum([k - 1 for k in kernel])
+                kernel = kernel[0] + sum([k - 1 for k in kernel[1:]])
             if stride > 1:
                 after_interp = self.receptive_fields[-1] * 2 - 1
                 self.receptive_fields.append(after_interp + (kernel - 1))
