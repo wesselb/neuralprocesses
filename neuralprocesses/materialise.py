@@ -141,6 +141,9 @@ def _repeat_concat(dims: B.Int, z1: B.Numeric, z2: B.Numeric):
     shape1, shape2 = list(B.shape(z1)), list(B.shape(z2))
     for i in [0] + list(range(rank - 1, rank - 1 - dims, -1)):
         shape_n = max(shape1[i], shape2[i])
+        # Zeros cannot be broadcasted. Those must be retained.
+        if shape1[i] == 0 or shape2[i] == 0:
+            shape_n = 0
         shape1[i] = shape_n
         shape2[i] = shape_n
     z1 = B.broadcast_to(z1, *shape1)
