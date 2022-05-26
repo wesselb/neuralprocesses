@@ -22,8 +22,9 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["points_per_unit"] = 256
     config["margin"] = 0.1
     config["conv_receptive_field"] = 1.0
-    config["unet_strides"] = (1,) + (2,) * 6
-    config["unet_channels"] = (64,) * 7
+    config["unet_strides"] = (1,) + (2,) * 5
+    config["unet_channels"] = (64,) * 6
+    config["encoder_scales"] = 0.77 / 256
     config["fullconvgnp_kernel_factor"] = 1
 
     # Other settings specific to the EEG experiments:
