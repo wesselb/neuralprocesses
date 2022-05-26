@@ -221,7 +221,7 @@ def main(**kw_args):
         device = "cuda"
     else:
         device = "cpu"
-        
+
     B.set_global_device(device)
     # Maintain an explicit random state through the execution.
     state = B.create_random_state(torch.float32, seed=0)
