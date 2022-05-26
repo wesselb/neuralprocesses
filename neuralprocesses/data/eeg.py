@@ -208,6 +208,9 @@ class EEGGenerator(DataGenerator):
                 # Select the `n`th trial for the subject.
                 trial = data[subject]["trials"][n]["df"]
                 trial = trial.loc[:, ["FZ", "F1", "F2", "F3", "F4", "F5", "F6"]]
+                if np.abs(np.array(trial)).sum() == 0:
+                    # There is no data here! Skip it.
+                    continue
                 trials.append(trial)
         return trials
 
