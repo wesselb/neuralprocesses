@@ -211,16 +211,6 @@ def main(**kw_args):
         diff=f"diff{mode}.txt",
     )
 
-    # Check if a run has completed.
-    if args.check_completed:
-        if os.path.exists(wd.file("model-last.torch")):
-            d = torch.load(wd.file("model-last.torch"), map_location="cpu")
-            if d["epoch"] == args.epochs:
-                out.out("Completed!")
-                sys.exit(0)
-        out.out("Not completed.")
-        sys.exit(1)
-
     # Determine which device to use. Try to use a GPU if one is available.
     if args.device is not None:
         device = args.device
@@ -270,6 +260,16 @@ def main(**kw_args):
     # is allowed to adjust these.
     args.epochs = args.epochs or config["epochs"] or 100
     args.rate = args.rate or config["rate"] or 3e-4
+
+    # Check if a run has completed.
+    if args.check_completed:
+        if os.path.exists(wd.file("model-last.torch")):
+            d = torch.load(wd.file("model-last.torch"), map_location="cpu")
+            if d["epoch"] >= args.epochs - 1:
+                out.out("Completed!")
+                sys.exit(0)
+        out.out("Not completed.")
+        sys.exit(1)
 
     # Set the regularisation based on the experiment settings.
     B.epsilon = config["epsilon"]
