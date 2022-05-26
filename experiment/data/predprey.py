@@ -30,6 +30,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         seed=10,
         batch_size=args.batch_size,
         num_tasks=num_tasks_train,
+        mode="random",
         device=device,
     )
     gen_cv = lambda: nps.PredPreyGenerator(
@@ -37,6 +38,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         seed=20,
         batch_size=args.batch_size,
         num_tasks=num_tasks_cv,
+        mode="random",
         device=device,
     )
 
