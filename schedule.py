@@ -231,7 +231,7 @@ async def main():
     elif args.collection == "predprey-latent-variable":
         commands = [
             f"python train.py --data predprey --model {model} --objective {objective}"
-            for model in ["anp", "convnp"]
+            for model in ["convnp", "anp"]
             for objective in [
                 f"loglik --num-samples 20",
                 f"elbo --num-samples 5",
@@ -246,7 +246,7 @@ async def main():
     elif args.collection == "eeg-latent-variable":
         commands = [
             f"python train.py --data eeg --model {model} --objective {objective}"
-            for model in ["anp", "convnp"]
+            for model in ["convnp", "anp"]
             for objective in [
                 f"loglik --num-samples 20",
                 f"elbo --num-samples 5",

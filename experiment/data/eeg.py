@@ -7,86 +7,86 @@ __all__ = []
 
 
 def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
-
     # Task dimensions: one input variable (time) and seven output variables (channels)
     config["dim_x"] = 1
     config["dim_y"] = 7
+    config["rate"] = 1e-4
+    config["epochs"] = 200
 
-    # Architecture choices specific for the EEG experiments
-    config["margin"] = 0.1
+    # Architecture choices specific for the EEG experiments:
     config["transform"] = None
-    config["conv_receptive_field"] = 1.0
     config["epsilon"] = 1e-6
-    config["fullconvgnp_kernel_factor"] = 1
-    config["points_per_unit"] = 256
-    config["encoder_scales"] = 1 / 512
+    config["enc_same"] = True
 
-    # Other settings specific to the predator-prey experiments:
+    # Configure the convolutional models:
+    config["points_per_unit"] = 256
+    config["margin"] = 0.1
+    config["conv_receptive_field"] = 1.0
+    config["unet_strides"] = (1,) + (2,) * 6
+    config["unet_channels"] = (64,) * 7
+    config["fullconvgnp_kernel_factor"] = 1
+
+    # Other settings specific to the EEG experiments:
     config["plot"] = {1: {"range": (0, 1), "axvline": []}}
 
     gen_train = nps.EEGGenerator(
         dtype=torch.float32,
-        split_seed=10,
-        split="train",
+        seed=0,
         batch_size=args.batch_size,
         num_tasks=num_tasks_train,
+        subset="train",
         device=device,
     )
 
     gen_cv = lambda: (
         nps.EEGGenerator(
             dtype=torch.float32,
-            split_seed=20,
-            split="valid",
+            seed=20,
             batch_size=args.batch_size,
             num_tasks=num_tasks_cv,
+            subset="cv",
             device=device,
         )
     )
 
     def gens_eval():
-
-        gen_eval_scattered = nps.EEGGenerator(
-            dtype=torch.float32,
-            split_seed=30,
-            split="test",
-            batch_size=args.batch_size,
-            num_tasks=num_tasks_eval,
-            mode="random",
-            device=device,
-        )
-
-        gen_eval_single_channel = nps.EEGGenerator(
-            dtype=torch.float32,
-            split_seed=30,
-            split="test",
-            batch_size=args.batch_size,
-            num_tasks=num_tasks_eval,
-            mode="single_channel",
-            device=device,
-        )
-
-        gen_eval_extrapolation = nps.EEGGenerator(
-            dtype=torch.float32,
-            split_seed=30,
-            split="test",
-            batch_size=args.batch_size,
-            num_tasks=num_tasks_eval,
-            mode="extrapolation",
-            device=device,
-        )
-
-        gens = [
-            ("random eval", gen_eval_scattered),
-            ("single channel eval", gen_eval_single_channel),
-            ("extrapolation eval", gen_eval_extrapolation),
+        return [
+            (
+                "Interpolation",
+                nps.EEGGenerator(
+                    dtype=torch.float32,
+                    batch_size=args.batch_size,
+                    num_tasks=num_tasks_eval,
+                    mode="interpolation",
+                    subset="eval",
+                    device=device,
+                ),
+            ),
+            (
+                "Forecasting",
+                nps.EEGGenerator(
+                    dtype=torch.float32,
+                    batch_size=args.batch_size,
+                    num_tasks=num_tasks_eval,
+                    mode="forecasting",
+                    subset="eval",
+                    device=device,
+                ),
+            ),
+            (
+                "Reconstruction",
+                nps.EEGGenerator(
+                    dtype=torch.float32,
+                    batch_size=args.batch_size,
+                    num_tasks=num_tasks_eval,
+                    mode="reconstruction",
+                    subset="eval",
+                    device=device,
+                ),
+            ),
         ]
 
-        return gens
-
     return gen_train, gen_cv, gens_eval
-
-
 
 
 register_data("eeg", setup)
