@@ -237,16 +237,15 @@ async def main():
                 f"elbo --num-samples 5",
             ]
         ]
-    elif args.collection == "eeg-conditional":
+    elif args.collection == "eeg-conv-conditional":
         # Don't run the FullConvGNP here. It's too expensive. We'll do it separately.
         commands = [
-            f"python train.py --data eeg --model {model}"
-            for model in ["convcnp", "convgnp", "acnp"]
+            f"python train.py --data eeg --model convcnp",
+            f"python train.py --data eeg --model convgnp",
         ]
-    elif args.collection == "eeg-latent-variable":
+    elif args.collection == "eeg-conv-latent-variable":
         commands = [
-            f"python train.py --data eeg --model {model} --objective {objective}"
-            for model in ["convnp", "anp"]
+            f"python train.py --data eeg --model convnp --objective {objective}"
             for objective in [
                 f"loglik --num-samples 20",
                 f"elbo --num-samples 5",
