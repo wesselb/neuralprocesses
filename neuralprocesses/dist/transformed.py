@@ -221,7 +221,7 @@ class TransformedMultiOutputDistribution(AbstractMultiOutputDistribution):
             )
 
         logpdf = self.dist.logpdf(_map_aggregate(self.transform.untransform, x))
-        logdet = _sum_aggregate(_map_aggregate(_logdet_sum, self.shape, x))
+        logdet = _sum_aggregate(_map_aggregate(_logdet_sum, x, self.shape))
         return logpdf + logdet
 
     def sample(self, *args, **kw_args):
