@@ -93,4 +93,4 @@ for data in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]:
                                 "KL (trivial)",
                                 with_err(B.stack(*logpdfs) - logpdf_trivial),
                             )
-                        out.kv("Logpdf (trivial)", logpdf_trivial)
+                        out.kv("Logpdf (trivial)", logpdf_trivial, fmt=".5f")
