@@ -13,7 +13,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["epochs"] = 200
 
     # Architecture choices specific for the predator-prey experiments:
-    config["transform"] = "softplus"
+    config["transform"] = "softplus_of_square"
 
     # Configure the convolutional models:
     config["points_per_unit"] = 4

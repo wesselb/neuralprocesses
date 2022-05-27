@@ -94,8 +94,8 @@ class Transform:
         def untransform_logdet(y):
             # Use the same approximations as above.
             y_clipped = B.minimum(B.maximum(y, B.exp(-20) * B.one(y)), 20 * B.one(y))
-            res = B.where(y > 20, B.one(y), B.exp(y_clipped) / (B.exp(y_clipped) - 1))
-            res = B.where(y < B.exp(-20), 1 / y, res)
+            res = B.where(y > 20, B.zero(y), y_clipped - B.log(B.exp(y_clipped) - 1))
+            res = B.where(y < B.exp(-20), -B.log(y), res)
             return res
 
         return cls(
@@ -126,6 +126,29 @@ class Transform:
 
         def untransform_logdet(y):
             return B.log(1 / (y - lower) + 1 / (upper - y))
+
+        @classmethod
+        def signed_square(cls):
+            """Construct the transform `f(x) = sign(x) |x|^2`."""
+
+            def transform(x):
+                return B.sign(x) * (x * x)
+
+            def transform_deriv(x):
+                return 2 * B.abs(x)
+
+            def untransform(y):
+                return B.sign(y) * B.sqrt(B.abs(y))
+
+            def untransform_logdet(y):
+                return -B.log(2) - B.log(B.abs(y))
+
+            return cls(
+                transform=transform,
+                transform_deriv=transform_deriv,
+                untransform=untransform,
+                untransform_logdet=untransform_logdet,
+            )
 
         return cls(
             transform=transform,
@@ -184,14 +207,19 @@ class TransformedMultiOutputDistribution(AbstractMultiOutputDistribution):
         return _map_aggregate(_var, self.dist.mean, self.dist.var)
 
     def logpdf(self, x):
-        def _logdet_sum(x):
-            return B.sum(
-                self.transform.untransform_logdet(x),
-                axis=tuple(range(-1 - data_dims(x), 0)),
-            )
-
         logpdf = self.dist.logpdf(_map_aggregate(self.transform.untransform, x))
+
+        def _logdet_sum(x):
+            logdet = self.transform.untransform_logdet(x)
+            # Automatically sum over any dimensions more than the dimensions of the
+            # `logpdf`.
+            if B.rank(logdet) > B.rank(logpdf):
+                dims = tuple(range(B.rank(x)))
+                logdet = B.sum(logdet, axis=dims[B.rank(logpdf) :])
+            return logdet
+
         logdet = _sum_aggregate(_map_aggregate(_logdet_sum, x))
+
         return logpdf + logdet
 
     def sample(self, *args, **kw_args):

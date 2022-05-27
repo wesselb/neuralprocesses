@@ -60,8 +60,9 @@ def parse_transform(nps=nps, *, transform):
         nps (module): Appropriate backend-specific module.
         transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
-            Must be either `"positive"`, `"exp"`, or `"softplus"` for positive data or
-            `(lower, upper)` for data in this open interval.
+            Must be either `"positive"`, `"exp"`, `"softplus"`, or
+            `"softplus_of_square"` for positive data or `(lower, upper)` for data in
+            this open interval.
 
     Returns:
         coder: Transform.
@@ -70,6 +71,11 @@ def parse_transform(nps=nps, *, transform):
         transform = nps.Transform.exp()
     elif isinstance(transform, str) and transform.lower() == "softplus":
         transform = nps.Transform.softplus()
+    elif isinstance(transform, str) and transform.lower() == "softplus_of_square":
+        transform = nps.Chain(
+            nps.Transform.signed_square(),
+            nps.Transform.softplus(),
+        )
     elif isinstance(transform, tuple):
         lower, upper = transform
         transform = nps.Transform.bounded(lower, upper)

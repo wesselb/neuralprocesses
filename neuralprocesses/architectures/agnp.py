@@ -37,8 +37,9 @@ def construct_agnp(*args, nps=nps, num_heads=8, **kw_args):
             `"het"` or `"dense"`. Defaults to `"het"`.
         transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
-            Must be either `"positive"`, `"exp"`, or `"softplus"` for positive data or
-            `(lower, upper)` for data in this open interval.
+            Must be either `"positive"`, `"exp"`, `"softplus"`, or
+            `"softplus_of_square"` for positive data or `(lower, upper)` for data in
+            this open interval.
         dtype (dtype, optional): Data type.
 
     Returns:
