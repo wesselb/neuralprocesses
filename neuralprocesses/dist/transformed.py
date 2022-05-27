@@ -7,7 +7,6 @@ from .dist import AbstractMultiOutputDistribution
 from .normal import _map_sample_output
 from .. import _dispatch
 from ..aggregate import Aggregate
-from ..datadims import data_dims
 from ..util import register_module
 
 __all__ = ["Transform", "TransformedMultiOutputDistribution"]
@@ -168,11 +167,19 @@ class TransformedMultiOutputDistribution(AbstractMultiOutputDistribution):
     Attributes:
         dist (:class:`.AbstractMultiOutputDistribution`): Transformed distribution.
         transform (:class:`.Transform`): Transform.
+        shape (shape or :class:`neuralprocesses.aggregate.Aggregate`): Shape(s) of the
+            data before vectorising.
     """
 
     def __init__(self, dist, transform):
         self.dist = dist
         self.transform = transform
+
+    @property
+    def shape(self):
+        """shape (shape or :class:`neuralprocesses.aggregate.Aggregate`): Shape(s) of
+        the data before vectorising."""
+        return self.dist.shape
 
     def __repr__(self):
         return (
@@ -207,19 +214,14 @@ class TransformedMultiOutputDistribution(AbstractMultiOutputDistribution):
         return _map_aggregate(_var, self.dist.mean, self.dist.var)
 
     def logpdf(self, x):
+        def _logdet_sum(x, shape):
+            return B.sum(
+                self.transform.untransform_logdet(x),
+                axis=tuple(range(-len(shape), 0)),
+            )
+
         logpdf = self.dist.logpdf(_map_aggregate(self.transform.untransform, x))
-
-        def _logdet_sum(x):
-            logdet = self.transform.untransform_logdet(x)
-            # Automatically sum over any dimensions more than the dimensions of the
-            # `logpdf`.
-            if B.rank(logdet) > B.rank(logpdf):
-                dims = tuple(range(B.rank(x)))
-                logdet = B.sum(logdet, axis=dims[B.rank(logpdf) :])
-            return logdet
-
-        logdet = _sum_aggregate(_map_aggregate(_logdet_sum, x))
-
+        logdet = _sum_aggregate(_map_aggregate(_logdet_sum, self.shape, x))
         return logpdf + logdet
 
     def sample(self, *args, **kw_args):
