@@ -79,7 +79,9 @@ for data in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]:
                         # Compute the trivial logpdf.
                         logpdfs_trivial = []
                         for i in range(dim_y):
-                            emp_var = (m2s[i] - m1s[i] * m1s[i]) / ns[i]
+                            m1 = m1s[i] / ns[i]
+                            m2 = m2s[i] / ns[i]
+                            emp_var = m2 - m1 ** 2
                             logpdfs_trivial.append(
                                 -0.5 * B.log(2 * B.pi * B.exp(1) * emp_var)
                             )
