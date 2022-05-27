@@ -127,28 +127,28 @@ class Transform:
         def untransform_logdet(y):
             return B.log(1 / (y - lower) + 1 / (upper - y))
 
-        @classmethod
-        def signed_square(cls):
-            """Construct the transform `f(x) = sign(x) |x|^2`."""
+        return cls(
+            transform=transform,
+            transform_deriv=transform_deriv,
+            untransform=untransform,
+            untransform_logdet=untransform_logdet,
+        )
 
-            def transform(x):
-                return B.sign(x) * (x * x)
+    @classmethod
+    def signed_square(cls):
+        """Construct the transform `f(x) = sign(x) |x|^2`."""
 
-            def transform_deriv(x):
-                return 2 * B.abs(x)
+        def transform(x):
+            return B.sign(x) * (x * x)
 
-            def untransform(y):
-                return B.sign(y) * B.sqrt(B.abs(y))
+        def transform_deriv(x):
+            return 2 * B.abs(x)
 
-            def untransform_logdet(y):
-                return -B.log(2) - B.log(B.abs(y))
+        def untransform(y):
+            return B.sign(y) * B.sqrt(B.abs(y))
 
-            return cls(
-                transform=transform,
-                transform_deriv=transform_deriv,
-                untransform=untransform,
-                untransform_logdet=untransform_logdet,
-            )
+        def untransform_logdet(y):
+            return -B.log(2) - B.log(B.abs(y))
 
         return cls(
             transform=transform,
