@@ -7,10 +7,10 @@ __all__ = []
 
 
 def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
+    config["default"]["rate"] = 1e-4
+    config["default"]["epochs"] = 200
     config["dim_x"] = 1
     config["dim_y"] = 2
-    config["rate"] = 1e-4
-    config["epochs"] = 200
 
     # Architecture choices specific for the predator-prey experiments:
     config["transform"] = "softplus"

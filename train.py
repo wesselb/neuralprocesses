@@ -228,8 +228,11 @@ def main(**kw_args):
 
     # General config.
     config = {
-        "epochs": None,
-        "rate": None,
+        "default": {
+            "epochs": None,
+            "rate": None,
+            "also_ar": False,
+        },
         "epsilon": 1e-8,
         "epsilon_start": 1e-2,
         "cholesky_retry_factor": 1e6,
@@ -261,8 +264,9 @@ def main(**kw_args):
 
     # Apply defaults for the number of epochs and the learning rate. The experiment
     # is allowed to adjust these.
-    args.epochs = args.epochs or config["epochs"] or 100
-    args.rate = args.rate or config["rate"] or 3e-4
+    args.epochs = args.epochs or config["default"]["epochs"] or 100
+    args.rate = args.rate or config["default"]["rate"] or 3e-4
+    args.also_ar = args.also_ar or config["default"]["also_ar"]
 
     # Check if a run has completed.
     if args.check_completed:

@@ -7,11 +7,10 @@ __all__ = []
 
 
 def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
-    # Task dimensions: one input variable (time) and seven output variables (channels)
+    config["default"]["rate"] = 2e-4
+    config["default"]["epochs"] = 200
     config["dim_x"] = 1
     config["dim_y"] = 7
-    config["rate"] = 2e-4
-    config["epochs"] = 200
 
     # Architecture choices specific for the EEG experiments:
     config["transform"] = None

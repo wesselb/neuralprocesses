@@ -58,8 +58,14 @@ def setup(
         target_elev = True
         target_square = 0
         do_plot = False
-        config["rate"] = 5e-5
-        config["epochs"] = 400
+
+        # Set defaults.
+        if data_task == "germany":
+            config["default"]["rate"] = 2.5e-5
+        else:
+            config["default"]["rate"] = 5e-5
+        config["default"]["epochs"] = 400
+
     elif args.model in {"convcnp-multires", "convgnp-multires"}:
         if args.model == "convcnp-multires":
             likelihood = "het"
@@ -75,8 +81,12 @@ def setup(
         target_elev = False
         target_square = 3
         do_plot = True
-        config["rate"] = 1e-5
-        config["epochs"] = 1000
+
+        # Set defaults.
+        config["default"]["rate"] = 1e-5
+        config["default"]["epochs"] = 1000
+        config["default"]["also_ar"] = True
+
     else:
         raise ValueError(f'Experiment does not yet support model "{args.model}".')
 

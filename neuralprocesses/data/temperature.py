@@ -176,7 +176,7 @@ class _TemperatureData:
         lat_mask = lats[0] <= self.xc_grid[1][0, 0, :]
         lat_mask &= self.xc_grid[1][0, 0, :] <= lats[1]
         if assert_no_data_lost and (B.any(~lon_mask) or B.any(~lat_mask)):
-            raise AssertionError("Longtitude and latitude bounds are too tight.")
+            raise AssertionError("Longitude and latitude bounds are too tight.")
         self.xc_grid = (
             self.xc_grid[0][:, :, lon_mask],
             self.xc_grid[1][:, :, lat_mask],
@@ -187,7 +187,7 @@ class _TemperatureData:
         mask = (lons[0] <= self.xt[0, 0, :]) & (self.xt[0, 0, :] < lons[1])
         mask &= (lats[0] <= self.xt[0, 1, :]) & (self.xt[0, 1, :] < lats[1])
         if assert_no_data_lost and B.any(~mask):
-            raise AssertionError("Longtitude and latitude bounds are too tight.")
+            raise AssertionError("Longitude and latitude bounds are too tight.")
         self.xt = self.xt[:, :, mask]
         self.yt = self.yt[:, :, mask]
         self.xt_elev = self.xt_elev[:, :, mask]
