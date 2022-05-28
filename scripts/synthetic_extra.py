@@ -83,6 +83,7 @@ for data in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]:
 
                         # Report  KLs.
                         if logpdfs:
+                            out.kv("Logpdf (diag)", with_err(B.stack(*logpdfs_diag)))
                             out.kv(
                                 "KL (diag)",
                                 with_err(B.stack(*logpdfs) - B.stack(*logpdfs_diag)),
