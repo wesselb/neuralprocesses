@@ -1,8 +1,8 @@
 from functools import partial
 
-import neuralprocesses.torch as nps
 import torch
 
+import neuralprocesses.torch as nps
 from .util import register_data
 
 __all__ = []
@@ -48,6 +48,9 @@ def setup(
             likelihood = "het"
         elif args.model == "convgnp-mlp":
             likelihood = "lowrank"
+            # Help the model a little in the beginning.
+            config["fix_noise"] = True
+            config["fix_noise_epochs"] = 10
         else:
             raise RuntimeError("Could not determine likelihood.")
         config["model"] = nps.construct_climate_convgnp_mlp(
@@ -84,7 +87,7 @@ def setup(
 
         # Set defaults.
         config["default"]["rate"] = 1e-5
-        config["default"]["epochs"] = 1000
+        config["default"]["epochs"] = 500
         config["default"]["also_ar"] = True
 
     else:
