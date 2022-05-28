@@ -63,11 +63,8 @@ def setup(
         do_plot = False
 
         # Set defaults.
-        if data_task == "germany":
-            config["default"]["rate"] = 2.5e-5
-        else:
-            config["default"]["rate"] = 5e-5
-        config["default"]["epochs"] = 400
+        config["default"]["rate"] = 2.5e-5
+        config["default"]["epochs"] = 500
 
     elif args.model in {"convcnp-multires", "convgnp-multires"}:
         if args.model == "convcnp-multires":
