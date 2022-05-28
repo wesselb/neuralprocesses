@@ -69,28 +69,25 @@ for data in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]:
                                     m2s[i] += B.sum(batch["yt"][i] ** 2)
                                     ns[i] += B.length(batch["yt"][i])
 
-                        # Report the KL of the diagonalised true GP.
-                        if logpdfs:
-                            out.kv(
-                                "KL (diag)",
-                                with_err(B.stack(*logpdfs) - B.stack(*logpdfs_diag)),
-                            )
-
                         # Compute the trivial logpdf.
                         logpdfs_trivial = []
                         for i in range(dim_y):
                             m1 = m1s[i] / ns[i]
                             m2 = m2s[i] / ns[i]
-                            emp_var = m2 - m1 ** 2
+                            emp_var = m2 - m1**2
                             logpdfs_trivial.append(
                                 -0.5 * B.log(2 * B.pi * B.exp(1) * emp_var)
                             )
                         logpdf_trivial = B.mean(B.stack(*logpdfs_trivial))
+                        out.kv("Logpdf (trivial)", logpdf_trivial, fmt=".5f")
 
-                        # Report the trivial logpdf.
+                        # Report  KLs.
                         if logpdfs:
+                            out.kv(
+                                "KL (diag)",
+                                with_err(B.stack(*logpdfs) - B.stack(*logpdfs_diag)),
+                            )
                             out.kv(
                                 "KL (trivial)",
                                 with_err(B.stack(*logpdfs) - logpdf_trivial),
                             )
-                        out.kv("Logpdf (trivial)", logpdf_trivial, fmt=".5f")
