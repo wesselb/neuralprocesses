@@ -1,7 +1,6 @@
 import lab as B
 from matrix import Diagonal
 from plum import Union
-from stheno import Normal
 
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
@@ -45,13 +44,13 @@ def sample(state: B.RandomState, x: Parallel, num: Union[B.Int, None] = None):
 
 
 @_dispatch
-def fix_noise(d, epoch: None):
-    """Fix the noise of a prediction in the first three epochs to `1e-4`.
+def fix_noise(d, value: None):
+    """Fix the noise of a prediction.
 
     Args:
         d (:class:`neuralprocesses.dist.dist.AbstractMultiOutputDistribution`):
             Prediction.
-        epoch (int or None): Epoch.
+        value (float or None): Value to fix it to.
 
     Returns:
         :class:`neuralprocesses.dist.dist.AbstractMultiOutputDistribution`: Prediction
@@ -61,23 +60,20 @@ def fix_noise(d, epoch: None):
 
 
 @_dispatch
-def fix_noise(d: MultiOutputNormal, epoch: int):
-    # Fix noise to `1e-4` in the first three epochs.
-    if epoch < 3:
-        with B.on_device(d.vectorised_normal.var_diag):
-            d = MultiOutputNormal(
-                d._mean,
-                B.zeros(d._var),
-                1e-4 * Diagonal(B.ones(d.vectorised_normal.var_diag)),
-                d.shape,
-            )
-    return d
+def fix_noise(d: MultiOutputNormal, value: float):
+    with B.on_device(d.vectorised_normal.var_diag):
+        return MultiOutputNormal(
+            d._mean,
+            B.zeros(d._var),
+            value * Diagonal(B.ones(d.vectorised_normal.var_diag)),
+            d.shape,
+        )
 
 
 @_dispatch
-def fix_noise(d: TransformedMultiOutputDistribution, epoch: int):
+def fix_noise(d: TransformedMultiOutputDistribution, value: float):
     return TransformedMultiOutputDistribution(
-        fix_noise(d.dist, epoch),
+        fix_noise(d.dist, value),
         d.transform,
     )
 
