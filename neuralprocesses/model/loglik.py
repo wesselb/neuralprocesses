@@ -2,7 +2,7 @@ import lab as B
 import numpy as np
 
 from .model import Model
-from .util import fix_noise
+from .util import fix_noise as fix_noise_in_pred
 from .. import _dispatch
 from ..numdata import num_data
 
@@ -20,7 +20,7 @@ def loglik(
     num_samples=1,
     batch_size=16,
     normalise=False,
-    epoch=None,
+    fix_noise=None,
     **kw_args,
 ):
     """Log-likelihood objective.
@@ -36,8 +36,7 @@ def loglik(
         batch_size (int, optional): Batch size to use for sampling. Defaults to 16.
         normalise (bool, optional): Normalise the objective by the number of targets.
             Defaults to `False`.
-        epoch (int, optional): Current epoch. If it is given, the likelihood variance
-            is fixed to `1e-4` for the first three epochs to encourage the model to fit.
+        fix_noise (float, optional): Fix the likelihood variance to this value.
 
     Returns:
         random state, optional: Random state.
@@ -63,7 +62,7 @@ def loglik(
             dtype_lik=float64,
             **kw_args,
         )
-        pred = fix_noise(pred, epoch)
+        pred = fix_noise_in_pred(pred, fix_noise)
         this_logpdfs = pred.logpdf(B.cast(float64, yt))
 
         # If the number of samples is equal to one but `num_samples > 1`, then the

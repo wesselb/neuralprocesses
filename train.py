@@ -19,7 +19,7 @@ __all__ = ["main"]
 warnings.filterwarnings("ignore", category=ToDenseWarning)
 
 
-def train(state, model, opt, objective, gen, *, epoch):
+def train(state, model, opt, objective, gen, *, fix_noise):
     """Train for an epoch."""
     vals = []
     for batch in gen.epoch():
@@ -29,7 +29,7 @@ def train(state, model, opt, objective, gen, *, epoch):
             batch["contexts"],
             batch["xt"],
             batch["yt"],
-            epoch=epoch,
+            fix_noise=fix_noise,
         )
         vals.append(B.to_numpy(obj))
         # Be sure to negate the output of `objective`.
@@ -186,20 +186,22 @@ def main(**kw_args):
     if not args.experiment_setting:
         args.experiment_setting = []
 
-    # Determine the mode of the script.
+    # Determine settings for the setup of the script.
+    suffix = ""
+    observe = False
     if args.check_completed or args.no_action or args.load:
-        # Don't add any mode suffix.
-        mode = ""
+        observe = True
     elif args.evaluate:
-        mode = "_evaluate"
+        suffix = "_evaluate"
         if args.ar:
-            mode += "_ar"
+            suffix += "_ar"
     else:
         # The default is training.
-        mode = "_train"
+        suffix = "_train"
 
     # Setup script.
-    out.report_time = True
+    if not observe:
+        out.report_time = True
     wd = WorkingDirectory(
         *args.root,
         *(args.subdir or ()),
@@ -208,8 +210,9 @@ def main(**kw_args):
         args.model,
         *((args.arch,) if hasattr(args, "arch") else ()),
         args.objective,
-        log=f"log{mode}.txt",
-        diff=f"diff{mode}.txt",
+        log=f"log{suffix}.txt",
+        diff=f"diff{suffix}.txt",
+        observe=observe,
     )
 
     # Determine which device to use. Try to use a GPU if one is available.
@@ -236,6 +239,8 @@ def main(**kw_args):
         "epsilon": 1e-8,
         "epsilon_start": 1e-2,
         "cholesky_retry_factor": 1e6,
+        "fix_noise": None,
+        "fix_noise_epochs": 3,
         "width": 256,
         "dim_embedding": 256,
         "enc_same": False,
@@ -447,24 +452,28 @@ def main(**kw_args):
         else:
             raise ValueError(f'Invalid model "{args.model}".')
 
-    # Settings specific model the model:
-    if args.model in {"np", "anp", "convnp"}:
-        config["fix_noise"] = True
-    else:
-        config["fix_noise"] = False
+    # Settings specific for the model:
+    if config["fix_noise"] is None:
+        if args.model in {"np", "anp", "convnp"}:
+            config["fix_noise"] = True
+        else:
+            config["fix_noise"] = False
 
     # Ensure that the model is on the GPU and print the setup.
     model = model.to(device)
-    out.kv(
-        "Arguments",
-        {
-            attr: getattr(args, attr)
-            for attr in args.__dir__()
-            if not attr.startswith("_")
-        },
-    )
-    out.kv("Config", {k: "<custom>" if k == "model" else v for k, v in config.items()})
-    out.kv("Number of parameters", nps.num_params(model))
+    if not args.load:
+        out.kv(
+            "Arguments",
+            {
+                attr: getattr(args, attr)
+                for attr in args.__dir__()
+                if not attr.startswith("_")
+            },
+        )
+        out.kv(
+            "Config", {k: "<custom>" if k == "model" else v for k, v in config.items()}
+        )
+        out.kv("Number of parameters", nps.num_params(model))
 
     # Setup training objective.
     if args.objective == "loglik":
@@ -623,13 +632,17 @@ def main(**kw_args):
                     B.epsilon = original_epsilon
 
                 # Perform an epoch.
+                if config["fix_noise"] and i < config["fix_noise_epochs"]:
+                    fix_noise = 1e-4
+                else:
+                    fix_noise = None
                 state, _ = train(
                     state,
                     model,
                     opt,
                     objective,
                     gen_train,
-                    epoch=i if config["fix_noise"] else None,
+                    fix_noise=fix_noise,
                 )
 
                 # The epoch is done. Now evaluate.

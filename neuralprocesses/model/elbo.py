@@ -2,7 +2,7 @@ import lab as B
 import numpy as np
 
 from .model import Model
-from .util import sample, fix_noise, compress_contexts
+from .util import sample, fix_noise as fix_noise_in_pred, compress_contexts
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
 from ..coding import code, code_track, recode_stochastic
@@ -24,7 +24,7 @@ def elbo(
     num_samples=1,
     normalise=False,
     subsume_context=False,
-    epoch=None,
+    fix_noise=None,
     **kw_args,
 ):
     """ELBO objective.
@@ -41,8 +41,7 @@ def elbo(
             Defaults to `False`.
         subsume_context (bool, optional): Subsume the context set into the target set.
             Defaults to `False`.
-        epoch (int, optional): Current epoch. If it is given, the likelihood variance
-            is fixed to `1e-4` for the first three epochs to encourage the model to fit.
+        fix_noise (float, optional): Fix the likelihood variance to this value.
 
     Returns:
         random state, optional: Random state.
@@ -92,7 +91,7 @@ def elbo(
         root=True,
         **kw_args,
     )
-    d = fix_noise(d, epoch)
+    d = fix_noise_in_pred(d, fix_noise)
 
     # Compute the ELBO.
     elbos = B.mean(d.logpdf(B.cast(float64, yt)), axis=0) - _kl(qz, pz)
