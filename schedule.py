@@ -251,16 +251,24 @@ async def main():
                 f"elbo --num-samples 5",
             ]
         ]
-    elif args.collection == "temperature-convcnp-mlp":
+    elif args.collection == "temperature-germany-convcnp-mlp":
         commands = [
-            f"python train.py --data temperature-{task}-{fold} --model convcnp-mlp"
-            for task in ["germany", "value"]
+            f"python train.py --data temperature-germany-{fold} --model convcnp-mlp"
             for fold in [1, 2, 3, 4, 5]
         ]
-    elif args.collection == "temperature-convgnp-mlp":
+    elif args.collection == "temperature-value-convcnp-mlp":
         commands = [
-            f"python train.py --data temperature-{task}-{fold} --model convgnp-mlp"
-            for task in ["germany", "value"]
+            f"python train.py --data temperature-value-{fold} --model convcnp-mlp"
+            for fold in [1, 2, 3, 4, 5]
+        ]
+    elif args.collection == "temperature-germany-convgnp-mlp":
+        commands = [
+            f"python train.py --data temperature-germany-{fold} --model convgnp-mlp"
+            for fold in [1, 2, 3, 4, 5]
+        ]
+    elif args.collection == "temperature-value-convgnp-mlp":
+        commands = [
+            f"python train.py --data temperature-value-{fold} --model convgnp-mlp"
             for fold in [1, 2, 3, 4, 5]
         ]
     else:
