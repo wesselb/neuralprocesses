@@ -83,7 +83,7 @@ def setup(
         do_plot = True
 
         # Set defaults.
-        config["default"]["rate"] = 1e-5
+        config["default"]["rate"] = 2.5e-5
         config["default"]["epochs"] = 500
         config["default"]["also_ar"] = True
 

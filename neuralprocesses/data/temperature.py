@@ -19,6 +19,7 @@ class _TemperatureData:
         data_path,
         data_task,
         data_fold,
+        cv_stations,
         context_elev_hr,
         target_elev_interpolate,
     ):
@@ -29,29 +30,36 @@ class _TemperatureData:
 
         # Load the data splits.
         if data_task == "germany":
-            # For Germany, the split is predetermined. We agree to use the first 100
-            # indices for cross-validation.
-            self.train_stations = np.load(f"{data_path}/data/train_inds.npy")[100:]
-            self.cv_stations = np.load(f"{data_path}/data/train_inds.npy")[:100]
+            # For Germany, the split is predetermined.
+            self.train_stations = np.load(f"{data_path}/data/train_inds.npy")
+            self.cv_stations = np.load(f"{data_path}/data/train_inds.npy")
+            if cv_stations:
+                # We agree to use the first 100 for cross-validation.
+                self.cv_stations = self.cv_stations[:100]
+                self.train_stations = self.train_stations[100:]
             self.eval_stations = np.load(f"{data_path}/data/test_inds.npy")
         elif data_task == "value":
-            # For VALUE, we evaluate on the same stations that we train on, so there
-            # is no split.
+            # For VALUE, we evaluate on the same stations that we train on, so we don't
+            # cross-validate on other stations.
             self.train_stations = slice(None, None, None)
             self.cv_stations = slice(None, None, None)
             self.eval_stations = slice(None, None, None)
         elif data_task == "europe":
-            # For the variant of VALUE, we train on different stations. In that case,
-            # we choose our cross-validation set to also be on different stations.
-            # This split, however, is not predetermined, so we choose a random one here.
-            n = 3043
-            n_train = int(n * 0.85)
-            # The seed below should not be altered! NumPy's `RandomState` policy says
-            # that this should always produce the exact same permutation for the same
-            # seed.
-            _, perm = B.randperm(B.create_random_state(np.int64, seed=99), np.int64, n)
-            self.train_stations = perm[:n_train]
-            self.cv_stations = perm[n_train:]
+            # For the variant of VALUE, we train on different stations.
+            if cv_stations:
+                # This split is not predetermined, so we choose a random one here.
+                n = 3043
+                n_train = int(n * 0.85)
+                # The seed below should not be altered! NumPy's `RandomState` policy
+                # says that this should always produce the exact same permutation for
+                # the same seed.
+                state = B.create_random_state(np.int64, seed=99)
+                _, perm = B.randperm(state, np.int64, n)
+                self.train_stations = perm[:n_train]
+                self.cv_stations = perm[n_train:]
+            else:
+                self.train_stations = slice(None, None, None)
+                self.cv_stations = slice(None, None, None)
             self.eval_stations = slice(None, None, None)
         else:  # pragma: no cover
             # This can never be reached.
@@ -240,6 +248,8 @@ class TemperatureGenerator(DataGenerator):
         dtype (dtype): Data type.
         seed (int, optional): Seed. Defaults to 0.
         batch_size (int, optional): Number of tasks per batch. Defaults to 16.
+        cv_stations (bool, optional): Cross-validate on different stations. Defaults
+            to `True`.
         context_sample (bool, optional): Randomly split the data into context and
             target. Defaults to `False`.
         context_sample_factor (scalar, optional): When randomly splitting the data into
@@ -250,6 +260,10 @@ class TemperatureGenerator(DataGenerator):
             a context set. If set to `False`, that context set will be `(None, None)`.
             Defaults to `True`.
         target_min (int, optional): Minimum number of target points. Defaults to 5.
+        target_max (int, optional): Maximum number of target points. Defaults to no
+            maximum.
+        target_dropnan (int, optional): Drop stations which have NaNs. Defaults to
+            `False`.
         target_square (float, optional): Size of the square of target points to sample.
             Defaults to not sampling a square.
         target_elev (bool, optional): Append the elevation at the target inputs as
@@ -278,6 +292,8 @@ class TemperatureGenerator(DataGenerator):
         context_sample_factor (scalar): This factor is the probability of the lowest
             number divided by the probability of the highest number. Defaults to 10.
         target_min (int): Minimum number of target points.
+        target_max (int, optional): Maximum number of target points.
+        target_dropnan (int, optional): Drop stations which have NaNs.
         target_square (float): Size of the square of target points to sample.
         target_elev (bool): Append the elevation at the target inputs as auxiliary
             information.
@@ -292,10 +308,13 @@ class TemperatureGenerator(DataGenerator):
         dtype,
         seed=0,
         batch_size=16,
+        cv_stations=True,
         context_sample=False,
         context_sample_factor=10,
         context_elev_hr=True,
         target_min=5,
+        target_max=None,
+        target_dropnan=False,
         target_square=0.0,
         target_elev=False,
         target_elev_interpolate=False,
@@ -310,6 +329,8 @@ class TemperatureGenerator(DataGenerator):
         self.context_sample_factor = context_sample_factor
         self.context_elev_hr = context_elev_hr
         self.target_min = target_min
+        self.target_max = target_max
+        self.target_dropnan = target_dropnan
         self.target_square = target_square
         self.target_elev = target_elev
         self._alternate_i = 0
@@ -319,6 +340,7 @@ class TemperatureGenerator(DataGenerator):
             data_path=data_path,
             data_task=data_task,
             data_fold=data_fold,
+            cv_stations=cv_stations,
             context_elev_hr=context_elev_hr,
             target_elev_interpolate=target_elev_interpolate,
         )
@@ -362,6 +384,7 @@ class TemperatureGenerator(DataGenerator):
         data_path,
         data_task,
         data_fold,
+        cv_stations,
         context_elev_hr,
         target_elev_interpolate,
     ):
@@ -369,6 +392,7 @@ class TemperatureGenerator(DataGenerator):
             data_path=data_path,
             data_task=data_task,
             data_fold=data_fold,
+            cv_stations=cv_stations,
             context_elev_hr=context_elev_hr,
             target_elev_interpolate=target_elev_interpolate,
         )
@@ -540,6 +564,21 @@ class TemperatureGenerator(DataGenerator):
             ),
             (b["xc_elev_station"], b["yc_elev_station"] / 100),
         ]
+
+        # Drop stations which have NaNs, if asked for.
+        if self.target_dropnan:
+            mask = ~B.any(B.any(B.isnan(b["yt"]), axis=0), axis=0)
+            b["xt"] = B.take(b["xt"], mask, axis=-1)
+            b["yt"] = B.take(b["yt"], mask, axis=-1)
+            b["yt_elev"] = B.take(b["yt_elev"], mask, axis=-1)
+
+        # Ensure that the maximum number of targets isn't exceeded.
+        if self.target_max:
+            self.state, perm = B.randperm(self.state, self.int64, B.shape(b["xt"], -1))
+            inds = perm[: self.target_max]
+            b["xt"] = B.take(b["xt"], inds, axis=-1)
+            b["yt"] = B.take(b["yt"], inds, axis=-1)
+            b["yt_elev"] = B.take(b["yt_elev"], inds, axis=-1)
 
         # Append the elevation as auxiliary information, if asked for.
         if self.target_elev:
