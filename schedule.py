@@ -117,7 +117,7 @@ async def benchmark_command(gpu_id, command):
 
 
 async def determine_current_stats(gpu_id):
-    """Determine the current statistics of GPU `gpu_id` by monitoring the GPU over 20
+    """Determine the current statistics of GPU `gpu_id` by monitoring the GPU over 60
     seconds.
 
     Args:
@@ -128,7 +128,7 @@ async def determine_current_stats(gpu_id):
     """
     stats = []
     current = 0
-    while current < 20:
+    while current < 60:
         await asyncio.sleep(1)
         stats.append(nvidia_smi(gpu_id))
         current += 1

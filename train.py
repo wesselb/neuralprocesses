@@ -604,8 +604,9 @@ def main(**kw_args):
                             gen,
                         )
 
-        # Sleep for twenty seconds before exiting.
-        time.sleep(20)
+        # Sleep for sixty seconds before exiting.
+        out.out("Finished evaluation. Sleeping for a minute before exiting.")
+        time.sleep(60)
     else:
         # Perform training. First, check if we want to resume training.
         start = 0
