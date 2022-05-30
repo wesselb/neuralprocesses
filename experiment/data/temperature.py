@@ -48,7 +48,7 @@ def setup(
             likelihood = "het"
         elif args.model == "convgnp-mlp":
             likelihood = "lowrank"
-            # Help the model a little in the beginning.
+            # Help the mean a little in the beginning.
             config["fix_noise"] = True
             config["fix_noise_epochs"] = 10
         else:
