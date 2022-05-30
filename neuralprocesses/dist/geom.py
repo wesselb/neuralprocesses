@@ -1,5 +1,6 @@
 import lab as B
 import numpy as np
+from plum import Union
 
 from .dist import AbstractDistribution
 from .. import _dispatch
@@ -14,27 +15,36 @@ class TruncatedGeometric(AbstractDistribution):
         lower (int): Lower bound.
         upper (int): Upper bound.
         factor (float): Probability of the lower bound divided by the probability of
-            the upper bound.
+            `factor_at`.
+        factor_at (int): Upper bound for `factor`. Defaults to `upper`.
 
     Attributes:
         lower (int): Lower bound.
         upper (int): Upper bound.
         factor (float): Probability of the lower bound divided by the probability of
-            the upper bound.
+            `factor_at`.
+        factor_at (int): Upper bound for `factor`.
     """
 
     @_dispatch
-    def __init__(self, lower: B.Int, upper: B.Int, factor: B.Number):
+    def __init__(
+        self,
+        lower: B.Int,
+        upper: B.Int,
+        factor: B.Number,
+        factor_at: Union[B.Number, None] = None,
+    ):
         self.lower = lower
         self.upper = upper
         self.factor = factor
+        self.factor_at = upper if factor_at is None else factor_at
 
     def sample(self, state, dtype, *shape):
         dtype_float = B.promote_dtypes(dtype, np.float16)
         realisations = B.range(dtype, self.lower, self.upper + 1)
         if self.upper > self.lower:
-            lam = B.cast(dtype_float, B.log(self.factor) / (self.upper - self.lower))
-            lam = B.to_active_device(lam)
+            lam = B.log(self.factor) / (self.factor_at - self.lower)
+            lam = B.cast(dtype_float, B.to_active_device(lam))
             probs = B.exp(-lam * B.cast(dtype_float, realisations))
         else:
             probs = B.to_active_device(B.ones(dtype_float, 1))

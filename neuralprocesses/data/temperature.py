@@ -254,8 +254,11 @@ class TemperatureGenerator(DataGenerator):
             target. Defaults to `False`.
         context_sample_factor (scalar, optional): When randomly splitting the data into
             context and target, emphasise the lower numbers more. This factor is the
-            probability of the lowest number divided by the probability of the highest
+            probability of the lowest number divided by the probability of
+            `context_sample_factor_at`, if it is given, and otherwise the highest
             number.
+        context_sample_factor_at (scalar, optional): Upper bound for
+            `context_sample_factor`.
         context_elev_hr (bool, optional): Load the high-resolution elevation data as
             a context set. If set to `False`, that context set will be `(None, None)`.
             Defaults to `True`.
@@ -289,8 +292,12 @@ class TemperatureGenerator(DataGenerator):
         batch_size (int): Number of tasks per batch.
         num_batches (int): Number of batches in an epoch.
         context_sample (bool): Randomly split the data into context and target.
-        context_sample_factor (scalar): This factor is the probability of the lowest
-            number divided by the probability of the highest number. Defaults to 10.
+        context_sample_factor (scalar): When randomly splitting the data into context
+            and target, emphasise the lower numbers more. This factor is the probability
+            of the lowest number divided by the probability of
+            `context_sample_factor_at`, if it is given, and otherwise the highest
+            number.
+        context_sample_factor_at (scalar): Upper bound for `context_sample_factor`.
         target_min (int): Minimum number of target points.
         target_max (int, optional): Maximum number of target points.
         target_dropnan (int, optional): Drop stations which have NaNs.
@@ -311,6 +318,7 @@ class TemperatureGenerator(DataGenerator):
         cv_stations=True,
         context_sample=False,
         context_sample_factor=10,
+        context_sample_factor_at=None,
         context_elev_hr=True,
         target_min=5,
         target_max=None,
@@ -327,6 +335,7 @@ class TemperatureGenerator(DataGenerator):
     ):
         self.context_sample = context_sample
         self.context_sample_factor = context_sample_factor
+        self.context_sample_factor_at = context_sample_factor_at
         self.context_elev_hr = context_elev_hr
         self.target_min = target_min
         self.target_max = target_max
@@ -481,7 +490,11 @@ class TemperatureGenerator(DataGenerator):
                 )
 
                 # Only stop sampling if the minimum number of targets was selected.
-                if B.sum(B.cast(B.dtype_float(mask), mask)) >= self.target_min:
+                available = B.cast(
+                    B.dtype_float(mask),
+                    ~B.isnan(B.take(b["yt"], mask, axis=-1)),
+                )
+                if B.min(B.sum(available, axis=(1, 2))) >= self.target_min:
                     b["xc_s_outside_square"] = B.take(b["xt"], ~mask, axis=-1)
                     b["yc_s_outside_square"] = B.take(b["yt"], ~mask, axis=-1)
                     b["xt"] = B.take(b["xt"], mask, axis=-1)
@@ -506,16 +519,26 @@ class TemperatureGenerator(DataGenerator):
             if nc is None:
                 # Find the maximum number of context points by ensuring that there are
                 # at least `self.target_min` in the target set.
+                # TODO: Is the below loop the right way of doing this?
                 nc_upper = len(inds)
                 count = 0
-                for inside, _ in reversed(inds):
-                    count += inside
+                for inside, i in reversed(inds):
+                    # If the current point is inside the square and if at least one
+                    # observation is available for all stations, only then increase
+                    # the count.
+                    if inside and B.all(B.any(~B.isnan(b["yt"][:, :, i]), axis=1)):
+                        count += 1
                     nc_upper -= 1
                     if count >= self.target_min:
                         break
                 # Now sample from a truncated geometric distribution, which has the
                 # ability to emphasise the lower context numbers.
-                dist = TruncatedGeometric(0, nc_upper, self.context_sample_factor)
+                dist = TruncatedGeometric(
+                    0,
+                    nc_upper,
+                    self.context_sample_factor,
+                    self.context_sample_factor_at,
+                )
                 self.state, nc = dist.sample(self.state, self.int64)
             inds_c_inside = [i for inside, i in inds[:nc] if inside]
             inds_t_inside = [i for inside, i in inds[nc:] if inside]
