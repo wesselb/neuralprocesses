@@ -28,6 +28,7 @@ maes = B.concat(*maes)
 
 # Compute the average MAE per station, and then take the median over
 # stations. This lines up with the VALUE protocol.
-mae = torch.median(B.nanmean(maes, axis=(0, 1)))
+maes = B.nanmean(maes, axis=(0, 1))
 
-out.kv("MAE", mae)
+out.kv("Station-wise MAEs", maes)
+out.kv("Median MAE", torch.median(maes))
