@@ -31,4 +31,4 @@ maes = B.concat(*maes)
 maes = B.nanmean(maes, axis=(0, 1))
 
 out.kv("Station-wise MAEs", maes)
-out.kv("Median MAE", torch.median(maes))
+out.kv("Median MAE", torch.nanmedian(maes))

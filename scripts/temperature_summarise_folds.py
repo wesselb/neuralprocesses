@@ -50,7 +50,7 @@ for model in ["convcnp-mlp", "convgnp-mlp"]:
 
                 # Compute the average MAE per station, and then take the median over
                 # stations. This lines up with the VALUE protocol.
-                mae = torch.median(B.nanmean(maes, axis=(0, 1)))
+                mae = torch.nanmedian(B.nanmean(maes, axis=(0, 1)))
 
                 out.kv("Loglik", experiment.with_err(logpdfs, and_upper=True))
                 out.kv("MAE", mae)
