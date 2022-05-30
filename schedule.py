@@ -309,6 +309,7 @@ async def main():
     with out.Section("Commands"):
         for c in commands:
             out.out(c)
+            out.kv("Benchmark", benchmark[c])
 
     while commands:
         # Check which commands we can run without putting too much strain on the GPU.
