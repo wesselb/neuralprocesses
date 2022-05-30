@@ -1,7 +1,6 @@
 import lab as B
-from . import _dispatch
-import numpy as np
 
+from . import _dispatch
 from .aggregate import Aggregate, AggregateInput
 from .datadims import data_dims
 
@@ -20,8 +19,9 @@ def num_data(x, y: B.Numeric):
         int: Number of data points.
     """
     d = data_dims(x)
-    # Also count the channels dimension!
-    return np.prod(B.shape(y)[-d - 1 :])
+    available = B.cast(B.dtype_float(y), ~B.isnan(y))
+    # Sum over the channel dimension and over all data dimensions.
+    return B.sum(available, axis=tuple(range(-d - 1, 0)))
 
 
 @_dispatch
