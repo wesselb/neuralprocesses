@@ -252,24 +252,16 @@ async def main():
             ]
         ]
     elif args.collection == "temperature-convcnp-mlp":
-        # Run `europe` and `value` for all five folds, but run `germany` only for the
-        # last fold.
         commands = [
             f"python train.py --data temperature-{task}-{fold} --model convcnp-mlp"
-            for task in ["europe", "value"]
+            for task in ["germany", "value"]
             for fold in [1, 2, 3, 4, 5]
-        ] + [
-            "python train.py --data temperature-germany-5 --model convcnp-mlp",
         ]
     elif args.collection == "temperature-convgnp-mlp":
-        # Run `europe` and `value` for all five folds, but run `germany` only for the
-        # last fold.
         commands = [
             f"python train.py --data temperature-{task}-{fold} --model convgnp-mlp"
-            for task in ["europe", "value"]
+            for task in ["germany", "value"]
             for fold in [1, 2, 3, 4, 5]
-        ] + [
-            "python train.py --data temperature-germany-5 --model convgnp-mlp",
         ]
     else:
         raise RuntimeError(f'Unknown collection "{args.collection}".')
