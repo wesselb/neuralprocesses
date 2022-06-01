@@ -83,7 +83,7 @@ def setup(
         do_plot = True
 
         # Set defaults.
-        config["default"]["rate"] = 2.5e-5
+        config["default"]["rate"] = 1e-5
         config["default"]["epochs"] = 500
         config["default"]["also_ar"] = True
 
@@ -101,7 +101,8 @@ def setup(
         seed=10,
         batch_size=args.batch_size,
         context_sample=context_sample,
-        context_sample_factor=100,
+        context_sample_factor=1000,
+        context_sample_factor_at=600,
         context_elev_hr=context_elev_hr,
         target_min=10,
         target_square=target_square,
@@ -116,7 +117,8 @@ def setup(
         seed=20,
         batch_size=args.batch_size,
         context_sample=context_sample,
-        context_sample_factor=100,
+        context_sample_factor=1000,
+        context_sample_factor_at=600,
         context_elev_hr=context_elev_hr,
         target_min=1,
         target_square=target_square,
@@ -153,7 +155,8 @@ def setup(
                 seed=30,
                 batch_size=args.batch_size,
                 context_sample=True,
-                context_sample_factor=100,
+                context_sample_factor=1000,
+                context_sample_factor_at=600,
                 context_elev_hr=context_elev_hr,
                 target_min=1,
                 target_square=3 if "eval-square" in args.experiment_setting else 0,
