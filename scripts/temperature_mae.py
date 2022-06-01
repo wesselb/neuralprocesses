@@ -3,6 +3,7 @@ import sys
 import lab as B
 import torch
 import wbml.out as out
+from neuralprocesses import AugmentedInput
 
 from train import main
 
@@ -12,23 +13,49 @@ exp = main()
 
 # Setup model.
 model = exp["model"]
-model.load_state_dict(torch.load(exp["wd"].file("model-best.torch"))["weights"])
+model.load_state_dict(torch.load(exp["wd"].file("model-last.torch"))["weights"])
 
-# Setup generator.
-gens = exp["gens_eval"]()
-_, gen = gens[0]  # The first one corresponds to downscaling.
+def strip_augmentation(x):
+    if isinstance(x, AugmentedInput):
+        return x.x
+    return x
 
-state = B.create_random_state(torch.float32, seed=0)
-maes = []
-with torch.no_grad():
-    for batch in gen.epoch():
-        state, pred = model(state, batch["contexts"], batch["xt"])
-        maes.append(B.abs(pred.mean - batch["yt"]))
-maes = B.concat(*maes)
 
-# Compute the average MAE per station, and then take the median over
-# stations. This lines up with the VALUE protocol.
-maes = B.nanmean(maes, axis=(0, 1))
+xt_all = strip_augmentation(exp["gens_eval"]()[0][1].generate_batch()["xt"])[0]
 
-out.kv("Station-wise MAEs", maes)
-out.kv("Median MAE", torch.nanmedian(maes))
+
+def reindex(mae, xt):
+    nan_row = mae[:, :, :1] * B.nan
+    xt = strip_augmentation(xt)[0]
+    rows = []
+    dists = B.to_numpy(B.pw_dists(B.t(xt_all), B.t(xt)).cpu())
+    for i in range(B.shape(xt_all, -1)):
+        match = False
+        for j in range(B.shape(xt, -1)):
+            if dists[i, j] < 1e-6:
+                rows.append(mae[:, :, j: j+1])
+                match = True
+                break
+        if not match:
+            rows.append(nan_row)
+    return B.concat(*rows, axis=-1)
+
+
+for name, gen in exp["gens_eval"]():
+    with out.Section(name):
+        state = B.create_random_state(torch.float32, seed=0)
+        maes = []
+
+        with torch.no_grad():
+            for batch in gen.epoch():
+                state, pred = model(state, batch["contexts"], batch["xt"])
+                mae = B.abs(pred.mean - batch["yt"])
+                maes.append(reindex(mae, batch["xt"]))
+        maes = B.concat(*maes)
+
+        # Compute the average MAE per station, and then take the median over
+        # stations. This lines up with the VALUE protocol.
+        maes = B.nanmean(maes, axis=(0, 1))
+
+        out.kv("Station-wise MAEs", maes)
+        out.kv("Median MAE", torch.nanmedian(maes))
