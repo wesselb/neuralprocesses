@@ -332,19 +332,20 @@ class Interface:
     LayerNorm = staticmethod(LayerNorm)
 
     @staticmethod
-    def Parameter(x, dtype=None):
+    def Parameter(x, dtype=None, learnable=True):
         """A tracked parameter.
 
         Args:
             x (tensor): Initial value of the parameter.
             dtype (dtype, optional): Data type.
+            learnable (bool, optional): Whether the parameter is learnable.
 
         Returns:
             :class:`tf.Variable`: Parameter.
         """
         dtype = dtype or tf.float32
         dtype = convert(dtype, B.TFDType)
-        return tf.Variable(x, dtype=dtype)
+        return tf.Variable(x, dtype=dtype, trainable=learnable)
 
 
 interface = Interface()  #: The TensorFlow interface.

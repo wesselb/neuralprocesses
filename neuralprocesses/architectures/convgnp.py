@@ -41,8 +41,9 @@ def _convgnp_construct_encoder_setconvs(
     encoder_scales,
     dim_yc,
     disc,
-    dtype,
+    dtype=None,
     init_factor=1,
+    encoder_scales_learnable=True,
 ):
     # Initialise scale.
     if encoder_scales is not None:
@@ -53,21 +54,27 @@ def _convgnp_construct_encoder_setconvs(
     if not isinstance(encoder_scales, (tuple, list)):
         encoder_scales = (encoder_scales,) * len(dim_yc)
     # Construct set convs.
-    return nps.Parallel(*(nps.SetConv(s, dtype=dtype) for s in encoder_scales))
+    return nps.Parallel(
+        *(
+            nps.SetConv(s, dtype=dtype, learnable=encoder_scales_learnable)
+            for s in encoder_scales
+        )
+    )
 
 
 def _convgnp_construct_decoder_setconv(
     nps,
     decoder_scale,
     disc,
-    dtype,
+    dtype=None,
     init_factor=1,
+    decoder_scale_learnable=True,
 ):
     if decoder_scale is not None:
         decoder_scale = init_factor * decoder_scale
     else:
         decoder_scale = 1 / disc.points_per_unit
-    return nps.SetConv(decoder_scale, dtype=dtype)
+    return nps.SetConv(decoder_scale, dtype=dtype, learnable=decoder_scale_learnable)
 
 
 def _convgnp_optional_division_by_density(nps, divide_by_density, epsilon):
@@ -101,7 +108,9 @@ def construct_convgnp(
     dim_lv=0,
     lv_likelihood="het",
     encoder_scales=None,
+    encoder_scales_learnable=True,
     decoder_scale=None,
+    decoder_scale_learnable=True,
     aux_t_mlp_layers=(128,) * 3,
     divide_by_density=True,
     epsilon=1e-4,
@@ -141,7 +150,7 @@ def construct_convgnp(
             Defaults to 5.
         unet_strides (int or tuple[int], optional): Strides in the UNet. Defaults to 2.
         unet_activations (object or tuple[object], optional): Activation functions
-            used by the UNet.
+            used by the UNet. If `None`, ReLUs are used.
         unet_resize_convs (bool, optional): Use resize convolutions rather than
             transposed convolutions in the UNet. Defaults to `False`.
         unet_resize_conv_interp_method (str, optional): Interpolation method for the
@@ -160,8 +169,12 @@ def construct_convgnp(
         encoder_scales (float or tuple[float], optional): Initial value for the length
             scales of the set convolutions for the context sets embeddings. Defaults
             to `1 / points_per_unit`.
+        encoder_scales_learnable (bool, optional): Whether the encoder SetConv
+            length scale(s) are learnable.
         decoder_scale (float, optional): Initial value for the length scale of the
             set convolution in the decoder. Defaults to `1 / points_per_unit`.
+        decoder_scale_learnable (bool, optional): Whether the decoder SetConv
+            length scale(s) are learnable.
         aux_t_mlp_layers (tuple[int], optional): Widths of the layers of the MLP
             for the target-specific auxiliary variable. Defaults to three layers of
             width 128.
@@ -342,6 +355,7 @@ def construct_convgnp(
                     dim_yc,
                     disc,
                     dtype,
+                    encoder_scales_learnable=encoder_scales_learnable,
                 ),
                 _convgnp_optional_division_by_density(nps, divide_by_density, epsilon),
                 nps.Concatenate(),
@@ -353,7 +367,13 @@ def construct_convgnp(
             conv,
             nps.RepeatForAggregateInputs(
                 nps.Chain(
-                    _convgnp_construct_decoder_setconv(nps, decoder_scale, disc, dtype),
+                    _convgnp_construct_decoder_setconv(
+                        nps,
+                        decoder_scale,
+                        disc,
+                        dtype,
+                        decoder_scale_learnable=decoder_scale_learnable,
+                    ),
                     linear_after_set_conv,
                     selector,  # Select the right target output.
                 )
