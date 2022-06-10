@@ -4,6 +4,8 @@ from stheno import EQ, Matern52
 from .gp import GPGenerator
 from .mixture import MixtureGenerator
 from .sawtooth import SawtoothGenerator
+from .flat import FlatGenerator
+from .sine import SinewaveGenerator
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
 __all__ = ["construct_predefined_gens"]
@@ -117,4 +119,21 @@ def construct_predefined_gens(
         ),
         seed=seed,
     )
+    flat_gen = FlatGenerator(
+        dtype,
+        seed=seed,
+        noise=0.05,
+        num_context=UniformDiscrete(0, 75 * dim_x),
+        num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+        **config,
+    )
+    sine_gen = SinewaveGenerator(
+        dtype,
+        seed=seed,
+        noise=0.05,
+        num_context=UniformDiscrete(0, 75 * dim_x),
+        num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+        **config,
+    )
+    gens["simple-mixture"] = MixtureGenerator(*(sine_gen, flat_gen), seed=seed)
     return gens
