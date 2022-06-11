@@ -93,15 +93,25 @@ class SoundlikeGenerator(SyntheticGenerator):
             z_upper = B.ceil((bounds[1] - shift) / T)
             z_lower = B.floor((bounds[0] - shift) / T)
             t = x.transpose(1, 2)
-            s = B.range(z_lower, z_upper)
+            ss = []
+            for l, u in zip(z_lower, z_upper):
+                ss.append(B.range(l, u))
+            # s = B.range(z_lower, z_upper)
             waves = B.zeros(t)
-            for k in s:
-                w = self._wave(t - T * k - shift, tao=D, w1=w1, w2=w2, bounds=(0, T))
-                # wave is set to 0 when outside of bounds
-                # as defined, t won't be out of bounds.
-                w[t < bounds[0]] = 0
-                w[t > bounds[1]] = 0
-                waves += w
+            for i, s in enumerate(ss):
+                for k in s:
+                    w = self._wave(
+                        t[i] - T[i] * k - shift[i],
+                        tao=D[i],
+                        w1=w1[i],
+                        w2=w2[i],
+                        bounds=(0, T[i]),
+                    )
+                    # wave is set to 0 when outside of bounds
+                    # as defined, t won't be out of bounds.
+                    w[t[i] < bounds[0]] = 0
+                    w[t[i] > bounds[1]] = 0
+                    waves[i] += w
             response = waves
             # TODO: figure out what self.h does
             # if self.h is not None:
