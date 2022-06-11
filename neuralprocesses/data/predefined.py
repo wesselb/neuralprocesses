@@ -6,6 +6,7 @@ from .mixture import MixtureGenerator
 from .sawtooth import SawtoothGenerator
 from .flat import FlatGenerator
 from .sine import SinewaveGenerator
+from .synthetic_audio import SoundlikeGenerator
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
 __all__ = ["construct_predefined_gens"]
@@ -136,4 +137,15 @@ def construct_predefined_gens(
         **config,
     )
     gens["simple-mixture"] = MixtureGenerator(*(sine_gen, flat_gen), seed=seed)
+    gens['synthetic-audio'] = SoundlikeGenerator(
+        dtype,
+        seed=seed,
+        noise=0.001,
+        # ^ less noise because may be hard to distinguish small peaks and troughs
+        num_context=UniformDiscrete(0, 75 * dim_x),
+        num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+        dist_w1=UniformContinuous(51, 51),  # For now, use fixed cosine frequencies
+        dist_w2=UniformContinuous(65, 65),
+        **config,
+    )
     return gens

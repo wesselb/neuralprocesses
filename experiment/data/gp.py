@@ -87,7 +87,15 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
     return gen_train, gen_cv, gens_eval
 
 
-for name in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture", "simple-mixture"]:
+for name in [
+    "eq",
+    "matern",
+    "weakly-periodic",
+    "sawtooth",
+    "mixture",
+    "simple-mixture",
+    "synthetic-audio",
+]:
     register_data(
         name,
         partial(setup, name),
