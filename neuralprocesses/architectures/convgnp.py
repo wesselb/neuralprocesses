@@ -384,7 +384,6 @@ def construct_convgnp(
     )
 
     # Set attribute `receptive_field`.
-    out.kv("Receptive field", receptive_field)
     model.receptive_field = receptive_field
 
     return model
