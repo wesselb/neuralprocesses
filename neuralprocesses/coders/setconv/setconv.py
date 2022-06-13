@@ -18,14 +18,17 @@ class SetConv:
     Args:
         scale (float): Initial value for the length scale.
         dtype (dtype, optional): Data type.
+        learnable (bool, optional): Whether the SetConv length scale is learnable.
 
     Attributes:
         log_scale (scalar): Logarithm of the length scale.
 
     """
 
-    def __init__(self, scale, dtype=None):
-        self.log_scale = self.nn.Parameter(B.log(scale), dtype=dtype)
+    def __init__(self, scale, dtype=None, learnable=True):
+        self.log_scale = self.nn.Parameter(
+            B.log(scale), dtype=dtype, learnable=learnable
+        )
 
 
 def _dim_is_concrete(x, i):
