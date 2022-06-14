@@ -22,7 +22,7 @@ def test_generate_batch(nps):
         num_context=nps.UniformDiscrete(1, 1),
         # Be sure to use the same distribution of frequencies we used during training.
         # dist_freq=nps.UniformContinuous(2, 4),
-        noise=0.001,
+        noise=0.000,
         dist_w1=nps.UniformContinuous(51, 51),
         dist_w2=nps.UniformContinuous(65, 65),
         num_target=nps.UniformDiscrete(2000, 2000),
@@ -35,7 +35,7 @@ def test_generate_batch(nps):
     sort_y = batch['yt'][..., order]
     # plt.plot(sort_x.numpy().reshape(-1), sort_y.numpy().reshape(-1))
     # plt.show()
-    a = torch.Tensor([2.0])
+    a = torch.Tensor([1.8])
     b = torch.max(sort_y)
     print(a, b)
     assert torch.isclose(a, b, atol=0.1)

@@ -140,8 +140,8 @@ def construct_predefined_gens(
     gens['synthetic-audio'] = SoundlikeGenerator(
         dtype,
         seed=seed,
-        noise=0.001,
-        # ^ less noise because may be hard to distinguish small peaks and troughs
+        noise=0.,
+        # ^ no noise because may be hard to distinguish small peaks and troughs
         num_context=UniformDiscrete(0, 75 * dim_x),
         num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
         dist_w1=UniformContinuous(51, 51),  # For now, use fixed cosine frequencies

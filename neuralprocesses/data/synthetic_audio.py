@@ -41,8 +41,8 @@ class SoundlikeGenerator(SyntheticGenerator):
     @staticmethod
     def _wave(x, tao=5, w1=2, w2=3, shift=0, bounds=None):
         x_shift = x - shift
-        y1 = B.cos(w1 * x_shift)
-        y2 = B.cos(w2 * x_shift)
+        y1 = B.sin(w1 * x_shift)
+        y2 = B.sin(w2 * x_shift)
         y = B.exp(-x_shift / tao) * (y1 + y2)
         if bounds is not None:
             y[x_shift < bounds[0]] = 0  # set negative values to zero
