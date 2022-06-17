@@ -27,44 +27,49 @@ def get_workers(workers):
         return os.cpu_count()
     elif workers == "half":
         return int(os.cpu_count() / 2)
+    elif workers is None:
+        return 1
     else:
         return workers
 
 
-def generate_marginal_densities(ss, model, targets, dxi, max_len=None, workers=None):
+def truncate_samples(xc, yc, max_len=None):
     # max_len here so that you can use a length less than the length of trajectory
     # used for the samples. Can be used to assess the impact of using different lengths
     # of trajectories.
-    xc, yc = append_contexts_to_samples(ss.contexts, ss.traj)
     if max_len is not None:
         LOG.info(f"Limiting trajectory length to {max_len}")
         xc = xc[..., : max_len + 1]
         yc = yc[..., : max_len + 1]
-    x = ss.contexts[0][0].item()
-    ad = np.zeros((len(targets), len(dxi)))
+    return xc, yc
+
+
+def generate_marginal_densities(out_marginal_densities, ss, model, targets, dxi, max_len=None, workers=None):
+    xc, yc = append_contexts_to_samples(ss.contexts, ss.traj)
+    xc, yc = truncate_samples(xc, yc, max_len)
 
     workers = get_workers(workers)
-    LOG.info(f"Generating {ss.y_traj.shape[0]} for each of {len(targets)} targets")
-    LOG.info(
-        "{N(mu, var) = p_model(y_target|ar_context_i, x_target) for y_target in targets, ar_context_i in trajectories}"
-    )
-    LOG.info("Generating predictive densities GMMs for all targets.")
-    LOG.info("[[Sum(N(x=x0|mu, var)) for mu, var in preds] for x0 in dxi]")
-    LOG.info(f"Using {workers} workers")
-    ads = []
-    dm = DensityMaker(xc, yc, model, dxi)
-    if workers is None:
-        for i, target_x in tqdm(enumerate(targets), total=len(targets)):
-            ad0 = dm.generate(target_x)
-            ads.append(ad0)
-    else:
+    with h5py.File(out_marginal_densities, "w") as f:
+        f.create_dataset("ad", (len(targets), len(dxi)), maxshape=(None, None)) # resizable
+        f.create_dataset("dxi", data=dxi)  # (grid_densities_calculated_on)
+        f.create_dataset("targets", data=targets)  # (x_target locations)
+
+        LOG.info(f"Generating {ss.y_traj.shape[0]} for each of {len(targets)} targets")
+        LOG.info(
+            "{N(mu, var) = p_model(y_target|ar_context_i, x_target) for y_target in targets, ar_context_i in trajectories}"
+        )
+        LOG.info("Generating predictive densities GMMs for all targets.")
+        LOG.info("[[Sum(N(x=x0|mu, var)) for mu, var in preds] for x0 in dxi]")
+        LOG.info(f"Using {workers} workers")
+
+        dm = DensityMaker(xc, yc, model, dxi)
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            for ad0 in tqdm(executor.map(dm.generate, targets), total=len(targets)):
-                ads.append(ad0)
+            pbar = tqdm(executor.map(dm.generate, targets), total=len(targets))
+            for i, ad0 in enumerate(pbar):
+                f['ad'][i, :] = ad0
 
     # TODO: directory use the mean (described by a GMM) on Monte Carlo samples at all
-    ad = np.stack(ads)
-    return ad, []
+    return out_marginal_densities
 
 
 class DensityMaker:
@@ -130,7 +135,8 @@ def generate_densities(
     if out_marginal_densities.exists() and not overwrite:
         LOG.warning(f"{out_marginal_densities} file already exists!")
     else:
-        ad, preds = generate_marginal_densities(
+        generate_marginal_densities(
+            out_marginal_densities,
             ss,
             model,
             targets,
@@ -138,10 +144,6 @@ def generate_densities(
             config["max_len"],
             workers,
         )
-        with h5py.File(out_marginal_densities, "w") as f:
-            f.create_dataset("ad", data=ad)
-            f.create_dataset("dxi", data=dxi)
-            f.create_dataset("targets", data=targets)
 
 
 def load_model(weights):
