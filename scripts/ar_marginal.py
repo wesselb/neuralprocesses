@@ -1,12 +1,13 @@
 import argparse
+import concurrent.futures
 import logging
 import os
+from itertools import repeat
 from pathlib import Path
 from typing import List, Tuple
 
 import h5py
 import numpy as np
-import pyro.distributions as dist
 import torch
 import yaml
 from scipy.stats import norm
@@ -22,7 +23,16 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
-def generate_marginal_densities(ss, model, targets, dxi, max_len=None):
+def get_workers(workers):
+    if workers == -1:
+        return os.cpu_count()
+    elif workers == "half":
+        return int(os.cpu_count() / 2)
+    else:
+        return workers
+
+
+def generate_marginal_densities(ss, model, targets, dxi, max_len=None, workers=None):
     # max_len here so that you can use a length less than the length of trajectory
     # used for the samples. Can be used to assess the impact of using different lengths
     # of trajectories.
@@ -33,21 +43,44 @@ def generate_marginal_densities(ss, model, targets, dxi, max_len=None):
         yc = yc[..., : max_len + 1]
     x = ss.contexts[0][0].item()
     ad = np.zeros((len(targets), len(dxi)))
-    preds = []
+
+    workers = get_workers(workers)
+
     # TODO: this could all be made parallel
+
+    LOG.info(f"Generating {ss.y_traj.shape[0]} for each of {len(targets)} targets")
+    LOG.info(
+        "{N(mu, var) = p_model(y_target|ar_context_i, x_target) for y_target in targets, ar_context_i in trajectories}"
+    )
+    preds = []
     for i, target_x in tqdm(enumerate(targets), total=len(targets)):
-        # if np.isclose(target_x, x):
-        #     continue
         xt = torch.tensor([target_x]).reshape(1, 1, -1)
         xt_ag = nps.AggregateInput((xt, 0))
 
         # TODO: Find out how to do this while setting the seed for reproducibility
         # Could do this in a batched fashion, I think
         pred = model(xc, yc, xt_ag)
-        # TODO: directory use the mean (described by a GMM) on Monte Carlo samples at all
-        # yt values. Get the variance (described by a GMM) at all yt values.
-        ad[i, :] = plot_densities(pred, dxi)
         preds.append(pred)
+
+    ads = []
+    LOG.info("Generating predictive densities GMMs for all targets.")
+    LOG.info("[[Sum(N(x=x0|mu, var)) for mu, var in preds] for x0 in dxi]")
+    LOG.info(f"Using {workers} workers")
+    # TODO: directory use the mean (described by a GMM) on Monte Carlo samples at all
+    if workers is None:
+        for i, pred in enumerate(tqdm(preds, total=len(targets))):
+            ad0 = plot_densities(pred, dxi)
+            ads.append(ad0)
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            for i, ad0 in enumerate(
+                tqdm(
+                    executor.map(plot_densities, preds, repeat(dxi)), total=len(targets)
+                )
+            ):
+                ads.append(ad0)
+
+    ad = np.stack(ads)
     return ad, preds
 
 
@@ -60,9 +93,7 @@ def clean_config(config: dict) -> dict:
     return config
 
 
-def generate_samples(config: dict, out_samples: Path):
-    LOG.info("Loading model and generating sawtooth with initial context.")
-
+def generate_samples(config: dict, out_samples: Path, overwrite=False):
     model = load_model(config["model_weights"])  # this has determined config, not ideal
 
     contexts = to_contexts(config["contexts"])
@@ -72,7 +103,7 @@ def generate_samples(config: dict, out_samples: Path):
     )[config["trajectory"]["generator"]]
     trajectory = gen.generate()
 
-    ss = SampleSet(contexts, trajectory, out_samples)
+    ss = SampleSet(contexts, trajectory, out_samples, overwrite=overwrite)
     ss.create_samples(model, config["n_mixtures"])
     # include the gen strategy as SampleSet attribute?
 
@@ -85,30 +116,36 @@ def get_dxi_and_targets(config):
     return dxi, targets
 
 
-def generate_densities(config: dict, in_samples: Path, out_marginal_densities: Path):
+def generate_densities(
+    config: dict,
+    in_samples: Path,
+    out_marginal_densities: Path,
+    overwrite=False,
+    workers=None,
+):
     # Only used in later steps
 
-    model = load_model(config['model_weights'])  # this has determined config, not ideal
+    model = load_model(config["model_weights"])  # this has determined config, not ideal
     ss = read_hdf5(in_samples)  # overwrites existing
     dxi, targets = get_dxi_and_targets(config)
 
-    # out_marginal_densities = Path(f"./data/{sp_name}/marginals_{max_len}.hdf5")
-    if out_marginal_densities.exists():
+    if out_marginal_densities.exists() and not overwrite:
         LOG.warning(f"{out_marginal_densities} file already exists!")
     else:
         ad, preds = generate_marginal_densities(
-            ss, model, targets, dxi, config["max_len"]
+            ss,
+            model,
+            targets,
+            dxi,
+            config["max_len"],
+            workers,
         )
-        if config["num_samples"] is not None:
-            samples = np.array(
-                [get_samples(pred, config["num_samples"]) for pred in preds]
-            )
         with h5py.File(out_marginal_densities, "w") as f:
             f.create_dataset("ad", data=ad)
             f.create_dataset("dxi", data=dxi)
             f.create_dataset("targets", data=targets)
-            if config["num_samples"] is not None:
-                f.create_dataset("samples", data=samples)
+            # if config["num_samples"] is not None:
+            #     f.create_dataset("samples", data=samples)
 
 
 def load_model(weights):
@@ -154,29 +191,16 @@ def append_contexts_to_samples(contexts, traj):
     return xc, yc
 
 
-def get_samples(pred, n_samples):
-    m2 = pred.mean.elements[0].detach().numpy().reshape(-1)
-    v2 = pred.var.elements[0].detach().numpy().reshape(-1)
-
-    mixtures = [dist.Normal(m, v) for m, v in zip(m2, v2)]
-    # choose random mixture with even probability, then take sample from that mixture
-    # TODO: confirm that this is correct
-    samples = [
-        np.random.choice(mixtures).sample().item() for _ in tqdm(range(n_samples))
-    ]
-    samples = np.array(samples)
-
-    return samples
-
-
 def plot_densities(pred, dxi):
     m2 = pred.mean.elements[0].detach().numpy().reshape(-1)
     v2 = pred.var.elements[0].detach().numpy().reshape(-1)
 
     densities = np.zeros(dxi.shape)
     # TODO: should be faster way to do this
-    for m, v in tqdm(zip(m2, v2), total=len(m2)):
-        densities += np.array([norm.pdf(dxi0, loc=m, scale=np.sqrt(v)) for dxi0 in dxi])
+    # parallelize here instead?
+
+    for m, v in zip(m2, v2):
+        densities += norm.pdf(dxi, loc=m, scale=np.sqrt(v))
     densities = densities / len(m2)
     return densities
 
@@ -189,13 +213,19 @@ def to_contexts(
     return contexts
 
 
-def main(config_path: Path, out_samples: Path, out_densities: Path):
+def main(
+    config_path: Path,
+    out_samples: Path,
+    out_densities: Path,
+    overwrite: bool = False,
+    workers=None,
+):
     with open(config_path, "r") as f:
         config = clean_config(yaml.safe_load(f))
     LOG.info(f"Generating samples with config: {config}")
-    generate_samples(config, out_samples)
+    generate_samples(config, out_samples, overwrite)
     LOG.info(f"Generating densities with config: {config}")
-    generate_densities(config, out_samples, out_densities)
+    generate_densities(config, out_samples, out_densities, overwrite, workers)
 
 
 if __name__ == "__main__":
@@ -203,5 +233,19 @@ if __name__ == "__main__":
     parser.add_argument("c", help="Path to AR configuration", type=Path)
     parser.add_argument("s", help="Path to output samples hdf5", type=Path)
     parser.add_argument("d", help="Path to output marginal densities hdf5", type=Path)
+    parser.add_argument("--overwrite", dest="overwrite", action="store_true")
+    parser.add_argument("--no-overwrite", dest="overwrite", action="store_false")
+    parser.set_defaults(overwrite=False)
+    parser.add_argument(
+        "--workers", help="number of workers to use. Defaults to None", type=str,
+    )
+
     args = parser.parse_args()
-    main(args.c, args.s, args.d)
+    if args.workers == "half":
+        workers = "half"
+    elif args.workers is not None:
+        workers = int(args.workers)
+    else:
+        workers = None
+
+    main(args.c, args.s, args.d, args.overwrite, workers)
