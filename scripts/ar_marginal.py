@@ -2,7 +2,6 @@ import argparse
 import concurrent.futures
 import logging
 import os
-from itertools import repeat
 from pathlib import Path
 from typing import List, Tuple
 
@@ -45,43 +44,44 @@ def generate_marginal_densities(ss, model, targets, dxi, max_len=None, workers=N
     ad = np.zeros((len(targets), len(dxi)))
 
     workers = get_workers(workers)
-
-    # TODO: this could all be made parallel
-
     LOG.info(f"Generating {ss.y_traj.shape[0]} for each of {len(targets)} targets")
     LOG.info(
         "{N(mu, var) = p_model(y_target|ar_context_i, x_target) for y_target in targets, ar_context_i in trajectories}"
     )
-    preds = []
-    for i, target_x in tqdm(enumerate(targets), total=len(targets)):
-        xt = torch.tensor([target_x]).reshape(1, 1, -1)
-        xt_ag = nps.AggregateInput((xt, 0))
-
-        # TODO: Find out how to do this while setting the seed for reproducibility
-        # Could do this in a batched fashion, I think
-        pred = model(xc, yc, xt_ag)
-        preds.append(pred)
-
-    ads = []
     LOG.info("Generating predictive densities GMMs for all targets.")
     LOG.info("[[Sum(N(x=x0|mu, var)) for mu, var in preds] for x0 in dxi]")
     LOG.info(f"Using {workers} workers")
-    # TODO: directory use the mean (described by a GMM) on Monte Carlo samples at all
+    ads = []
+    dm = DensityMaker(xc, yc, model, dxi)
     if workers is None:
-        for i, pred in enumerate(tqdm(preds, total=len(targets))):
-            ad0 = plot_densities(pred, dxi)
+        for i, target_x in tqdm(enumerate(targets), total=len(targets)):
+            ad0 = dm.generate(target_x)
             ads.append(ad0)
     else:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            for i, ad0 in enumerate(
-                tqdm(
-                    executor.map(plot_densities, preds, repeat(dxi)), total=len(targets)
-                )
-            ):
+            for ad0 in tqdm(executor.map(dm.generate, targets), total=len(targets)):
                 ads.append(ad0)
 
+    # TODO: directory use the mean (described by a GMM) on Monte Carlo samples at all
     ad = np.stack(ads)
-    return ad, preds
+    return ad, []
+
+
+class DensityMaker:
+    def __init__(self, xc, yc, model, dxi):
+        self.xc = xc
+        self.yc = yc
+        self.model = model
+        self.dxi = dxi
+
+    def generate(self, target_x):
+        xt = torch.tensor([target_x]).reshape(1, 1, -1)
+        xt_ag = nps.AggregateInput((xt, 0))
+        # TODO: Find out how to do this while setting the seed for reproducibility
+        # Could do this in a batched fashion, I think
+        pred = self.model(self.xc, self.yc, xt_ag)
+        ad0 = plot_densities(pred, self.dxi)
+        return ad0
 
 
 def clean_config(config: dict) -> dict:
@@ -123,8 +123,6 @@ def generate_densities(
     overwrite=False,
     workers=None,
 ):
-    # Only used in later steps
-
     model = load_model(config["model_weights"])  # this has determined config, not ideal
     ss = read_hdf5(in_samples)  # overwrites existing
     dxi, targets = get_dxi_and_targets(config)
@@ -144,8 +142,6 @@ def generate_densities(
             f.create_dataset("ad", data=ad)
             f.create_dataset("dxi", data=dxi)
             f.create_dataset("targets", data=targets)
-            # if config["num_samples"] is not None:
-            #     f.create_dataset("samples", data=samples)
 
 
 def load_model(weights):
@@ -237,7 +233,9 @@ if __name__ == "__main__":
     parser.add_argument("--no-overwrite", dest="overwrite", action="store_false")
     parser.set_defaults(overwrite=False)
     parser.add_argument(
-        "--workers", help="number of workers to use. Defaults to None", type=str,
+        "--workers",
+        help="number of workers to use. Defaults to None",
+        type=str,
     )
 
     args = parser.parse_args()
