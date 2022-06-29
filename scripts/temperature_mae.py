@@ -64,4 +64,4 @@ for name, gen in exp["gens_eval"]():
         maes = B.nanmean(maes, axis=(0, 1))
 
         out.kv("Station-wise MAEs", maes)
-        out.kv("Median MAE", torch.nanmedian(maes))
+        out.kv("Median MAE", experiment.with_err(*experiment.median_and_err(maes)))
