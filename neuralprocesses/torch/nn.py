@@ -240,12 +240,13 @@ class Interface:
     LayerNorm = staticmethod(LayerNorm)
 
     @staticmethod
-    def Parameter(x, dtype=None):
+    def Parameter(x, dtype=None, learnable=True):
         """A tracked parameter.
 
         Args:
             x (tensor): Initial value of the parameter.
             dtype (dtype, optional): Data type.
+            learnable (bool, optional): Whether the parameter is learnable.
 
         Returns:
             :class:`torch.nn.Parameter`: Parameter.
@@ -256,7 +257,7 @@ class Interface:
             x = torch.tensor(x, dtype=dtype)
         else:
             x = B.cast(dtype, x)
-        return torch.nn.Parameter(x, requires_grad=True)
+        return torch.nn.Parameter(x, requires_grad=learnable)
 
 
 interface = Interface()  #: The PyTorch interface.

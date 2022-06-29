@@ -118,6 +118,8 @@ def product_kw_args(config, **kw_args):
             dim_x=[1, 2],
             dim_y=[1, 2],
             likelihood=["het", "lowrank"],
+            encoder_scales_learnable=[True, False],
+            decoder_scale_learnable=[True, False],
         )
     )
     # ConvNP:
