@@ -33,7 +33,7 @@ def median_and_err(xs, alpha=0.05):
         scalar: Median.
         scalar: Error which constructs a central `100 * (1 - alpha)`%-confidence region.
     """
-    xs = B.to_numpy(xs)
+    xs = B.to_numpy(B.flatten(xs))
     xs = np.sort(xs)
     n = len(xs)
 
