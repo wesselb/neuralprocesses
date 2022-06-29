@@ -1,5 +1,6 @@
 import sys
 
+import experiment
 import lab as B
 import torch
 import wbml.out as out
