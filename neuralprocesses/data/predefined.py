@@ -123,7 +123,7 @@ def construct_predefined_gens(
     flat_gen = FlatGenerator(
         dtype,
         seed=seed,
-        noise=0.05,
+        noise=0.005,
         num_context=UniformDiscrete(0, 75 * dim_x),
         num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
         **config,
@@ -131,7 +131,7 @@ def construct_predefined_gens(
     sine_gen = SinewaveGenerator(
         dtype,
         seed=seed,
-        noise=0.05,
+        noise=0.005,
         num_context=UniformDiscrete(0, 75 * dim_x),
         num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
         **config,
