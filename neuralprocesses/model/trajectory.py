@@ -11,10 +11,11 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
-def permute(xi):
+def permute(xi, seed=None):
     state = B.global_random_state(B.dtype(xi))
     B.random.set_global_random_state(state)
-    np.random.seed(0)
+    if seed is not None:
+        np.random.seed(seed)
     xi = xi[:, :, np.random.permutation(xi.shape[-1])]
     return xi
 

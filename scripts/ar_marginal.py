@@ -44,19 +44,24 @@ def truncate_samples(xc, yc, max_len=None):
     return xc, yc
 
 
-def generate_marginal_densities(out_marginal_densities, ss, model, targets, dxi, max_len=None, workers=None):
+def generate_marginal_densities(
+    out_marginal_densities, ss, model, targets, dxi, max_len=None, workers=None
+):
     xc, yc = append_contexts_to_samples(ss.contexts, ss.traj)
     xc, yc = truncate_samples(xc, yc, max_len)
 
     workers = get_workers(workers)
     with h5py.File(out_marginal_densities, "w") as f:
-        f.create_dataset("ad", (len(targets), len(dxi)), maxshape=(None, None)) # resizable
+        # TODO: write out a reference to SampleSet
+        # TODO: write out trajectory length truncation
+        f.create_dataset("ad", (len(targets), len(dxi)), maxshape=(None, None))
         f.create_dataset("dxi", data=dxi)  # (grid_densities_calculated_on)
         f.create_dataset("targets", data=targets)  # (x_target locations)
 
-        LOG.info(f"Generating {ss.y_traj.shape[0]} for each of {len(targets)} targets")
         LOG.info(
-            "{N(mu, var) = p_model(y_target|ar_context_i, x_target) for y_target in targets, ar_context_i in trajectories}"
+            "{N(mu, var) = p_model(y_target|ar_context_i, x_target) "
+            f"for y_target in targets (n={len(targets)}), "
+            f"ar_context_i in trajectories (n={ss.y_traj.shape[0]}"
         )
         LOG.info("Generating predictive densities GMMs for all targets.")
         LOG.info("[[Sum(N(x=x0|mu, var)) for mu, var in preds] for x0 in dxi]")
@@ -66,9 +71,8 @@ def generate_marginal_densities(out_marginal_densities, ss, model, targets, dxi,
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             pbar = tqdm(executor.map(dm.generate, targets), total=len(targets))
             for i, ad0 in enumerate(pbar):
-                f['ad'][i, :] = ad0
+                f["ad"][i, :] = ad0
 
-    # TODO: directory use the mean (described by a GMM) on Monte Carlo samples at all
     return out_marginal_densities
 
 
@@ -106,11 +110,8 @@ def generate_samples(config: dict, out_samples: Path, overwrite=False):
         trajectory_length=config["trajectory"]["length"],
         x_range=(config["trajectory"]["low"], config["trajectory"]["high"]),
     )[config["trajectory"]["generator"]]
-    trajectory = gen.generate()
-
-    ss = SampleSet(contexts, trajectory, out_samples, overwrite=overwrite)
+    ss = SampleSet(out_samples, contexts, gen, overwrite=overwrite)
     ss.create_samples(model, config["n_mixtures"])
-    # include the gen strategy as SampleSet attribute?
 
 
 def get_dxi_and_targets(config):
@@ -129,6 +130,8 @@ def generate_densities(
     workers=None,
 ):
     model = load_model(config["model_weights"])  # this has determined config, not ideal
+    # TODO: make sure contexts are the same as in the samples?
+    # Load directly from the ss instead?
     ss = read_hdf5(in_samples)  # overwrites existing
     dxi, targets = get_dxi_and_targets(config)
 
@@ -176,12 +179,10 @@ def get_context():
 
 
 def append_contexts_to_samples(contexts, traj):
+    # TODO: adapt to work with multiple outputs
     xc = traj[0]
     yc = traj[1]
     num_samples = traj[0].shape[0]
-    # Include the observation context in the trajectory.
-    # TODO: only works for one context, because its only appending the first context
-    # could use a loop or something to include all initial contexts
     repcx = contexts[0][0].repeat(num_samples, 1, 1, 1)
     repcy = contexts[0][1].repeat(num_samples, 1, 1, 1)
     xc = torch.cat((repcx, xc), axis=-1)
