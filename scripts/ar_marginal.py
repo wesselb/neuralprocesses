@@ -206,8 +206,14 @@ def plot_densities(pred, dxi):
 def to_contexts(
     context_list: List[List[float]],
 ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
-    x, y = zip(*context_list)
-    contexts = [(torch.Tensor(x).reshape(1, 1, -1), torch.Tensor(y).reshape(1, 1, -1))]
+    try:
+        x, y = zip(*context_list)
+        contexts = [
+            (torch.Tensor(x).reshape(1, 1, -1), torch.Tensor(y).reshape(1, 1, -1))]
+    # TODO: probably could make this cleaner instead of catching exception
+    # Error is the context is empty
+    except ValueError:
+        contexts = [(torch.Tensor([]).reshape(1, 1, -1), torch.Tensor([]).reshape(1, 1, -1))]
     return contexts
 
 
