@@ -1,25 +1,22 @@
-import logging
 from pathlib import Path
+from typing import List
 
 import lab as B
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import soundfile as sf
 import torch
 from matplotlib import pyplot as plt
 from plum import convert
 from pydub import AudioSegment
 from tqdm import tqdm
-from typing import List
 
-import neuralprocesses.torch as nps
 from .data import DataGenerator, apply_task
 from .util import cache
 from ..dist import AbstractDistribution
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
-# __all__ = ["PhoneGenerator"]
+__all__ = ["PhoneGenerator"]
 
 
 def match_target_amplitude(sound, target_dBFS):
@@ -36,7 +33,7 @@ class _PhoneData:
         #     raise ValueError(f"`data_task` must be one of {all_phones}")
         df = load_phone_df(data_path, data_task)
         df = df.apply(get_signal_data, timit_loc=data_path, axis=1)
-        cv_split = 1 - (train_split / 2)
+        cv_split = 1 - (1 - train_split) / 2
         splits = [int(train_split * len(df)), int(cv_split * len(df))]
         train_df, cv_df, eval_df = np.split(
             df.sample(frac=1, random_state=seed), splits
@@ -91,9 +88,9 @@ class PhoneGenerator(DataGenerator):
         batch_size=16,
         num_tasks=2**10,
         mode="interpolation",
-        num_data=UniformDiscrete(150, 250),  # how to choose these?
-        num_target=UniformDiscrete(100, 100),  # how to choose these?
-        forecast_start=UniformContinuous(25, 75),
+        num_data=UniformDiscrete(20, 300),  # how to choose these?
+        num_target=UniformDiscrete(50, 200),  # how to choose these?
+        forecast_start=UniformDiscrete(50, 300),
         device="cpu",
         subset="train",
         data_path="data/timit/",
@@ -117,6 +114,7 @@ class PhoneGenerator(DataGenerator):
 
         # self.utterances = self._load_data(self.data_path, self.data_task)
         data = PhoneGenerator._load_data(self.data_path, self.data_task)
+        self.subset = subset
         # data = self._load_data(self.data_path, self.data_task)
         if subset == "train":
             self.utterances = data.train_phones
@@ -160,14 +158,13 @@ class PhoneGenerator(DataGenerator):
             )
             x = perm[:n_frames]
             x = B.tile(B.transpose(x)[None, :, :], self.batch_size, 1, 1)
+            x = B.cast(self.dtype, x)
 
-            ys = []
+            y = B.zeros(x)
             for i, utterance in enumerate(batch_utterances):
-                u0 = B.cast(torch.float32, utterance)
-                y0 = u0[x[i, :, :]]
-                ys.append(y0)
-            y = np.stack(ys)
-            y = B.cast(torch.float32, y)
+                u0 = B.cast(self.dtype, utterance)
+                y0 = u0[x[i, :, :].long()]
+                y[i, :, :] = y0
 
             # Utterances are off different lengths.
             # Only take up to smallest_utterance_length

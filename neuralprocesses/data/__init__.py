@@ -1,6 +1,7 @@
 from .batch import *
 from .data import *
 from .eeg import *
+from .phone import *
 from .gp import *
 from .mixture import *
 from .predefined import *
