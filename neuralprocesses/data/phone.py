@@ -22,20 +22,24 @@ from ..dist.uniform import UniformDiscrete, UniformContinuous
 
 
 class _PhoneData:
-    def __init__(self, data_path, data_task, train_split=0.8, seed=0):
+    def __init__(self, data_path, data_task, train_split=0.70, seed=0):
+        # TODO: add error if not in list of all phones
+        # TODO: add ability to use all vowels
+        # TODO: adapt to words somehow?
         # if data_task not in all_phones:
         #     raise ValueError(f"`data_task` must be one of {all_phones}")
         df = load_phone_df(data_path, data_task)
         df = df.apply(get_signal_data, timit_loc=data_path, axis=1)
-        splits = [int(train_split * len(df))]
-        train_df, eval_df = np.split(df.sample(frac=1, random_state=seed), splits)
+        cv_split = 1 - (train_split / 2)
+        splits = [int(train_split * len(df)), int(cv_split * len(df))]
+        train_df, cv_df, eval_df = np.split(
+            df.sample(frac=1, random_state=seed), splits
+        )
 
         self.df = df
         self.train_phones = train_df["phn_data"].values
+        self.cv_phones = cv_df["phn_data"].values
         self.eval_phones = eval_df["phn_data"].values
-        # Load a subset of the phones
-        # Use a mask to split into train and eval,
-        # a seed determines the mask? Or make it more explicit, use unseen speakers?
 
 
 class PhoneGenerator(DataGenerator):
@@ -80,17 +84,16 @@ class PhoneGenerator(DataGenerator):
         data_path,
         seed=0,
         batch_size=16,
-        num_tasks=2 ** 10,
+        num_tasks=2**10,
         mode="interpolation",
         num_data=UniformDiscrete(150, 250),  # how to choose these?
         num_target=UniformDiscrete(100, 100),  # how to choose these?
         forecast_start=UniformContinuous(25, 75),
         device="cpu",
         subset="train",
-        data_task=None, # add default or make default behaviour to load all phones?
+        data_task=None,  # add default or make default behaviour to load all phones?
     ):
         if (not isinstance(data_task, tuple)) and (data_task is not None):
-            # logging.warning("Coercing data_task to tuple")
             data_task = tuple(data_task)
         if not isinstance(data_path, Path):
             data_path = Path(data_path)
@@ -110,18 +113,18 @@ class PhoneGenerator(DataGenerator):
         # data = self._load_data(self.data_path, self.data_task)
         if subset == "train":
             self.utterances = data.train_phones
+        elif subset == "cv":
+            self.utterances = data.cv_phones
         elif subset == "eval":
             self.utterances = data.eval_phones
+        else:
+            raise ValueError(f"`subset` must be one of ['train', 'cv', 'eval']")
         self._utterances_i = 0
 
     @staticmethod
     @cache
-    def _load_data(data_path, data_task=None):
+    def _load_data(data_path, data_task=("iy")):
         data = _PhoneData(data_path, data_task)
-        # TODO: Load data based on a chosen set of phones, or set of triphones.
-        # as defined by data_task.
-        # right now this is just using a fixed dataset of "iy".
-        # return np.load(data_path, allow_pickle=True)
         return data
 
     def generate_batch(self):
@@ -130,7 +133,9 @@ class PhoneGenerator(DataGenerator):
             if self._utterances_i >= len(self.utterances):
                 # We've reached the end of the data set. Shuffle and reset the counter
                 # to start another cycle.
-                self.state, perm = B.randperm(self.state, self.int64, len(self.utterances))
+                self.state, perm = B.randperm(
+                    self.state, self.int64, len(self.utterances)
+                )
                 self.utterances = [self.utterances[i] for i in perm]
                 self._utterances_i = 0
             # Get the next utterance.
@@ -138,10 +143,14 @@ class PhoneGenerator(DataGenerator):
             self._utterances_i += 1
 
         with B.on_device(self.device):
-            smallest_utterance_length = min(len(utterance) for utterance in batch_utterances)
+            smallest_utterance_length = min(
+                len(utterance) for utterance in batch_utterances
+            )
             self.state, n_frames = self.num_data.sample(self.state, self.int64)
             n_frames = min((smallest_utterance_length, n_frames.item()))
-            self.state, perm = B.randperm(self.state, self.int64, smallest_utterance_length)
+            self.state, perm = B.randperm(
+                self.state, self.int64, smallest_utterance_length
+            )
             x = perm[:n_frames]
             x = B.tile(B.transpose(x)[None, :, :], self.batch_size, 1, 1)
 
@@ -166,8 +175,8 @@ class PhoneGenerator(DataGenerator):
                 self.dtype,
                 self.int64,
                 self.mode,
-                (x, ),
-                (y[:, 0:1, :], ),
+                (x,),
+                (y[:, 0:1, :],),
                 self.num_target,
                 self.forecast_start,
             )
