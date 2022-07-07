@@ -9,6 +9,7 @@ import soundfile as sf
 import torch
 from matplotlib import pyplot as plt
 from plum import convert
+from pydub import AudioSegment
 from tqdm import tqdm
 from typing import List
 
@@ -19,6 +20,11 @@ from ..dist import AbstractDistribution
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
 # __all__ = ["PhoneGenerator"]
+
+
+def match_target_amplitude(sound, target_dBFS):
+    change_in_dBFS = target_dBFS - sound.dBFS
+    return sound.apply_gain(change_in_dBFS)
 
 
 class _PhoneData:
@@ -81,7 +87,6 @@ class PhoneGenerator(DataGenerator):
     def __init__(
         self,
         dtype,
-        data_path,
         seed=0,
         batch_size=16,
         num_tasks=2**10,
@@ -91,13 +96,15 @@ class PhoneGenerator(DataGenerator):
         forecast_start=UniformContinuous(25, 75),
         device="cpu",
         subset="train",
-        data_task=None,  # add default or make default behaviour to load all phones?
+        data_path="data/timit/",
+        data_task=("iy"),  # add default or make default behaviour to load all phones?
     ):
+        super().__init__(dtype, seed, num_tasks, batch_size, device)
+
         if (not isinstance(data_task, tuple)) and (data_task is not None):
             data_task = tuple(data_task)
         if not isinstance(data_path, Path):
             data_path = Path(data_path)
-        # super().__init__(*args, **kw_args)
         super().__init__(dtype, seed, num_tasks, batch_size, device=device)
         self.data_path = data_path
         self.data_task = data_task
@@ -210,11 +217,16 @@ def load_phones(phn_loc: Path):
     return phn_df
 
 
-def get_signal_data(phn_row: pd.Series, timit_loc: Path, full_wav=False):
+def get_signal_data(
+    phn_row: pd.Series, timit_loc: Path, full_wav=False, normalize_gain=-20
+):
     phn_row = phn_row.copy()
     subdir = timit_loc / f"{phn_row['dialect']}-{phn_row['speaker']}"
     wav_loc = subdir / f"{phn_row['sentence']}.wav"
-    wav_data, fs = sf.read(wav_loc)
+    aseg = AudioSegment.from_file(wav_loc)
+    if normalize_gain is not None:
+        aseg = match_target_amplitude(aseg, normalize_gain)
+    wav_data = np.array(aseg.get_array_of_samples())
     if full_wav is True:
         phn_data = wav_data
     else:
@@ -222,7 +234,7 @@ def get_signal_data(phn_row: pd.Series, timit_loc: Path, full_wav=False):
         end = phn_row["end"]
         phn_data = wav_data[start:end]
     phn_row["phn_data"] = phn_data
-    phn_row["fs"] = fs
+    phn_row["fs"] = aseg.frame_rate
     return phn_row
 
 
