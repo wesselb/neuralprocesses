@@ -7,7 +7,7 @@ import torch
 import lab as B
 import numpy as np
 
-from neuralprocesses.data.phone import PhoneGenerator
+from neuralprocesses.data.phone import PhoneGenerator, plot_signal
 from .util import nps
 
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +26,9 @@ def test_generate_batch(nps):
         num_data=nps.UniformDiscrete(500, 1500),
         # num_target=nps.UniformDiscrete(1000, 1000), # to see full plot
         # num_data=nps.UniformDiscrete(2000, 2000),  # to see full plot
-        data_path="../../data/phn0.npy",
+        data_path="../data/timit",
+        data_task=("iy", "aa"),
+        subset="train",
         # TODO: data_path should be included in a more stable way
     )
     batch = gen.generate_batch()  # Sample a batch of data.
@@ -45,4 +47,4 @@ def test_generate_batch(nps):
     # plt.ylabel("Amplitude")
     # plt.show()
     max_y = sort_y.max()
-    assert np.isclose(max_y, 0.023, atol=0.001)
+    assert np.isclose(max_y, 0.010, atol=0.001)

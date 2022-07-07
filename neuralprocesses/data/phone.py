@@ -1,7 +1,16 @@
+import logging
+from pathlib import Path
+
 import lab as B
 import numpy as np
+import pandas as pd
+import seaborn as sns
+import soundfile as sf
 import torch
+from matplotlib import pyplot as plt
 from plum import convert
+from tqdm import tqdm
+from typing import List
 
 import neuralprocesses.torch as nps
 from .data import DataGenerator, apply_task
@@ -9,7 +18,24 @@ from .util import cache
 from ..dist import AbstractDistribution
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
-__all__ = ["PhoneGenerator"]
+# __all__ = ["PhoneGenerator"]
+
+
+class _PhoneData:
+    def __init__(self, data_path, data_task, train_split=0.8, seed=0):
+        # if data_task not in all_phones:
+        #     raise ValueError(f"`data_task` must be one of {all_phones}")
+        df = load_phone_df(data_path, data_task)
+        df = df.apply(get_signal_data, timit_loc=data_path, axis=1)
+        splits = [int(train_split * len(df))]
+        train_df, eval_df = np.split(df.sample(frac=1, random_state=seed), splits)
+
+        self.df = df
+        self.train_phones = train_df["phn_data"].values
+        self.eval_phones = eval_df["phn_data"].values
+        # Load a subset of the phones
+        # Use a mask to split into train and eval,
+        # a seed determines the mask? Or make it more explicit, use unseen speakers?
 
 
 class PhoneGenerator(DataGenerator):
@@ -60,8 +86,14 @@ class PhoneGenerator(DataGenerator):
         num_target=UniformDiscrete(100, 100),  # how to choose these?
         forecast_start=UniformContinuous(25, 75),
         device="cpu",
-        data_task=None,
+        subset="train",
+        data_task=None, # add default or make default behaviour to load all phones?
     ):
+        if (not isinstance(data_task, tuple)) and (data_task is not None):
+            # logging.warning("Coercing data_task to tuple")
+            data_task = tuple(data_task)
+        if not isinstance(data_path, Path):
+            data_path = Path(data_path)
         # super().__init__(*args, **kw_args)
         super().__init__(dtype, seed, num_tasks, batch_size, device=device)
         self.data_path = data_path
@@ -73,17 +105,24 @@ class PhoneGenerator(DataGenerator):
         self.num_target = convert(num_target, AbstractDistribution)
         self.forecast_start = convert(forecast_start, AbstractDistribution)
 
-        self.utterances = self._load_data(self.data_path, self.data_task)
+        # self.utterances = self._load_data(self.data_path, self.data_task)
+        data = PhoneGenerator._load_data(self.data_path, self.data_task)
+        # data = self._load_data(self.data_path, self.data_task)
+        if subset == "train":
+            self.utterances = data.train_phones
+        elif subset == "eval":
+            self.utterances = data.eval_phones
         self._utterances_i = 0
-
 
     @staticmethod
     @cache
     def _load_data(data_path, data_task=None):
+        data = _PhoneData(data_path, data_task)
         # TODO: Load data based on a chosen set of phones, or set of triphones.
         # as defined by data_task.
         # right now this is just using a fixed dataset of "iy".
-        return np.load(data_path, allow_pickle=True)
+        # return np.load(data_path, allow_pickle=True)
+        return data
 
     def generate_batch(self):
         batch_utterances = []
@@ -134,3 +173,78 @@ class PhoneGenerator(DataGenerator):
             )
 
             return batch
+
+
+def get_speaker_dirs(timit_loc: Path):
+    speaker_dirs = []
+    for f in timit_loc.iterdir():
+        if f.is_dir():
+            speaker_dirs.append(f)
+    return speaker_dirs
+
+
+def get_sentence_ids(speaker_dir):
+    sentence_ids = []
+    for f in speaker_dir.iterdir():
+        if f.stem not in sentence_ids:
+            sentence_ids.append(f.stem)
+    return sentence_ids
+
+
+def load_phones(phn_loc: Path):
+    with open(phn_loc, "r") as f:
+        phn_lines = f.readlines()
+    phn_lines = [l.strip().split() for l in phn_lines]
+    phn_df = pd.DataFrame(phn_lines, columns=["start", "end", "phone"])
+    phn_df["start"] = phn_df["start"].astype(int)
+    phn_df["end"] = phn_df["end"].astype(int)
+    return phn_df
+
+
+def get_signal_data(phn_row: pd.Series, timit_loc: Path, full_wav=False):
+    phn_row = phn_row.copy()
+    subdir = timit_loc / f"{phn_row['dialect']}-{phn_row['speaker']}"
+    wav_loc = subdir / f"{phn_row['sentence']}.wav"
+    wav_data, fs = sf.read(wav_loc)
+    if full_wav is True:
+        phn_data = wav_data
+    else:
+        start = phn_row["start"]
+        end = phn_row["end"]
+        phn_data = wav_data[start:end]
+    phn_row["phn_data"] = phn_data
+    phn_row["fs"] = fs
+    return phn_row
+
+
+def load_phone_df(timit_loc: Path, phn0: List[str]):
+    # Load list of all phones and throw and error if phn0 has values not in list
+    speaker_dirs = get_speaker_dirs(timit_loc)
+    phn0_dfs = []
+    pbar = tqdm(speaker_dirs)
+    for speaker_dir in pbar:
+        pbar.set_description(speaker_dir.name)
+        sentence_ids = get_sentence_ids(speaker_dir)
+        for loc in sentence_ids:
+            phn_loc = speaker_dir / f"{loc}.phn"
+            phn_df = load_phones(phn_loc)
+            phn0_df0 = phn_df[np.isin(phn_df["phone"], phn0)].copy()
+            phn0_df0["dialect"], phn0_df0["speaker"] = speaker_dir.stem.split("-")
+            phn0_df0["sentence"] = loc
+            phn0_dfs.append(phn0_df0)
+    phn0_df = pd.concat(phn0_dfs)
+    phn0_df = phn0_df.reset_index(drop=True)
+    return phn0_df
+
+
+def plot_signal(phn_data, fs):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+
+    sns.lineplot(x=range(len(phn_data)), y=phn_data, ax=ax1)
+    ax1.set_ylabel("Amplitude")
+    ax1.set_xlabel("Frame")
+
+    ax2.specgram(phn_data, Fs=fs)
+    ax2.set_ylabel("Frequency [Hz]")
+    ax2.set_xlabel("Time (s)")
+    return fig
