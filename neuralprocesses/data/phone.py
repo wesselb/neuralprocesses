@@ -17,6 +17,7 @@ from ..dist import AbstractDistribution
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
 __all__ = ["PhoneGenerator"]
+tqdm.pandas()
 
 
 def match_target_amplitude(sound, target_dBFS):
@@ -24,25 +25,68 @@ def match_target_amplitude(sound, target_dBFS):
     return sound.apply_gain(change_in_dBFS)
 
 
+def get_train_cv_eval_dfs(data_path, data_task, seed=0):
+    df = load_phone_df(data_path, data_task, frac=1)
+    phn0_df = df.progress_apply(get_signal_data, timit_loc=data_path, axis=1)
+
+    train_df = phn0_df[phn0_df["dataset"] == "TRAIN"]
+    test_df = phn0_df[phn0_df["dataset"] == "TEST"]
+
+    snippet_start = 0  # put this in some config somewhere?
+    snippet_len = 800
+    train_seg_df = get_phone_segs(train_df, snippet_start, snippet_len)
+    test_seg_df = get_phone_segs(test_df, snippet_start, snippet_len)
+
+    splits = [int(0.5 * len(test_seg_df))]
+    cv_seg_df, eval_seg_df = np.split(
+        test_seg_df.sample(frac=1, random_state=seed), splits
+    )
+    return train_seg_df, cv_seg_df, eval_seg_df
+
+
 class _PhoneData:
-    def __init__(self, data_path, data_task, train_split=0.70, seed=0):
+    def __init__(self, data_path, data_task, seed=0):
         # TODO: add error if not in list of all phones
         # TODO: add ability to use all vowels
         # TODO: adapt to words somehow?
         # if data_task not in all_phones:
         #     raise ValueError(f"`data_task` must be one of {all_phones}")
-        df = load_phone_df(data_path, data_task)
-        df = df.apply(get_signal_data, timit_loc=data_path, axis=1)
-        cv_split = 1 - (1 - train_split) / 2
-        splits = [int(train_split * len(df)), int(cv_split * len(df))]
-        train_df, cv_df, eval_df = np.split(
-            df.sample(frac=1, random_state=seed), splits
-        )
+        data_task = sorted(data_task)
+        if isinstance(data_task, str):
+            dstr = data_task
+        else:
+            dstr = "-".join(data_task)
+        task_dir = data_path / str(dstr)
+        if task_dir.exists():
+            self.train_phones = np.load(
+                task_dir / "train_phones.npy", allow_pickle=True
+            )
+            self.cv_phones = np.load(task_dir / "cv_phones.npy", allow_pickle=True)
+            self.eval_phones = np.load(task_dir / "eval_phones.npy", allow_pickle=True)
+        else:
+            train_seg_df, cv_seg_df, eval_seg_df = get_train_cv_eval_dfs(data_path, data_task, seed=0)
 
-        self.df = df
-        self.train_phones = train_df["phn_data"].values
-        self.cv_phones = cv_df["phn_data"].values
-        self.eval_phones = eval_df["phn_data"].values
+            train_ind = train_seg_df.index.values
+            cv_ind = cv_seg_df.index.values
+            eval_ind = eval_seg_df.index.values
+
+            train_vals = np.stack(train_seg_df.values)
+            cv_vals = np.stack(cv_seg_df.values)
+            eval_vals = np.stack(eval_seg_df.values)
+
+            self.train_phones = train_vals
+            self.cv_phones = cv_vals
+            self.eval_phones = eval_vals
+
+            task_dir.mkdir(exist_ok=True)
+
+            np.save(task_dir / "train_phones.npy", self.train_phones)
+            np.save(task_dir / "cv_phones.npy", self.cv_phones)
+            np.save(task_dir / "eval_phones.npy", self.eval_phones)
+
+            np.save(task_dir / "train_ind.npy", train_ind)
+            np.save(task_dir / "cv_ind.npy", cv_ind)
+            np.save(task_dir / "eval_ind.npy", eval_ind)
 
 
 class PhoneGenerator(DataGenerator):
@@ -93,13 +137,15 @@ class PhoneGenerator(DataGenerator):
         forecast_start=UniformDiscrete(50, 300),
         device="cpu",
         subset="train",
-        data_path="data/timit/",
+        data_path="data/timit/TIMIT/",
         data_task=("iy"),  # add default or make default behaviour to load all phones?
     ):
         super().__init__(dtype, seed, num_tasks, batch_size, device)
 
         if (not isinstance(data_task, tuple)) and (data_task is not None):
             data_task = tuple(data_task)
+        elif isinstance(data_task, str):
+            data_task = (data_task,)
         if not isinstance(data_path, Path):
             data_path = Path(data_path)
         super().__init__(dtype, seed, num_tasks, batch_size, device=device)
@@ -128,7 +174,7 @@ class PhoneGenerator(DataGenerator):
 
     @staticmethod
     @cache
-    def _load_data(data_path, data_task=("iy")):
+    def _load_data(data_path, data_task=("iy",)):
         data = _PhoneData(data_path, data_task)
         return data
 
@@ -190,9 +236,11 @@ class PhoneGenerator(DataGenerator):
 
 def get_speaker_dirs(timit_loc: Path):
     speaker_dirs = []
-    for f in timit_loc.iterdir():
-        if f.is_dir():
-            speaker_dirs.append(f)
+    for ds in timit_loc.iterdir():
+        if (ds.is_dir()) and (ds.name in ("TRAIN", "TEST")):
+            for dialect in ds.iterdir():
+                for speaker in dialect.iterdir():
+                    speaker_dirs.append(speaker)
     return speaker_dirs
 
 
@@ -214,12 +262,13 @@ def load_phones(phn_loc: Path):
     return phn_df
 
 
+# TODO: Do all of this ahead of time so don't need to redo for training each time.
 def get_signal_data(
     phn_row: pd.Series, timit_loc: Path, full_wav=False, normalize_gain=-20
 ):
     phn_row = phn_row.copy()
-    subdir = timit_loc / f"{phn_row['dialect']}-{phn_row['speaker']}"
-    wav_loc = subdir / f"{phn_row['sentence']}.wav"
+    subdir = timit_loc / phn_row["dataset"] / phn_row["dialect"] / phn_row["speaker"]
+    wav_loc = subdir / f"{phn_row['sentence']}.WAV"
     aseg = AudioSegment.from_file(wav_loc)
     if normalize_gain is not None:
         aseg = match_target_amplitude(aseg, normalize_gain)
@@ -235,8 +284,9 @@ def get_signal_data(
     return phn_row
 
 
-def load_phone_df(timit_loc: Path, phn0: List[str]):
+def load_phone_df(timit_loc: Path, phn0: List[str], frac=1):
     # Load list of all phones and throw and error if phn0 has values not in list
+    # shuffles the dataframe as well
     speaker_dirs = get_speaker_dirs(timit_loc)
     phn0_dfs = []
     pbar = tqdm(speaker_dirs)
@@ -244,14 +294,17 @@ def load_phone_df(timit_loc: Path, phn0: List[str]):
         pbar.set_description(speaker_dir.name)
         sentence_ids = get_sentence_ids(speaker_dir)
         for loc in sentence_ids:
-            phn_loc = speaker_dir / f"{loc}.phn"
+            phn_loc = speaker_dir / f"{loc}.PHN"
             phn_df = load_phones(phn_loc)
             phn0_df0 = phn_df[np.isin(phn_df["phone"], phn0)].copy()
-            phn0_df0["dialect"], phn0_df0["speaker"] = speaker_dir.stem.split("-")
+            phn0_df0["dialect"] = speaker_dir.parent.name.strip()
+            phn0_df0["speaker"] = speaker_dir.name.strip()
             phn0_df0["sentence"] = loc
+            phn0_df0["dataset"] = speaker_dir.parent.parent.name.strip()
             phn0_dfs.append(phn0_df0)
     phn0_df = pd.concat(phn0_dfs)
     phn0_df = phn0_df.reset_index(drop=True)
+    phn0_df = phn0_df.sample(frac=frac)
     return phn0_df
 
 
@@ -266,3 +319,33 @@ def plot_signal(phn_data, fs):
     ax2.set_ylabel("Frequency [Hz]")
     ax2.set_xlabel("Time (s)")
     return fig
+
+
+def get_phone_segs(ds_df, snippet_start=0, snippet_len=800):
+    """
+    Get the phone segments from the dataset.
+    Args:
+        ds_df: dataframe with column phn_data which has the amplitudes for the frames
+            from the audio file.
+        snippet_start: start index of the snippet.
+        snippet_len: length of the snippet.
+
+    Returns:
+        A dataframe with the phone segments.
+    """
+    if snippet_len == 0:
+        raise ValueError("snippet_len must be greater than 0.")
+    ds_frames = ds_df["phn_data"].apply(lambda x: x.shape[0])
+    sm_dfs = []
+    i = 0
+    while True:
+        start = snippet_start + i * snippet_len
+        end = snippet_start + (i + 1) * snippet_len
+        tf = ds_frames > end
+        sm_df = ds_df.loc[tf, "phn_data"].apply(lambda x: x[start:end])
+        if sm_df.shape[0] == 0:
+            break
+        sm_dfs.append(sm_df)
+        i += 1
+    phn_seg_df = pd.concat(sm_dfs)
+    return phn_seg_df

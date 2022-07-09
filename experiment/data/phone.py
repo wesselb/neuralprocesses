@@ -9,7 +9,7 @@ __all__ = []
 
 
 def setup(data_task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
-    config["default"]["rate"] = 1e-4
+    config["default"]["rate"] = 2.5e-5
     config["default"]["epochs"] = 500
     config["dim_x"] = 1
     config["dim_y"] = 1
@@ -18,14 +18,19 @@ def setup(data_task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_e
     config["transform"] = None
 
     # Configure the convolutional models:
-    config["points_per_unit"] = 1
-    config["margin"] = 1
-    config["conv_receptive_field"] = 50
-    # config["unet_strides"] = (1,) + (2,) * 6,
-    config["unet_channels"] = (128,) * 6  # Increase Capacity
+    num_channels = 9
+    config["points_per_unit"] = 4
+    config["margin"] = 0.25
+    # config["unet_kernels"] = 8 <- this does not get passed to convcnp
+    config["conv_receptive_field"] = None  # not needed for unet architecture
+    config["unet_strides"] = (1,) + (2,) * (num_channels-1)
+    config["unet_channels"] = (128,) * num_channels  # Increase Capacity
 
     # Other settings specific to the phone experiments:
-    config["plot"] = {1: {"range": (0, 750), "axvline": []}}
+    config["plot"] = {
+        1: {"range": (0, 800), "axvline": []},
+        2: {"range": (0, 1600), "axvline": [800]},
+    }
 
     gen_train = nps.PhoneGenerator(
         torch.float32,
@@ -94,4 +99,4 @@ def setup(data_task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_e
 
 
 # TODO: register more data types (more phones)
-register_data("phone", partial(setup, ("iy")))
+register_data("phone", partial(setup, ("iy",)))
