@@ -103,15 +103,20 @@ def clean_config(config: dict) -> dict:
 
 
 def generate_samples(config: dict, out_samples: Path, overwrite=False):
-    model = load_model(config["model_weights"])  # this has determined config, not ideal
+    model = load_model(config["model_weights"], name=config["name"])
 
     contexts = to_contexts(config["contexts"])
     gen = construct_trajectory_gens(
         trajectory_length=config["trajectory"]["length"],
         x_range=(config["trajectory"]["low"], config["trajectory"]["high"]),
+        x_context=contexts[0][0],
     )[config["trajectory"]["generator"]]
+    # Move generator dictionary into SampleSet? That way we can reconstruct
+    # May also want metadata about what model is made, so just write all config to
+    # metadata for SampleSet?
     ss = SampleSet(out_samples, contexts, gen, overwrite=overwrite)
     ss.create_samples(model, config["n_mixtures"])
+    return ss
 
 
 def get_dxi_and_targets(config):
@@ -129,7 +134,7 @@ def generate_densities(
     overwrite=False,
     workers=None,
 ):
-    model = load_model(config["model_weights"])  # this has determined config, not ideal
+    model = load_model(config["model_weights"], config["name"])  # this has determined config, not ideal
     # TODO: make sure contexts are the same as in the samples?
     # Load directly from the ss instead?
     ss = read_hdf5(in_samples)  # overwrites existing
@@ -149,7 +154,19 @@ def generate_densities(
         )
 
 
-def load_model(weights):
+def load_model(weights, name):
+    print("Name:", name)
+    if name in ["sawtooth", "synthetic-audio", "simple-mixture"]:
+        model = get_model_gen()
+    elif name in ["real-audio"]:
+        model = get_model_real_audio()
+    else:
+        raise ValueError(f"Unknown model name: {name}")
+    model.load_state_dict(torch.load(weights, map_location="cpu")["weights"])
+    return model
+
+
+def get_model_gen():
     # Construct the model and load the weights.
     model = nps.construct_convgnp(  # where do I get these values? make sure they are correct
         dim_x=1,
@@ -158,7 +175,30 @@ def load_model(weights):
         points_per_unit=64,
         likelihood="het",
     )
-    model.load_state_dict(torch.load(weights, map_location="cpu")["weights"])
+    # model.load_state_dict(torch.load(weights, map_location="cpu")["weights"])
+    return model
+
+
+def get_model_real_audio():
+    # Take these values from experiment/data/phone.py
+    # TODO: This should be done in a more clear and automatable way
+    model = nps.construct_convgnp(
+        points_per_unit=1,
+        dim_x=1,
+        dim_yc=(1,) * 1,
+        dim_yt=1,
+        likelihood="het",
+        # conv_arch=args.arch,
+        unet_channels=(128,) * 6,
+        unet_strides=(1, 2, 2, 2, 2, 2),
+        conv_channels=64,
+        conv_layers=6,
+        conv_receptive_field=50,
+        margin=0.25, # 07_10
+        # margin=1,  # 07_8
+        encoder_scales=None,
+        transform=None,
+    )
     return model
 
 

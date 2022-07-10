@@ -18,8 +18,8 @@ def setup(data_task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_e
     config["transform"] = None
 
     # Configure the convolutional models:
-    num_channels = 9
-    config["points_per_unit"] = 4
+    num_channels = 8
+    config["points_per_unit"] = 2
     config["margin"] = 0.25
     # config["unet_kernels"] = 8 <- this does not get passed to convcnp
     config["conv_receptive_field"] = None  # not needed for unet architecture
