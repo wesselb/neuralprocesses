@@ -33,7 +33,7 @@ class AbstractTrajectoryGenerator(metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def generate(self):
+    def generate(self, x_context):
         """Generate a trajectory
 
         Returns:
@@ -48,7 +48,7 @@ class GridGenerator(AbstractTrajectoryGenerator):
         self.min_x = min_x
         self.max_x = max_x
 
-    def generate(self):
+    def generate(self, x_context=None):
         xi = B.linspace(torch.float32, self.min_x, self.max_x, self.trajectory_length)[
             None, None, :
         ]
@@ -62,7 +62,7 @@ class RandomGenerator(AbstractTrajectoryGenerator):
         self.min_x = min_x
         self.max_x = max_x
 
-    def generate(self):
+    def generate(self, x_context=None):
         xi = torch.distributions.Uniform(low=self.min_x, high=self.max_x).sample(
             [self.trajectory_length]
         )[None, None, :]
@@ -83,18 +83,16 @@ class EmanateGridGenerator(AbstractTrajectoryGenerator):
         trajectory_length: int,
         min_x: float,
         max_x: float,
-        x_context: torch.Tensor,
     ):
         self.trajectory_length = trajectory_length
         self.min_x = min_x
         self.max_x = max_x
-        self.x_context = x_context
 
-    def generate(self, seed=None):
+    def generate(self, x_context, seed=None):
         xi = B.linspace(torch.float32, self.min_x, self.max_x, self.trajectory_length)[
             None, None, :
         ]
-        xi = emanate(xi, self.x_context, seed=seed)
+        xi = emanate(xi, x_context, seed=seed)
         return xi
 
 
@@ -123,13 +121,11 @@ def emanate(xi, x_context, seed=None):
 
 
 def construct_trajectory_gens(
-    trajectory_length: int, x_range: Tuple, x_context: torch.Tensor
+    trajectory_length: int, x_range: Tuple
 ):
     gens = {
         "grid": GridGenerator(trajectory_length, x_range[0], x_range[1]),
         "random": RandomGenerator(trajectory_length, x_range[0], x_range[1]),
-        "emanate": EmanateGridGenerator(
-            trajectory_length, x_range[0], x_range[1], x_context
-        ),
+        "emanate": EmanateGridGenerator(trajectory_length, x_range[0], x_range[1]),
     }
     return gens
