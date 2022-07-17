@@ -1,19 +1,19 @@
 import argparse
-import matplotlib.pyplot as plt
-import seaborn as sns
 import concurrent.futures
 import logging
 import os
 from collections import namedtuple
+from enum import Enum
 from functools import cached_property
 from pathlib import Path
 
 import h5py
 import lab as B
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import torch
 import yaml
-from matplotlib.colors import LogNorm, Normalize, SymLogNorm
 from scipy.stats import norm
 from tqdm import tqdm
 
@@ -28,111 +28,201 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
-def read_hdf5(hdf5_loc: Path):
+class GroupNames(Enum):
+    MARGINAL_DENSITIES = "marginal_densities"
+    TRAJECTORIES = "trajectories"
+
+
+def read_hdf5(hdf5_loc: Path, group_name: str):
     if not hdf5_loc.exists():
         raise FileNotFoundError(f"{hdf5_loc} does not exist")
-    ss = SampleSet(hdf5_loc=hdf5_loc)
+    ss = FunctionTrajectorySet(hdf5_loc=hdf5_loc, group_name=group_name)
     return ss
 
 
-class OuterSampler:
-    def __init__(self, hdf5_dir, model, gen, traj_gen, device="cpu"):
-        self.hdf_dir = hdf5_dir
+class TrajectorySet:
+    def __init__(
+        self,
+        density_loc,
+        model,
+        data_generator,
+        trajectory_generator,
+        num_functions_per_context_size=10,
+        num_trajectories=100,
+        context_range=(0, 10),
+        device="cpu",
+        overwrite=True,
+    ):
+        # self. = density_loc
         self.model = model
-        self.gen = gen
-        self.traj_gen = traj_gen
         self.tqdm = tqdm
         # these gens need to be retrieved somehow when loading from hdf5
-        self.samples_sets = []
         # TODO: batch won't be defined at this level, will depend on the SampleSet
-        self.density_loc = hdf5_dir / "density_grid.hdf5"
-        with h5py.File(self.density_loc, "w") as f:
-            md_grp = f.create_group("marginal_densities")
-            tj_grp = f.create_group("trajectories")
+        self.overwrite = overwrite
+        self.num_functions_per_context_size = num_functions_per_context_size
+        self.num_trajectories = num_trajectories
 
-        # ^ better to use a setter probably
-        LOG.info(f'Making directory "{hdf5_dir.absolute()}"')
-        hdf5_dir.mkdir(exist_ok=True)
+        self._function_trajectory_sets = []
+        self._xt = None
+        self._yt = None
+        self._density_loc = None
+        self._num_functions = None
+        self._context_sizes = None
+        self._num_targets = None
+        self._data_generator = None
+        self._trajectory_generator = None
+        self._trajectory_length = None
 
-        # these should be immutable properties
-        self.trajectory_length = self.traj_gen.trajectory_length
-        self.num_functions = None
+        # properties
+        # self.density_loc = density_loc / "density_grid.hdf5"
+        self.density_loc = density_loc
+        self.context_range = context_range
+        self.device = device
+        self.data_generator = data_generator
+        self.trajectory_generator = trajectory_generator
+
         # TODO: num context won't be defined at this level, will depend on the SampleSet
-        self.num_trajectories = None
-        self.num_targets = None
         self.num_density_eval_locations = None
 
-        self.device = device
+    @property
+    def data_generator(self):
+        return self._data_generator
+
+    @data_generator.setter
+    def data_generator(self, data_generator):
+        self._data_generator = data_generator
+        # assumes upper and lower are the same, only one number for num_targets
+        self._num_targets = self.data_generator.num_target.upper
+        self._xt = torch.Tensor(self.num_functions, 1, self.num_targets)
+        self._yt = torch.Tensor(self.num_functions, 1, self.num_targets)
+
+    @property
+    def trajectory_generator(self):
+        return self._trajectory_generator
+
+    @trajectory_generator.setter
+    def trajectory_generator(self, trajectory_generator):
+        self._trajectory_generator = trajectory_generator
+        self._trajectory_length = self.trajectory_generator.trajectory_length
+
+    @property
+    def trajectory_length(self):
+        return self._trajectory_length
+
+    @property
+    def num_targets(self):
+        return self._num_targets
+
+    @property
+    def xt(self):
+        return self._xt
+
+    @property
+    def yt(self):
+        return self._yt
+
+    @property
+    def device(self):
+        return self._device
+
+    @device.setter
+    def device(self, device):
+        self._device = device
         B.set_global_device(device)
+
+    @property
+    def density_loc(self):
+        return self._density_loc
+
+    @density_loc.setter
+    def density_loc(self, density_loc):
+        if density_loc.exists() and not self.overwrite:
+            raise ValueError(f"{density_loc} already exists")
+        with h5py.File(density_loc, "w") as f:
+            f.create_group(GroupNames.MARGINAL_DENSITIES.value)
+            f.create_group(GroupNames.TRAJECTORIES.value)
+        self._density_loc = density_loc
+
+    @property
+    def num_functions(self):
+        return self._num_functions
+
+    @property
+    def context_range(self):
+        return self._context_range
+
+    @property
+    def context_sizes(self):
+        return self._context_sizes
+
+    @context_range.setter
+    def context_range(self, context_range):
+        self._context_range = context_range
+        self._context_sizes = np.arange(context_range[0], context_range[1] + 1)
+        self._num_functions = (
+            self.num_functions_per_context_size * self.context_sizes.shape[0]
+        )
+
+    @cached_property
+    def function_trajectory_sets(self):
+        group_names = []
+        with h5py.File(self.density_loc, "r") as f:
+            for gn in f[GroupNames.TRAJECTORIES.value].keys():
+                group_names.append(gn)
+        for gn in group_names:
+            ss = FunctionTrajectorySet.from_hdf5(
+                hdf5_loc=self.density_loc, group_name=gn
+            )
+            self._function_trajectory_sets.append(ss)
+        return self._function_trajectory_sets
 
     def generate_batch(self, batch_size=16, num_context=None):
         # This is messy since is changes the attributes of the generator.
         # Maybe fix at some point.
-        self.gen.batch_size = batch_size
+        self.data_generator.batch_size = batch_size
         if num_context is not None:
             # TODO: could also allow for ranges here?
-            self.gen.num_context = UniformDiscrete(num_context, num_context)
-        batch = self.gen.generate_batch()
+            self.data_generator.num_context = UniformDiscrete(num_context, num_context)
+        batch = self.data_generator.generate_batch()
         # choose batch with defined context? or use defined x_target?
         return batch
 
-    def make_sample_sets(self, num_functions_per_context_size=10, num_samples=100, overwrite=False, context_range=(0, 10)):
-        csizes = np.arange(context_range[0], context_range[1] + 1)
-        # num_funcs_per_csize = num_functions / csizes.shape[0]
-        num_functions = num_functions_per_context_size * csizes.shape[0]
-        self.num_functions = num_functions
-        self.num_targets = self.gen.num_target.upper #assumes upper and lower are the same
-        # in other words, only one number of targets
-        xt = torch.zeros((num_functions, 1, self.num_targets))
-        yt = torch.zeros((num_functions, 1, self.num_targets))
-        for ci, csize in tqdm(enumerate(csizes), total=csizes.shape[0], leave=False):
-            start_ind = ci * num_functions_per_context_size
-            end_ind = (ci + 1) * num_functions_per_context_size
-            batch = self.generate_batch(batch_size=num_functions_per_context_size)
-            xt[start_ind:end_ind, :, :] = batch["xt"]
-            yt[start_ind:end_ind, :, :] = batch["yt"]
+    def make_sample_sets(self):
+        pbar = tqdm(enumerate(self.context_sizes), leave=False)
+        for ci, context_size in pbar:
+            pbar.set_description(f"context set size: {context_size}")
+
+            start_ind = ci * self.num_functions_per_context_size
+            end_ind = (ci + 1) * self.num_functions_per_context_size
+            batch = self.generate_batch(batch_size=self.num_functions_per_context_size)
+            self._xt[start_ind:end_ind, :, :] = batch["xt"]
+            self._yt[start_ind:end_ind, :, :] = batch["yt"]
             contexts = batch["contexts"]
-            # clear away existing sample sets
-            self.samples_sets = []
-            for i in self.tqdm(range(num_functions_per_context_size)):
-                # hdf5_loc = self.hdf_dir / f"sample_set_{csize}|{i}.hdf5"
-                hdf5_loc = self.density_loc
-                # if hdf5_loc.exists() and not overwrite:
-                if False:
-                    ss = read_hdf5(hdf5_loc)
-                    ss.gen = self.traj_gen
-                else:
-                    contexts_i = self.get_i_context(contexts, i)
-                    ss = SampleSet(
-                        hdf5_loc=hdf5_loc,
-                        contexts=contexts_i,
-                        gen=self.traj_gen,
-                        overwrite=overwrite,
-                        group_name=f"{csize}|{i}",
-                    )
-                    ss.tqdm = self.tqdm
-                    # LOG.info("Creating sample set")
-                    ss.create_samples(self.model, num_samples)
-                self.samples_sets.append(ss)
-            # TODO: won't need to have list because it will be a part of the file
-            # or make the iterator a property which is defined by the file contents
-            # use hdf5 external link
-            # Will still have old sample sets lying around
-            # Should just write everything to one hdf5
-        # self.num_functions = num_functions_per_context_size
-        self.num_trajectories = num_samples
-        self.xt = xt
-        self.yt = yt
-        self.num_targets = self.yt.shape[2]
-        # ^ above should be properties which are immutable and get their values
-        # from hdf5
-        # TODO: separate batches for each sample set to see impact of context size
+
+            for fi in self.tqdm(range(self.num_functions_per_context_size)):
+                func_context = self.get_function_context(contexts, fi)
+                ss = FunctionTrajectorySet(
+                    hdf5_loc=self.density_loc,
+                    contexts=func_context,
+                    trajectory_generator=self.trajectory_generator,
+                    group_name=f"{context_size}|{fi}",
+                )
+                ss.tqdm = self.tqdm
+                ss.create_samples(self.model, self.num_trajectories)
         # Think about how to adapt this KL using ABC rejection sampling
         # Think about how to adapt to using chain rule of prob on joint
-        return self.xt, self.yt
 
     @staticmethod
-    def get_i_context(contexts, i):
+    def get_function_context(contexts: torch.Tensor, i: int) -> torch.Tensor:
+        """
+        Get context for the i-th function the batch of contexts.
+
+        Args:
+            contexts: the contexts for all functions in the batch.
+            i: index of the function
+        Returns:
+            the context for the i-th function.
+        """
         xc = contexts[0][0][i, :, :].reshape(1, 1, -1)
         yc = contexts[0][1][i, :, :].reshape(1, 1, -1)
         contexts_i = [(xc, yc)]
@@ -142,29 +232,25 @@ class OuterSampler:
         self,
         density_eval="generated",
         density_kwargs=None,
-        overwrite=False,
-        workers=1,
+        # TODO: allow passing of group name to make separate densities from same
     ):
-        if len(self.samples_sets) == 0:
+        if len(self.function_trajectory_sets) == 0:
             raise ValueError("No sample sets created yet!")
-        if self.density_loc.exists() and not overwrite:
-            raise ValueError(f"{self.density_loc} already exists")
         with h5py.File(self.density_loc, "a") as f:
-            md_grp = f["marginal_densities"]
-            tj_grp = f["trajectories"]
-            # md_grp = f.create_group("marginal_densities")
-            # tj_grp = f.create_group("trajectories")
-            for func_ind, ss in enumerate(self.samples_sets):
+            md_grp = f[GroupNames.MARGINAL_DENSITIES.value]
+            for func_ind, ss in enumerate(self.function_trajectory_sets):
                 md_grp.create_group(str(func_ind))
-        LOG.info(f"Creating density grid for each {self.num_functions} sampled functions.")
-        pbar = self.tqdm(enumerate(self.samples_sets), total=len(self.samples_sets))
+        LOG.info(f"Creating density grid for {self.num_functions} sampled functions.")
+        pbar = self.tqdm(
+            enumerate(self.function_trajectory_sets),
+            total=len(self.function_trajectory_sets),
+        )
         for func_ind, ss in pbar:
             self.inner_create_density_grid(
                 ss,
                 func_ind,
                 density_eval=density_eval,
                 density_kwargs=density_kwargs,
-                workers=workers,
             )
 
     def get_targets_and_density_eval_points(
@@ -206,10 +292,9 @@ class OuterSampler:
         func_loglikelihoods = np.zeros(
             (self.num_functions, self.num_density_eval_locations)
         )
-        for func_ind, _ in enumerate(self.samples_sets):
+        for func_ind, _ in enumerate(self.function_trajectory_sets):
             with h5py.File(self.density_loc, "r") as f:
                 grp = f["marginal_densities"][str(func_ind)]
-                # grp = f[str(func_ind)]
                 lh = grp["likelihoods"]
                 # get mean likelihood of GMM components for all target points
                 mn = lh[:, :num_trajectories, :, trajectory_length].mean(axis=1)
@@ -224,7 +309,6 @@ class OuterSampler:
         self,
         ss,
         func_ind,
-        workers=1,
         density_eval="generated",
         density_kwargs=None,
     ):
@@ -267,45 +351,94 @@ class OuterSampler:
                 pred = self.model(xc, yc, xt_ag)
                 # TODO: something different for many density eval points?
                 densities = B.exp(pred.logpdf(y_targets))
-                lls = B.transpose(densities).reshape(self.num_targets, self.num_trajectories, 1)
+                lls = B.transpose(densities).reshape(
+                    self.num_targets, self.num_trajectories, 1
+                )
                 llnp = lls.cpu().detach().numpy()
                 grp["likelihoods"][:, :, :, tl_ind] = llnp
 
 
-class SampleSet:
-    def __init__(self, hdf5_loc: Path, contexts=None, gen=None, overwrite=False, group_name=None):
+class FunctionTrajectorySet:
+
+    dtype = torch.float32
+
+    def __init__(
+        self,
+        hdf5_loc: Path,
+        contexts=None,
+        trajectory_generator=None,
+        group_name=None,
+    ):
         self.hdf5_loc = hdf5_loc
         self.data = None
-        self.gen = gen
+        self.trajectory_generator = trajectory_generator
         self.tqdm = tqdm
         self.dtype = torch.float32
         self.group_name = group_name
+        self.frozen = False
 
-        if self.hdf5_loc.exists() and overwrite is False:
-            if contexts is not None:
-                LOG.warning(
-                    f"HDF5 file already exists. Using existing file at {self.hdf5_loc}."
-                )
-                LOG.warning("ar_inputs, and contexts will be ignored.")
-            else:
-                LOG.warning(f"Loading from {self.hdf5_loc}")
+        go_init = False
+        if self.hdf5_loc.exists():
+            with h5py.File(self.hdf5_loc, "r") as f:
+                if group_name is not None:
+                    if group_name in f[GroupNames.TRAJECTORIES.value].keys():
+                        grp = f[GroupNames.TRAJECTORIES.value][group_name]
+                    else:
+                        go_init = True
+                else:
+                    grp = f
+
+                if not go_init:
+                    if "cx" in grp.keys():
+                        LOG.info(f"{self.hdf5_loc}:{group_name} already created")
+                        self.freeze()
+                    else:
+                        raise Exception(
+                            f"{self.hdf5_loc}:{group_name} exists but cx not found."
+                        )
         else:
-            cx_np = contexts[0][0].cpu().detach().numpy().reshape(-1)
-            cy_np = contexts[0][1].cpu().detach().numpy().reshape(-1)
-            if group_name is not None:
-                mode = "a"
+            go_init = True
+
+        if go_init:
+            LOG.debug(f"{self.hdf5_loc}:{group_name} not found, creating")
+            self.initialize_data(contexts)
+
+    def initialize_data(self, contexts):
+        cx_np = contexts[0][0].cpu().detach().numpy().reshape(-1)
+        cy_np = contexts[0][1].cpu().detach().numpy().reshape(-1)
+        if self.group_name is not None:
+            mode = "a"
+        else:
+            mode = "w"
+        with h5py.File(self.hdf5_loc, mode) as f:
+            grp = self.get_group(f)
+            grp.attrs["trajectory_generator"] = str(self.trajectory_generator)
+            grp.attrs["sample_size"] = self.trajectory_generator.trajectory_length
+            grp.create_dataset("cx", data=cx_np)
+            grp.create_dataset("cy", data=cy_np)
+
+    def freeze(self):
+        self.frozen = True
+
+    @classmethod
+    def from_hdf5(cls, hdf5_loc, group_name=None):
+        with h5py.File(hdf5_loc, "r") as f:
+            if group_name is None:
+                grp = f
             else:
-                mode = "w"
-            with h5py.File(self.hdf5_loc, mode) as f:
-                grp = self.get_group(f)
-                grp.attrs["trajectory_generator"] = str(gen)
-                grp.attrs["sample_size"] = gen.trajectory_length
-                grp.create_dataset("cx", data=cx_np)
-                grp.create_dataset("cy", data=cy_np)
+                grp = f[GroupNames.TRAJECTORIES.value][group_name]
+            cx = grp["cx"][:].reshape(1, 1, -1)
+            cy = grp["cy"][:].reshape(1, 1, -1)
+            contexts = cls._get_contexts(cx, cy)
+            return cls(
+                hdf5_loc=hdf5_loc,
+                contexts=contexts,
+                group_name=group_name,
+            )
 
     def get_group(self, f):
         if self.group_name is not None:
-            tj_grp = f["trajectories"]
+            tj_grp = f[GroupNames.TRAJECTORIES.value]
             if self.group_name in tj_grp.keys():
                 grp = tj_grp[self.group_name]
             else:
@@ -314,12 +447,12 @@ class SampleSet:
             grp = f
         return grp
 
-    @cached_property
-    def trajectory_generator(self):
-        with h5py.File(self.hdf5_loc, "r") as f:
-            grp = self.get_group(f)
-            traj_gen = grp.attrs["trajectory_generator"]
-        return traj_gen
+    # @cached_property
+    # def trajectory_generator(self):
+    #     with h5py.File(self.hdf5_loc, "r") as f:
+    #         grp = self.get_group(f)
+    #         traj_gen = grp.attrs["trajectory_generator"]
+    #     return traj_gen
 
     @cached_property
     def sample_size(self):
@@ -332,10 +465,15 @@ class SampleSet:
     def contexts(self):
         with h5py.File(self.hdf5_loc, "r") as f:
             grp = self.get_group(f)
-            cx = grp["cx"][:].reshape(1, 1, -1)  # not sure if -1 should be for last index
+            cx = grp["cx"][:].reshape(1, 1, -1)
             cy = grp["cy"][:].reshape(1, 1, -1)
-        cxt = B.to_active_device(B.cast(self.dtype, cx))
-        cyt = B.to_active_device(B.cast(self.dtype, cy))
+        fc = self._get_contexts(cx, cy)
+        return fc
+
+    @staticmethod
+    def _get_contexts(cx, cy):
+        cxt = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, cx))
+        cyt = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, cy))
         fc = [(cxt, cyt)]
         return fc
 
@@ -374,14 +512,13 @@ class SampleSet:
         return [self.x_traj, self.y_traj]
 
     def create_samples(self, model, n_samples):
-        with h5py.File(self.hdf5_loc, "r") as f:
+        if self.frozen is True:
+            raise Exception("Samples already created.")
+        with h5py.File(self.hdf5_loc, "a") as f:
             grp = self.get_group(f)
             if "y_traj" in grp:
                 LOG.warning("Samples already created. Skipping.")
                 return
-
-        # LOG.info(f"Initial context: {self.contexts}")
-        # LOG.info(f"Generating {n_samples} trajectories of length {self.sample_size}")
 
         with h5py.File(self.hdf5_loc, "a") as f:
             grp = self.get_group(f)
@@ -397,11 +534,12 @@ class SampleSet:
             )
             for i in self.tqdm(range(n_samples), leave=False):
                 # TODO: assess whether this is fast enough, can I do it in parallel somehow?
-                x_traj0 = self.gen.generate(self.contexts[0][0].cpu())
+                x_traj0 = self.trajectory_generator.generate(self.contexts[0][0].cpu())
                 x_traj0 = B.to_active_device(B.cast(self.dtype, x_traj0))
                 y_traj0 = get_trajectories(model, x_traj0, inner_samples, self.contexts)
                 x_traj[i] = x_traj0.cpu().detach().numpy()
                 y_traj[i] = y_traj0.cpu().detach().numpy()
+        self.freeze()
 
 
 def get_trajectories(model, xi, n_mixtures, contexts):
@@ -669,7 +807,7 @@ def make_heatmap(grd, config, outdir):
     ax = sns.heatmap(grd)
     plt.xlabel("trajectory length")
     plt.ylabel("number of trajectories")
-    gname = config['trajectory']['generator']
+    gname = config["trajectory"]["generator"]
     plt.title(f"{config['name']} log-likelihoods with {gname} trajectory.")
     plt.savefig(outdir / f"heatmap.png")
     plt.clf()
@@ -687,9 +825,7 @@ def main(
     out_sampler_dir: Path,
     device=None,
     gpu=None,
-    workers=1,
     exist_ok=False,
-    overwrite_ss=False,
 ):
     with open(in_config, "r") as f0:
         config = clean_config(yaml.safe_load(f0))
@@ -701,7 +837,6 @@ def main(
         config["generator_kwargs"],
         num_context=config["num_context"],
         specific_x=config["specific_x"],
-        # TODO: make different context set sizes for different sample sets
         device=device,
     )
     trajectory_generator = construct_trajectory_gens(
@@ -712,18 +847,21 @@ def main(
     model = model.to(device)
 
     out_sampler_dir.mkdir(exist_ok=exist_ok)
-    s = OuterSampler(
-        out_sampler_dir, model, data_generator, trajectory_generator, device
+    density_loc = out_sampler_dir / "densities.hdf5"
+    s = TrajectorySet(
+        density_loc=density_loc,
+        model=model,
+        data_generator=data_generator,
+        trajectory_generator=trajectory_generator,
+        num_functions_per_context_size=config["num_functions"],
+        num_trajectories=config["num_trajectories"],
+        context_range=config["context_range"],
+        device=device,
     )
     LOG.info("Making Trajectories")
-    s.make_sample_sets(
-        num_functions_per_context_size=config["num_functions"],
-        num_samples=config["n_mixtures"],
-        overwrite=overwrite_ss,
-        context_range=config["context_range"],
-    )
+    s.make_sample_sets()
     LOG.info("Getting all loglikelihoods")
-    s.create_density_grid(density_eval="generated", overwrite=True, workers=workers)
+    s.create_density_grid(density_eval="generated")
     # TODO: overwrite not necessarily true
     grd = s.grid_loglikelihoods()
     make_heatmap(grd, config, out_sampler_dir)
@@ -736,16 +874,9 @@ if __name__ == "__main__":
     parser.add_argument("--out_sampler_dir", help="output directory", type=Path)
     parser.add_argument("--device", help="device to use", default=None)
     parser.add_argument("--gpu", help="gpu to use", type=int, default=None)
-    parser.add_argument(
-        "--workers", help="number of workers to use", type=int, default=None
-    )
     parser.add_argument("--exist_ok", dest="exist_ok", action="store_true")
     parser.add_argument("--no-exist_ok", dest="exist_ok", action="store_false")
-    parser.add_argument("--overwrite_ss", dest="overwrite_ss", action="store_true")
-    parser.add_argument("--no-overwrite_ss", dest="overwrite_ss", action="store_false")
-
     parser.set_defaults(exist_ok=True)
-    parser.set_defaults(overwrite_ss=False)
 
     args = parser.parse_args()
     main(
@@ -753,7 +884,5 @@ if __name__ == "__main__":
         args.out_sampler_dir,
         args.device,
         args.gpu,
-        args.workers,
         args.exist_ok,
-        args.overwrite_ss,
     )
