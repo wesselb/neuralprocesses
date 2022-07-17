@@ -141,8 +141,9 @@ class OuterSampler:
         if self.density_loc.exists() and not overwrite:
             raise ValueError(f"{self.density_loc} already exists")
         with h5py.File(self.density_loc, "w") as f:
+            md_grp = f.create_group("marginal_densities")
             for func_ind, ss in enumerate(self.samples_sets):
-                f.create_group(str(func_ind))
+                md_grp.create_group(str(func_ind))
         LOG.info(f"Creating density grid for each {self.num_functions} sampled functions.")
         pbar = self.tqdm(enumerate(self.samples_sets), total=len(self.samples_sets))
         for func_ind, ss in pbar:
@@ -195,7 +196,8 @@ class OuterSampler:
         )
         for func_ind, _ in enumerate(self.samples_sets):
             with h5py.File(self.density_loc, "r") as f:
-                grp = f[str(func_ind)]
+                grp = f["marginal_densities"][str(func_ind)]
+                # grp = f[str(func_ind)]
                 lh = grp["likelihoods"]
                 # get mean likelihood of GMM components for all target points
                 mn = lh[:, :num_trajectories, :, trajectory_length].mean(axis=1)
@@ -221,10 +223,11 @@ class OuterSampler:
             func_ind, density_eval, density_kwargs
         )
         with h5py.File(self.density_loc, "a") as f:
-            if str(func_ind) in f.keys():
-                grp = f[str(func_ind)]
+            if str(func_ind) in f["marginal_densities"].keys():
+                # grp = f[str(func_ind)]
+                grp = f["marginal_densities"][str(func_ind)]
             else:
-                grp = f.create_group(str(func_ind))
+                grp = f["marginal_densities"].create_group(str(func_ind))
             # Always the same number of targets throughout the batch.
             # Technically could add function draw as a dimension and add to tensor.
             grp.create_dataset(
