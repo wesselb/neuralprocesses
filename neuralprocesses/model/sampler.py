@@ -194,7 +194,9 @@ class TrajectorySet:
 
             start_ind = ci * self.num_functions_per_context_size
             end_ind = (ci + 1) * self.num_functions_per_context_size
-            batch = self.generate_batch(batch_size=self.num_functions_per_context_size)
+            batch = self.generate_batch(
+                batch_size=self.num_functions_per_context_size, num_context=context_size
+            )
             self._xt[start_ind:end_ind, :, :] = batch["xt"]
             self._yt[start_ind:end_ind, :, :] = batch["yt"]
             contexts = batch["contexts"]
