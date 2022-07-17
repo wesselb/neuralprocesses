@@ -46,6 +46,10 @@ class OuterSampler:
         self.samples_sets = []
         # TODO: batch won't be defined at this level, will depend on the SampleSet
         self.density_loc = hdf5_dir / "density_grid.hdf5"
+        with h5py.File(self.density_loc, "w") as f:
+            md_grp = f.create_group("marginal_densities")
+            tj_grp = f.create_group("trajectories")
+
         # ^ better to use a setter probably
         LOG.info(f'Making directory "{hdf5_dir.absolute()}"')
         hdf5_dir.mkdir(exist_ok=True)
@@ -91,8 +95,10 @@ class OuterSampler:
             # clear away existing sample sets
             self.samples_sets = []
             for i in self.tqdm(range(num_functions_per_context_size)):
-                hdf5_loc = self.hdf_dir / f"sample_set_{csize}|{i}.hdf5"
-                if hdf5_loc.exists() and not overwrite:
+                # hdf5_loc = self.hdf_dir / f"sample_set_{csize}|{i}.hdf5"
+                hdf5_loc = self.density_loc
+                # if hdf5_loc.exists() and not overwrite:
+                if False:
                     ss = read_hdf5(hdf5_loc)
                     ss.gen = self.traj_gen
                 else:
@@ -102,11 +108,14 @@ class OuterSampler:
                         contexts=contexts_i,
                         gen=self.traj_gen,
                         overwrite=overwrite,
+                        group_name=f"{csize}|{i}",
                     )
                     ss.tqdm = self.tqdm
                     # LOG.info("Creating sample set")
                     ss.create_samples(self.model, num_samples)
                 self.samples_sets.append(ss)
+            # TODO: won't need to have list because it will be a part of the file
+            # or make the iterator a property which is defined by the file contents
             # use hdf5 external link
             # Will still have old sample sets lying around
             # Should just write everything to one hdf5
@@ -140,8 +149,11 @@ class OuterSampler:
             raise ValueError("No sample sets created yet!")
         if self.density_loc.exists() and not overwrite:
             raise ValueError(f"{self.density_loc} already exists")
-        with h5py.File(self.density_loc, "w") as f:
-            md_grp = f.create_group("marginal_densities")
+        with h5py.File(self.density_loc, "a") as f:
+            md_grp = f["marginal_densities"]
+            tj_grp = f["trajectories"]
+            # md_grp = f.create_group("marginal_densities")
+            # tj_grp = f.create_group("trajectories")
             for func_ind, ss in enumerate(self.samples_sets):
                 md_grp.create_group(str(func_ind))
         LOG.info(f"Creating density grid for each {self.num_functions} sampled functions.")
@@ -216,18 +228,12 @@ class OuterSampler:
         density_eval="generated",
         density_kwargs=None,
     ):
-        workers = get_workers(workers)
-
         xc_all, yc_all = append_contexts_to_samples(ss.contexts, ss.traj)
         targets, y_targets = self.get_targets_and_density_eval_points(
             func_ind, density_eval, density_kwargs
         )
         with h5py.File(self.density_loc, "a") as f:
-            if str(func_ind) in f["marginal_densities"].keys():
-                # grp = f[str(func_ind)]
-                grp = f["marginal_densities"][str(func_ind)]
-            else:
-                grp = f["marginal_densities"].create_group(str(func_ind))
+            grp = f["marginal_densities"][str(func_ind)]
             # Always the same number of targets throughout the batch.
             # Technically could add function draw as a dimension and add to tensor.
             grp.create_dataset(
@@ -265,34 +271,15 @@ class OuterSampler:
                 llnp = lls.cpu().detach().numpy()
                 grp["likelihoods"][:, :, :, tl_ind] = llnp
 
-                # dm = DensityMaker(xc, yc, self.model)
-                # xt_yts = zip(targets, y_targets)
-                #
-                # # all dxi are the same if we are just gridding across the whole space
-                # if workers == 1:
-                #     for j, xt_yt in tqdm(enumerate(xt_yts), leave=False):
-                #         ad0 = dm.generate(xt_yt)
-                #         grp["likelihoods"][j, :, :, tl_ind] = ad0
-                # else:
-                #     with concurrent.futures.ThreadPoolExecutor(
-                #         max_workers=workers
-                #     ) as executor:
-                #         pbar = self.tqdm(
-                #             executor.map(dm.generate, xt_yts),
-                #             total=len(targets),
-                #             leave=False,
-                #         )
-                #         for j, ad0 in enumerate(pbar):
-                #             grp["likelihoods"][j, :, :, tl_ind] = ad0
-
 
 class SampleSet:
-    def __init__(self, hdf5_loc: Path, contexts=None, gen=None, overwrite=False):
+    def __init__(self, hdf5_loc: Path, contexts=None, gen=None, overwrite=False, group_name=None):
         self.hdf5_loc = hdf5_loc
         self.data = None
         self.gen = gen
         self.tqdm = tqdm
         self.dtype = torch.float32
+        self.group_name = group_name
 
         if self.hdf5_loc.exists() and overwrite is False:
             if contexts is not None:
@@ -305,29 +292,48 @@ class SampleSet:
         else:
             cx_np = contexts[0][0].cpu().detach().numpy().reshape(-1)
             cy_np = contexts[0][1].cpu().detach().numpy().reshape(-1)
-            with h5py.File(self.hdf5_loc, "w") as f:
-                f.attrs["trajectory_generator"] = str(gen)
-                f.attrs["sample_size"] = gen.trajectory_length
-                f.create_dataset("cx", data=cx_np)
-                f.create_dataset("cy", data=cy_np)
+            if group_name is not None:
+                mode = "a"
+            else:
+                mode = "w"
+            with h5py.File(self.hdf5_loc, mode) as f:
+                grp = self.get_group(f)
+                grp.attrs["trajectory_generator"] = str(gen)
+                grp.attrs["sample_size"] = gen.trajectory_length
+                grp.create_dataset("cx", data=cx_np)
+                grp.create_dataset("cy", data=cy_np)
+
+    def get_group(self, f):
+        if self.group_name is not None:
+            tj_grp = f["trajectories"]
+            if self.group_name in tj_grp.keys():
+                grp = tj_grp[self.group_name]
+            else:
+                grp = tj_grp.create_group(self.group_name)
+        else:
+            grp = f
+        return grp
 
     @cached_property
     def trajectory_generator(self):
         with h5py.File(self.hdf5_loc, "r") as f:
-            traj_gen = f.attrs["trajectory_generator"]
+            grp = self.get_group(f)
+            traj_gen = grp.attrs["trajectory_generator"]
         return traj_gen
 
     @cached_property
     def sample_size(self):
         with h5py.File(self.hdf5_loc, "r") as f:
-            sample_size = int(f.attrs["sample_size"])
+            grp = self.get_group(f)
+            sample_size = int(grp.attrs["sample_size"])
         return sample_size
 
     @cached_property
     def contexts(self):
         with h5py.File(self.hdf5_loc, "r") as f:
-            cx = f["cx"][:].reshape(1, 1, -1)  # not sure if -1 should be for last index
-            cy = f["cy"][:].reshape(1, 1, -1)
+            grp = self.get_group(f)
+            cx = grp["cx"][:].reshape(1, 1, -1)  # not sure if -1 should be for last index
+            cy = grp["cy"][:].reshape(1, 1, -1)
         cxt = B.to_active_device(B.cast(self.dtype, cx))
         cyt = B.to_active_device(B.cast(self.dtype, cy))
         fc = [(cxt, cyt)]
@@ -339,13 +345,15 @@ class SampleSet:
 
     def check_traj(self):
         with h5py.File(self.hdf5_loc, "r") as f:
-            if "y_traj" not in f:
+            grp = self.get_group(f)
+            if "y_traj" not in grp:
                 raise Exception("Samples not yet created.")
 
     def get_traj(self, dset_name):
         self.check_traj()
         with h5py.File(self.hdf5_loc, "r") as f:
-            np_dim_traj = f[dset_name][:]
+            grp = self.get_group(f)
+            np_dim_traj = grp[dset_name][:]
             dim_traj = torch.Tensor(np_dim_traj).reshape(-1, 1, 1, self.sample_size)
         dim_traj = B.to_active_device(B.cast(self.dtype, dim_traj))
         return dim_traj
@@ -367,7 +375,8 @@ class SampleSet:
 
     def create_samples(self, model, n_samples):
         with h5py.File(self.hdf5_loc, "r") as f:
-            if "y_traj" in f:
+            grp = self.get_group(f)
+            if "y_traj" in grp:
                 LOG.warning("Samples already created. Skipping.")
                 return
 
@@ -375,10 +384,11 @@ class SampleSet:
         # LOG.info(f"Generating {n_samples} trajectories of length {self.sample_size}")
 
         with h5py.File(self.hdf5_loc, "a") as f:
-            x_traj = f.create_dataset(
+            grp = self.get_group(f)
+            x_traj = grp.create_dataset(
                 "x_traj", (n_samples, self.sample_size), dtype="float32"
             )
-            y_traj = f.create_dataset(
+            y_traj = grp.create_dataset(
                 "y_traj", (n_samples, self.sample_size), dtype="float32"
             )
 
