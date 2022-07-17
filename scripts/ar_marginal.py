@@ -11,24 +11,13 @@ from collections import namedtuple
 
 import neuralprocesses.torch as nps
 from neuralprocesses.model.sampler import SampleSet, read_hdf5, load_model, \
-    generate_marginal_densities, get_dxi_and_targets
+    generate_marginal_densities, get_dxi_and_targets, clean_config
 from neuralprocesses.model.trajectory import construct_trajectory_gens
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 logging.basicConfig(level=LOGLEVEL)
 LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
-
-
-def clean_config(config: dict) -> dict:
-    if "max_len" not in config:
-        config["max_len"] = None
-    if "num_samples" not in config:
-        config["num_samples"] = None
-    if "generator_kwargs" not in config:
-        config["generator_kwargs"] = {}
-    config["model_weights"] = Path(config["model_weights"])
-    return config
 
 
 def get_batch(generator_kwargs):

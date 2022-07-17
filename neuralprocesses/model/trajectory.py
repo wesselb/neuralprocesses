@@ -91,7 +91,7 @@ class EmanateGridGenerator(AbstractTrajectoryGenerator):
     def generate(self, x_context, seed=None):
         xi = B.linspace(torch.float32, self.min_x, self.max_x, self.trajectory_length)[
             None, None, :
-        ]
+        ].cpu()
         xi = emanate(xi, x_context, seed=seed)
         return xi
 
