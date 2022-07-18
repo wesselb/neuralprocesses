@@ -16,11 +16,10 @@ LOG.setLevel(logging.INFO)
 
 def permute(xi, seed=None):
     state = B.global_random_state(B.dtype(xi))
-    B.random.set_global_random_state(state)
-    if seed is not None:
-        np.random.seed(seed)
-    xi = xi[:, :, np.random.permutation(xi.shape[-1])]
-    return xi
+    perm_xi = torch.Tensor(xi.shape)
+    for ri in torch.arange(xi.shape[0]):
+        perm_xi[ri, :, ] = xi[ri, :, torch.randperm(xi.shape[-1])]
+    return perm_xi
 
 
 class AbstractTrajectoryGenerator(metaclass=abc.ABCMeta):
@@ -49,10 +48,9 @@ class GridGenerator(AbstractTrajectoryGenerator):
         self.max_x = max_x
 
     def generate(self, x_context=None):
-        xi = B.linspace(torch.float32, self.min_x, self.max_x, self.trajectory_length)[
-            None, None, :
-        ]
-        xi = permute(xi)
+        grid = B.linspace(torch.float32, self.min_x, self.max_x, self.trajectory_length)
+        rep_grid = grid.repeat((x_context.shape[0], 1)).reshape(x_context.shape[0], 1, self.trajectory_length)
+        xi = permute(rep_grid)
         return xi
 
 
@@ -65,7 +63,8 @@ class RandomGenerator(AbstractTrajectoryGenerator):
     def generate(self, x_context=None):
         xi = torch.distributions.Uniform(low=self.min_x, high=self.max_x).sample(
             [self.trajectory_length]
-        )[None, None, :]
+        )
+        xi = xi.repeat((x_context.shape[0], 1)).reshape(x_context.shape[0], 1, self.trajectory_length)
         xi = permute(xi)
         return xi
 

@@ -31,6 +31,7 @@ LOG.setLevel(logging.INFO)
 class GroupNames(Enum):
     MARGINAL_DENSITIES = "marginal_densities"
     TRAJECTORIES = "trajectories"
+    LIKELIHOODS = "likelihoods"
 
 
 def read_hdf5(hdf5_loc: Path, group_name: str):
@@ -115,10 +116,12 @@ class TrajectorySet:
 
     @property
     def xt(self):
+        # TODO: load from the hdf5 file?
         return self._xt
 
     @property
     def yt(self):
+        # TODO: load from the hdf5 file
         return self._yt
 
     @property
@@ -194,6 +197,8 @@ class TrajectorySet:
 
             start_ind = ci * self.num_functions_per_context_size
             end_ind = (ci + 1) * self.num_functions_per_context_size
+            # TODO: remove context_size from this and we get really good lls from AR?
+            # Why? Only on a single point?
             batch = self.generate_batch(
                 batch_size=self.num_functions_per_context_size, num_context=context_size
             )
@@ -201,16 +206,17 @@ class TrajectorySet:
             self._yt[start_ind:end_ind, :, :] = batch["yt"]
             contexts = batch["contexts"]
 
-            for fi in self.tqdm(range(self.num_functions_per_context_size)):
-                func_context = self.get_function_context(contexts, fi)
-                ss = FunctionTrajectorySet(
-                    hdf5_loc=self.density_loc,
-                    contexts=func_context,
-                    trajectory_generator=self.trajectory_generator,
-                    group_name=f"{context_size}|{fi}",
-                )
-                ss.tqdm = self.tqdm
-                ss.create_samples(self.model, self.num_trajectories)
+            # for fi in self.tqdm(range(self.num_functions_per_context_size)):
+            # func_context = self.get_function_context(contexts, fi)
+            func_context = contexts
+            ss = FunctionTrajectorySet(
+                hdf5_loc=self.density_loc,
+                contexts=func_context,
+                trajectory_generator=self.trajectory_generator,
+                group_name=f"{context_size}",
+            )
+            ss.tqdm = self.tqdm
+            ss.create_samples(self.model, self.num_trajectories)
         # Think about how to adapt this KL using ABC rejection sampling
         # Think about how to adapt to using chain rule of prob on joint
 
@@ -240,26 +246,32 @@ class TrajectorySet:
             raise ValueError("No sample sets created yet!")
         with h5py.File(self.density_loc, "a") as f:
             md_grp = f[GroupNames.MARGINAL_DENSITIES.value]
-            for func_ind, ss in enumerate(self.function_trajectory_sets):
-                md_grp.create_group(str(func_ind))
+            for ss in self.function_trajectory_sets:
+                for func_ind in range(ss.num_functions):
+                    md_grp.create_group(f"{ss.num_contexts}|{func_ind}")
         LOG.info(f"Creating density grid for {self.num_functions} sampled functions.")
         pbar = self.tqdm(
             enumerate(self.function_trajectory_sets),
             total=len(self.function_trajectory_sets),
         )
-        for func_ind, ss in pbar:
+        for ss_ind, ss in pbar:
             self.inner_create_density_grid(
                 ss,
-                func_ind,
+                ss_ind,
                 density_eval=density_eval,
                 density_kwargs=density_kwargs,
             )
 
     def get_targets_and_density_eval_points(
-        self, func_ind, density_eval, density_kwargs
+        self, tfunc_ind, ss_ind, density_eval, density_kwargs
     ):
+        func_ind = (ss_ind * self.num_functions_per_context_size) + tfunc_ind
+        # start_ind = func_ind * ss.num_functions
+        # end_ind = (func_ind + 1) * ss.num_functions
+        # targets = self.xt[start_ind:end_ind, :, :].reshape(-1, 1)
         targets = self.xt[func_ind, :, :].reshape(-1, 1)
         if density_eval == "generated":
+            # yt0 = self.yt[start_ind:end_ind, :, :]
             yt0 = self.yt[func_ind, :, :]
             y_targets = yt0.reshape(-1, 1)
         elif density_eval == "grid":
@@ -294,10 +306,10 @@ class TrajectorySet:
         func_loglikelihoods = np.zeros(
             (self.num_functions, self.num_density_eval_locations)
         )
-        for func_ind, _ in enumerate(self.function_trajectory_sets):
+        for func_ind, ss in enumerate(self.function_trajectory_sets):
             with h5py.File(self.density_loc, "r") as f:
-                grp = f["marginal_densities"][str(func_ind)]
-                lh = grp["likelihoods"]
+                grp = f[GroupNames.MARGINAL_DENSITIES.value][f"{ss.num_contexts}|{func_ind}"]
+                lh = grp[GroupNames.LIKELIHOODS.value]
                 # get mean likelihood of GMM components for all target points
                 mn = lh[:, :num_trajectories, :, trajectory_length].mean(axis=1)
                 # Get the log likelihood for each target point (under the GMM)
@@ -310,54 +322,59 @@ class TrajectorySet:
     def inner_create_density_grid(
         self,
         ss,
-        func_ind,
+        ss_ind,
         density_eval="generated",
         density_kwargs=None,
     ):
-        xc_all, yc_all = append_contexts_to_samples(ss.contexts, ss.traj)
-        targets, y_targets = self.get_targets_and_density_eval_points(
-            func_ind, density_eval, density_kwargs
-        )
-        with h5py.File(self.density_loc, "a") as f:
-            grp = f["marginal_densities"][str(func_ind)]
-            # Always the same number of targets throughout the batch.
-            # Technically could add function draw as a dimension and add to tensor.
-            grp.create_dataset(
-                "likelihoods",
-                (
-                    self.num_targets,
-                    self.num_trajectories,
-                    self.num_density_eval_locations,
-                    self.trajectory_length + 1,  # include trajectory length of 0.
-                ),
+        xc_all_funcs, yc_all_funcs = append_contexts_to_samples(ss.contexts, ss.traj)
+        for func_ind in range(ss.num_functions):
+            xc_all = xc_all_funcs[:, func_ind, ...][:, None, ...]
+            yc_all = yc_all_funcs[:, func_ind, ...][:, None, ...]
+            targets, y_targets = self.get_targets_and_density_eval_points(
+                func_ind, ss_ind, density_eval, density_kwargs
             )
-            # append to existing if adding more points
-            # make something to store index which tells which experiment it is from
-            # write all config yaml as attributes?
-            # write github hash repo as attribute?
-            grp.create_dataset("y_density_evaluation_points", data=y_targets.cpu())
-            grp.create_dataset("x_targets", data=targets.cpu())  # (x_target locations)
-            pbar = self.tqdm(
-                range(self.trajectory_length + 1),
-                total=self.trajectory_length + 1,
-                leave=False,
-            )
-            for tl_ind in pbar:
-                pbar.set_description(f"Trajectory length: {tl_ind}")
-                # i=0 -> no AR (b/c no trajectory, only context)
-                trunc_length = tl_ind + ss.num_contexts
-                xc, yc = truncate_samples(xc_all, yc_all, trunc_length)
-
-                xt = targets.reshape(-1, 1, 1)
-                xt_ag = nps.AggregateInput((xt, 0))
-                pred = self.model(xc, yc, xt_ag)
-                # TODO: something different for many density eval points?
-                densities = B.exp(pred.logpdf(y_targets))
-                lls = B.transpose(densities).reshape(
-                    self.num_targets, self.num_trajectories, 1
+            with h5py.File(self.density_loc, "a") as f:
+                grp = f[GroupNames.MARGINAL_DENSITIES.value][f"{ss.num_contexts}|{func_ind}"]
+                # Always the same number of targets throughout the batch.
+                # Technically could add function draw as a dimension and add to tensor.
+                grp.create_dataset(
+                    GroupNames.LIKELIHOODS.value,
+                    (
+                        self.num_targets,
+                        self.num_trajectories,
+                        self.num_density_eval_locations,
+                        self.trajectory_length + 1,  # include trajectory length of 0.
+                    ),
                 )
-                llnp = lls.cpu().detach().numpy()
-                grp["likelihoods"][:, :, :, tl_ind] = llnp
+                # append to existing if adding more points
+                # make something to store index which tells which experiment it is from
+                # write all config yaml as attributes?
+                # write github hash repo as attribute?
+                grp.create_dataset("y_density_evaluation_points", data=y_targets.cpu())
+                grp.create_dataset("x_targets", data=targets.cpu())  # (x_target locations)
+                pbar = self.tqdm(
+                    range(self.trajectory_length + 1),
+                    total=self.trajectory_length + 1,
+                    leave=False,
+                )
+                for tl_ind in pbar:
+                    pbar.set_description(f"Trajectory length: {tl_ind}")
+                    # i=0 -> no AR (b/c no trajectory, only context)
+                    trunc_length = tl_ind + ss.num_contexts
+                    xc, yc = truncate_samples(xc_all, yc_all, trunc_length)
+
+                    xt = targets.reshape(-1, 1, 1)
+                    # xt = targets
+                    xt_ag = nps.AggregateInput((xt, 0))
+                    pred = self.model(xc, yc, xt_ag)
+                    # TODO: something different for many density eval points?
+                    # ytemp = y_targets.repeat((self.num_trajectories, 1, 1, 1))
+                    densities = B.exp(pred.logpdf(y_targets))
+                    lls = B.transpose(densities).reshape(
+                        self.num_targets, self.num_trajectories, 1
+                    )
+                    llnp = lls.cpu().detach().numpy()
+                    grp["likelihoods"][:, :, :, tl_ind] = llnp
 
 
 class FunctionTrajectorySet:
@@ -380,6 +397,7 @@ class FunctionTrajectorySet:
         self.frozen = False
 
         go_init = False
+        #TODO: this is quite convoluted. Probably can make more clear.
         if self.hdf5_loc.exists():
             with h5py.File(self.hdf5_loc, "r") as f:
                 if group_name is not None:
@@ -406,8 +424,8 @@ class FunctionTrajectorySet:
             self.initialize_data(contexts)
 
     def initialize_data(self, contexts):
-        cx_np = contexts[0][0].cpu().detach().numpy().reshape(-1)
-        cy_np = contexts[0][1].cpu().detach().numpy().reshape(-1)
+        # cx_np = contexts[0][0].cpu().detach().numpy().reshape(-1)
+        # cy_np = contexts[0][1].cpu().detach().numpy().reshape(-1)
         if self.group_name is not None:
             mode = "a"
         else:
@@ -416,8 +434,8 @@ class FunctionTrajectorySet:
             grp = self.get_group(f)
             grp.attrs["trajectory_generator"] = str(self.trajectory_generator)
             grp.attrs["sample_size"] = self.trajectory_generator.trajectory_length
-            grp.create_dataset("cx", data=cx_np)
-            grp.create_dataset("cy", data=cy_np)
+            grp.create_dataset("cx", data=contexts[0][0].cpu())
+            grp.create_dataset("cy", data=contexts[0][1].cpu())
 
     def freeze(self):
         self.frozen = True
@@ -449,13 +467,6 @@ class FunctionTrajectorySet:
             grp = f
         return grp
 
-    # @cached_property
-    # def trajectory_generator(self):
-    #     with h5py.File(self.hdf5_loc, "r") as f:
-    #         grp = self.get_group(f)
-    #         traj_gen = grp.attrs["trajectory_generator"]
-    #     return traj_gen
-
     @cached_property
     def sample_size(self):
         with h5py.File(self.hdf5_loc, "r") as f:
@@ -467,8 +478,8 @@ class FunctionTrajectorySet:
     def contexts(self):
         with h5py.File(self.hdf5_loc, "r") as f:
             grp = self.get_group(f)
-            cx = grp["cx"][:].reshape(1, 1, -1)
-            cy = grp["cy"][:].reshape(1, 1, -1)
+            cx = grp["cx"][:]
+            cy = grp["cy"][:]
         fc = self._get_contexts(cx, cy)
         return fc
 
@@ -481,7 +492,11 @@ class FunctionTrajectorySet:
 
     @cached_property
     def num_contexts(self):
-        return len(self.contexts[0][0])
+        return self.contexts[0][0].shape[2]
+
+    @cached_property
+    def num_functions(self):
+        return self.contexts[0][0].shape[0]
 
     def check_traj(self):
         with h5py.File(self.hdf5_loc, "r") as f:
@@ -493,8 +508,8 @@ class FunctionTrajectorySet:
         self.check_traj()
         with h5py.File(self.hdf5_loc, "r") as f:
             grp = self.get_group(f)
-            np_dim_traj = grp[dset_name][:]
-            dim_traj = torch.Tensor(np_dim_traj).reshape(-1, 1, 1, self.sample_size)
+            dim_traj = grp[dset_name][:]
+            # dim_traj = torch.Tensor(np_dim_traj).reshape(-1, 1, 1, self.sample_size)
         dim_traj = B.to_active_device(B.cast(self.dtype, dim_traj))
         return dim_traj
 
@@ -525,10 +540,10 @@ class FunctionTrajectorySet:
         with h5py.File(self.hdf5_loc, "a") as f:
             grp = self.get_group(f)
             x_traj = grp.create_dataset(
-                "x_traj", (n_samples, self.sample_size), dtype="float32"
+                "x_traj", (n_samples, self.num_functions, 1, self.sample_size), dtype="float32"
             )
             y_traj = grp.create_dataset(
-                "y_traj", (n_samples, self.sample_size), dtype="float32"
+                "y_traj", (n_samples, self.num_functions, 1, self.sample_size), dtype="float32"
             )
 
             inner_samples = (
@@ -539,8 +554,8 @@ class FunctionTrajectorySet:
                 x_traj0 = self.trajectory_generator.generate(self.contexts[0][0].cpu())
                 x_traj0 = B.to_active_device(B.cast(self.dtype, x_traj0))
                 y_traj0 = get_trajectories(model, x_traj0, inner_samples, self.contexts)
-                x_traj[i] = x_traj0.cpu().detach().numpy()
-                y_traj[i] = y_traj0.cpu().detach().numpy()
+                x_traj[i, ...] = x_traj0.cpu().detach().numpy()
+                y_traj[i, ...] = y_traj0.cpu().detach().numpy()
         self.freeze()
 
 
@@ -550,7 +565,8 @@ def get_trajectories(model, xi, n_mixtures, contexts):
     mean, var, noiseless_samples, noisy_samples = nps.ar_predict(
         model, contexts, ag, num_samples=n_mixtures, order="given"
     )
-    y_traj = noisy_samples.elements[0]
+    y_traj = noisy_samples.elements[0].reshape(xi.shape)
+    # TODO: confirm that this is doing the right thing ^
     return y_traj
 
 
