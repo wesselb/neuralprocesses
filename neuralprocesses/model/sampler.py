@@ -481,7 +481,7 @@ class FunctionTrajectorySet:
 
     @cached_property
     def num_contexts(self):
-        return len(self.contexts[0][0])
+        return self.contexts[0][0].shape[2]
 
     def check_traj(self):
         with h5py.File(self.hdf5_loc, "r") as f:
