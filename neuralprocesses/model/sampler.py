@@ -306,17 +306,19 @@ class TrajectorySet:
         func_loglikelihoods = np.zeros(
             (self.num_functions, self.num_density_eval_locations)
         )
-        for func_ind, ss in enumerate(self.function_trajectory_sets):
-            with h5py.File(self.density_loc, "r") as f:
-                grp = f[GroupNames.MARGINAL_DENSITIES.value][f"{ss.num_contexts}|{func_ind}"]
-                lh = grp[GroupNames.LIKELIHOODS.value]
-                # get mean likelihood of GMM components for all target points
-                mn = lh[:, :num_trajectories, :, trajectory_length].mean(axis=1)
-                # Get the log likelihood for each target point (under the GMM)
-                target_lls = np.log(mn)
-                # Sum the log likelihoods for each target point (not using chain rule to factorize, just summing)
-                all_targets_ll = target_lls.sum()
-                func_loglikelihoods[func_ind] = all_targets_ll
+        for ss_ind, ss in enumerate(self.function_trajectory_sets):
+            for func_ind in range(ss.num_functions):
+                with h5py.File(self.density_loc, "r") as f:
+                    grp = f[GroupNames.MARGINAL_DENSITIES.value][f"{ss.num_contexts}|{func_ind}"]
+                    lh = grp[GroupNames.LIKELIHOODS.value]
+                    # get mean likelihood of GMM components for all target points
+                    mn = lh[:, :num_trajectories, :, trajectory_length].mean(axis=1)
+                    # Get the log likelihood for each target point (under the GMM)
+                    target_lls = np.log(mn)
+                    # Sum the log likelihoods for each target point (not using chain rule to factorize, just summing)
+                    all_targets_ll = target_lls.sum()
+                    overall_func_ind = (ss_ind * self.num_functions_per_context_size) + func_ind
+                    func_loglikelihoods[overall_func_ind] = all_targets_ll
         return func_loglikelihoods.mean()
 
     def inner_create_density_grid(
