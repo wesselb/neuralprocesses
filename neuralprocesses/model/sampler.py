@@ -28,9 +28,12 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
-class GroupNames(Enum):
+class Groups(Enum):
     MARGINAL_DENSITIES = "marginal_densities"
     TRAJECTORIES = "trajectories"
+
+
+class Datasets(Enum):
     LIKELIHOODS = "likelihoods"
 
 
@@ -142,8 +145,8 @@ class TrajectorySet:
         if density_loc.exists() and not self.overwrite:
             raise ValueError(f"{density_loc} already exists")
         with h5py.File(density_loc, "w") as f:
-            f.create_group(GroupNames.MARGINAL_DENSITIES.value)
-            f.create_group(GroupNames.TRAJECTORIES.value)
+            f.create_group(Groups.MARGINAL_DENSITIES.value)
+            f.create_group(Groups.TRAJECTORIES.value)
         self._density_loc = density_loc
 
     @property
@@ -170,7 +173,7 @@ class TrajectorySet:
     def function_trajectory_sets(self):
         group_names = []
         with h5py.File(self.density_loc, "r") as f:
-            for gn in f[GroupNames.TRAJECTORIES.value].keys():
+            for gn in f[Groups.TRAJECTORIES.value].keys():
                 group_names.append(gn)
         for gn in group_names:
             ss = FunctionTrajectorySet.from_hdf5(
@@ -245,7 +248,7 @@ class TrajectorySet:
         if len(self.function_trajectory_sets) == 0:
             raise ValueError("No sample sets created yet!")
         with h5py.File(self.density_loc, "a") as f:
-            md_grp = f[GroupNames.MARGINAL_DENSITIES.value]
+            md_grp = f[Groups.MARGINAL_DENSITIES.value]
             for ss in self.function_trajectory_sets:
                 for func_ind in range(ss.num_functions):
                     md_grp.create_group(f"{ss.num_contexts}|{func_ind}")
@@ -266,12 +269,8 @@ class TrajectorySet:
         self, tfunc_ind, ss_ind, density_eval, density_kwargs
     ):
         func_ind = (ss_ind * self.num_functions_per_context_size) + tfunc_ind
-        # start_ind = func_ind * ss.num_functions
-        # end_ind = (func_ind + 1) * ss.num_functions
-        # targets = self.xt[start_ind:end_ind, :, :].reshape(-1, 1)
         targets = self.xt[func_ind, :, :].reshape(-1, 1)
         if density_eval == "generated":
-            # yt0 = self.yt[start_ind:end_ind, :, :]
             yt0 = self.yt[func_ind, :, :]
             y_targets = yt0.reshape(-1, 1)
         elif density_eval == "grid":
@@ -309,17 +308,74 @@ class TrajectorySet:
         for ss_ind, ss in enumerate(self.function_trajectory_sets):
             for func_ind in range(ss.num_functions):
                 with h5py.File(self.density_loc, "r") as f:
-                    grp = f[GroupNames.MARGINAL_DENSITIES.value][f"{ss.num_contexts}|{func_ind}"]
-                    lh = grp[GroupNames.LIKELIHOODS.value]
+                    grp = f[Groups.MARGINAL_DENSITIES.value][
+                        f"{ss.num_contexts}|{func_ind}"
+                    ]
+                    lh = grp[Datasets.LIKELIHOODS.value]
                     # get mean likelihood of GMM components for all target points
+                    if self.num_density_eval_locations != 1:
+                        LOG.warning(
+                            "Getting mean across all density eval locations for loglikelihood."
+                        )
+                        LOG.warning(
+                            "Are you sure you didn't mean to use a true y values?"
+                        )
+                        LOG.warning(
+                            "Resulting loglikelihood is not something you want to maximize."
+                        )
                     mn = lh[:, :num_trajectories, :, trajectory_length].mean(axis=1)
                     # Get the log likelihood for each target point (under the GMM)
                     target_lls = np.log(mn)
                     # Sum the log likelihoods for each target point (not using chain rule to factorize, just summing)
                     all_targets_ll = target_lls.sum()
-                    overall_func_ind = (ss_ind * self.num_functions_per_context_size) + func_ind
+                    overall_func_ind = (
+                        ss_ind * self.num_functions_per_context_size
+                    ) + func_ind
                     func_loglikelihoods[overall_func_ind] = all_targets_ll
         return func_loglikelihoods.mean()
+
+    def get_choices(self, num_contexts, func_ind, num_trajectories, trajectory_length):
+        if num_contexts is None:
+            num_contexts = np.random.choice(self.context_sizes)
+        if num_contexts not in self.context_sizes:
+            raise ValueError(f"num_contexts must be one of {self.context_sizes}")
+        if func_ind is None:
+            func_ind = np.random.choice(self.num_functions_per_context_size)
+        if func_ind >= self.num_functions_per_context_size:
+            raise ValueError(
+                f"func_ind must be less than {self.num_functions_per_context_size}"
+            )
+        if num_trajectories is None:
+            num_trajectories = np.random.choice(self.num_trajectories)
+        if num_trajectories > self.num_trajectories:
+            raise ValueError(
+                f"num_trajectories must be less than or equal to {self.num_trajectories}"
+            )
+        if trajectory_length is None:
+            trajectory_length = np.random.choice(self.trajectory_length)
+        if trajectory_length > self.trajectory_length:
+            raise ValueError(
+                f"trajectory_length must be less than or equal to {self.trajectory_length}"
+            )
+        return num_contexts, func_ind, num_trajectories, trajectory_length
+
+    def get_density(
+        self,
+        num_contexts=None,
+        func_ind=None,
+        num_trajectories=None,
+        trajectory_length=None,
+    ):
+        num_contexts, func_ind, num_trajectories, trajectory_length = self.get_choices(
+            num_contexts, func_ind, num_trajectories, trajectory_length
+        )
+        with h5py.File(self.density_loc, "a") as f:
+            grp = f[Groups.MARGINAL_DENSITIES.value][
+                f"{num_contexts}|{func_ind}"
+            ]
+            lh = grp[Datasets.LIKELIHOODS.value]
+            density = lh[:, :num_trajectories, :, trajectory_length]
+        return density
 
     def inner_create_density_grid(
         self,
@@ -336,11 +392,13 @@ class TrajectorySet:
                 func_ind, ss_ind, density_eval, density_kwargs
             )
             with h5py.File(self.density_loc, "a") as f:
-                grp = f[GroupNames.MARGINAL_DENSITIES.value][f"{ss.num_contexts}|{func_ind}"]
+                grp = f[Groups.MARGINAL_DENSITIES.value][
+                    f"{ss.num_contexts}|{func_ind}"
+                ]
                 # Always the same number of targets throughout the batch.
                 # Technically could add function draw as a dimension and add to tensor.
                 grp.create_dataset(
-                    GroupNames.LIKELIHOODS.value,
+                    Datasets.LIKELIHOODS.value,
                     (
                         self.num_targets,
                         self.num_trajectories,
@@ -353,7 +411,9 @@ class TrajectorySet:
                 # write all config yaml as attributes?
                 # write github hash repo as attribute?
                 grp.create_dataset("y_density_evaluation_points", data=y_targets.cpu())
-                grp.create_dataset("x_targets", data=targets.cpu())  # (x_target locations)
+                grp.create_dataset(
+                    "x_targets", data=targets.cpu()
+                )  # (x_target locations)
                 pbar = self.tqdm(
                     range(self.trajectory_length + 1),
                     total=self.trajectory_length + 1,
@@ -368,14 +428,20 @@ class TrajectorySet:
                     xt = targets.reshape(-1, 1, 1)
                     xt_ag = nps.AggregateInput((xt, 0))
                     pred = self.model(xc, yc, xt_ag)
-                    all_lls = torch.Tensor(self.num_targets, self.num_trajectories, y_targets.shape[1])
-                    for i in torch.arange(y_targets.shape[1]):
+                    all_lls = torch.Tensor(
+                        self.num_targets,
+                        self.num_trajectories,
+                        self.num_density_eval_locations,
+                    )
+                    for i in torch.arange(self.num_density_eval_locations):
                         ytmp = y_targets[:, i].reshape(-1, 1)
                         dtmp = B.exp(pred.logpdf(ytmp))
                         lls = B.transpose(dtmp).reshape(
                             self.num_targets, self.num_trajectories, 1
                         )
-                        all_lls[:, :, i] = lls.reshape(self.num_targets, self.num_trajectories)
+                        all_lls[:, :, i] = lls.reshape(
+                            self.num_targets, self.num_trajectories
+                        )
                     all_llnp = all_lls.cpu().detach().numpy()
                     grp["likelihoods"][:, :, :, tl_ind] = all_llnp
 
@@ -400,12 +466,12 @@ class FunctionTrajectorySet:
         self.frozen = False
 
         go_init = False
-        #TODO: this is quite convoluted. Probably can make more clear.
+        # TODO: this is quite convoluted. Probably can make more clear.
         if self.hdf5_loc.exists():
             with h5py.File(self.hdf5_loc, "r") as f:
                 if group_name is not None:
-                    if group_name in f[GroupNames.TRAJECTORIES.value].keys():
-                        grp = f[GroupNames.TRAJECTORIES.value][group_name]
+                    if group_name in f[Groups.TRAJECTORIES.value].keys():
+                        grp = f[Groups.TRAJECTORIES.value][group_name]
                     else:
                         go_init = True
                 else:
@@ -449,7 +515,7 @@ class FunctionTrajectorySet:
             if group_name is None:
                 grp = f
             else:
-                grp = f[GroupNames.TRAJECTORIES.value][group_name]
+                grp = f[Groups.TRAJECTORIES.value][group_name]
             cx = grp["cx"][:].reshape(1, 1, -1)
             cy = grp["cy"][:].reshape(1, 1, -1)
             contexts = cls._get_contexts(cx, cy)
@@ -461,7 +527,7 @@ class FunctionTrajectorySet:
 
     def get_group(self, f):
         if self.group_name is not None:
-            tj_grp = f[GroupNames.TRAJECTORIES.value]
+            tj_grp = f[Groups.TRAJECTORIES.value]
             if self.group_name in tj_grp.keys():
                 grp = tj_grp[self.group_name]
             else:
@@ -543,10 +609,14 @@ class FunctionTrajectorySet:
         with h5py.File(self.hdf5_loc, "a") as f:
             grp = self.get_group(f)
             x_traj = grp.create_dataset(
-                "x_traj", (n_samples, self.num_functions, 1, self.sample_size), dtype="float32"
+                "x_traj",
+                (n_samples, self.num_functions, 1, self.sample_size),
+                dtype="float32",
             )
             y_traj = grp.create_dataset(
-                "y_traj", (n_samples, self.num_functions, 1, self.sample_size), dtype="float32"
+                "y_traj",
+                (n_samples, self.num_functions, 1, self.sample_size),
+                dtype="float32",
             )
 
             inner_samples = (
@@ -882,7 +952,10 @@ def main(
     LOG.info("Making Trajectories")
     s.make_sample_sets()
     LOG.info("Getting all loglikelihoods")
-    s.create_density_grid(density_eval="generated")
+    s.create_density_grid(
+        density_eval=config["density"]["type"],
+        density_kwargs=config["density"]["range"],
+    )
     # TODO: overwrite not necessarily true
     grd = s.grid_loglikelihoods()
     make_heatmap(grd, config, out_sampler_dir)
