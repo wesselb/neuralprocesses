@@ -6,6 +6,7 @@ from collections import namedtuple
 from enum import Enum
 from functools import cached_property
 from pathlib import Path
+import subprocess
 
 import h5py
 import lab as B
@@ -47,7 +48,7 @@ def read_hdf5(hdf5_loc: Path, group_name: str):
 class TrajectorySet:
     def __init__(
         self,
-        density_loc,
+        density_loc: Path,
         model,
         data_generator,
         trajectory_generator,
@@ -56,6 +57,8 @@ class TrajectorySet:
         context_range=(0, 10),
         device="cpu",
         overwrite=True,
+        metadata=None,
+        load=False,
     ):
         # self. = density_loc
         self.model = model
@@ -65,6 +68,8 @@ class TrajectorySet:
         self.overwrite = overwrite
         self.num_functions_per_context_size = num_functions_per_context_size
         self.num_trajectories = num_trajectories
+        self.metadata = metadata
+        self.load = load
 
         self._function_trajectory_sets = []
         self._xt = None
@@ -79,14 +84,44 @@ class TrajectorySet:
 
         # properties
         # self.density_loc = density_loc / "density_grid.hdf5"
-        self.density_loc = density_loc
         self.context_range = context_range
         self.device = device
         self.data_generator = data_generator
         self.trajectory_generator = trajectory_generator
+        self.density_loc = density_loc
 
         # TODO: num context won't be defined at this level, will depend on the SampleSet
         self.num_density_eval_locations = None
+
+    @classmethod
+    def from_hdf5(cls, density_loc):
+        with h5py.File(density_loc, "r") as f:
+            num_functions_per_context_size = f.attrs["num_functions_per_context_size"]
+            num_trajectories = f.attrs["num_trajectories"]
+            context_range = f.attrs["context_range"]
+        #     config = f.attrs["config"]
+        #     git_describe = f.attrs["git_describe"]
+        # LOG.info(f"Loading density from {density_loc}, made at \"{git_describe}\".")
+        # LOG.info(f"Config: \n {config}")
+        # data_generator = get_generator(
+        #     config["generator_kwargs"],
+        #     num_context=config["num_context"],
+        #     specific_x=config["specific_x"],
+        # )
+        # trajectory_generator = construct_trajectory_gens(
+        #     trajectory_length=config["trajectory"]["length"],
+        #     x_range=(config["trajectory"]["low"], config["trajectory"]["high"]),
+        # )[config["trajectory"]["generator"]]
+        return cls(
+            density_loc,
+            model=None,
+            data_generator=None,
+            trajectory_generator=None,
+            num_functions_per_context_size=num_functions_per_context_size,
+            num_trajectories=num_trajectories,
+            context_range=context_range,
+            load=True
+        )
 
     @property
     def data_generator(self):
@@ -95,10 +130,13 @@ class TrajectorySet:
     @data_generator.setter
     def data_generator(self, data_generator):
         self._data_generator = data_generator
-        # assumes upper and lower are the same, only one number for num_targets
-        self._num_targets = self.data_generator.num_target.upper
-        self._xt = torch.Tensor(self.num_functions, 1, self.num_targets)
-        self._yt = torch.Tensor(self.num_functions, 1, self.num_targets)
+        if data_generator is None:
+            LOG.warning("Model is frozen if data_generator is None.")
+        else:
+            # assumes upper and lower are the same, only one number for num_targets
+            self._num_targets = self.data_generator.num_target.upper
+            self._xt = torch.Tensor(self.num_functions, 1, self.num_targets)
+            self._yt = torch.Tensor(self.num_functions, 1, self.num_targets)
 
     @property
     def trajectory_generator(self):
@@ -107,7 +145,10 @@ class TrajectorySet:
     @trajectory_generator.setter
     def trajectory_generator(self, trajectory_generator):
         self._trajectory_generator = trajectory_generator
-        self._trajectory_length = self.trajectory_generator.trajectory_length
+        if trajectory_generator is None:
+            LOG.warning("Model is frozen if trajectory_generator is None.")
+        else:
+            self._trajectory_length = self.trajectory_generator.trajectory_length
 
     @property
     def trajectory_length(self):
@@ -142,11 +183,30 @@ class TrajectorySet:
 
     @density_loc.setter
     def density_loc(self, density_loc):
-        if density_loc.exists() and not self.overwrite:
+        density_loc = Path(density_loc)
+        if self.load is True:
+            if density_loc.exists():
+                self._density_loc = density_loc
+            else:
+                raise FileNotFoundError(f"{density_loc} does not exist")
+        elif density_loc.exists() and not self.overwrite:
             raise ValueError(f"{density_loc} already exists")
-        with h5py.File(density_loc, "w") as f:
-            f.create_group(Groups.MARGINAL_DENSITIES.value)
-            f.create_group(Groups.TRAJECTORIES.value)
+        else:
+            with h5py.File(density_loc, "w") as f:
+                f.create_group(Groups.MARGINAL_DENSITIES.value)
+                f.create_group(Groups.TRAJECTORIES.value)
+                f.attrs["num_functions_per_context_size"] = self.num_functions_per_context_size
+                f.attrs["num_trajectories"] = self.num_trajectories
+                f.attrs["context_range"] = self.context_range
+                f.attrs["str(model)"] = str(self.model)
+                f.attrs["str(data_generator)"] = str(self.data_generator)
+                f.attrs["str(trajectory_generator)"] = str(self.trajectory_generator)
+                if self.metadata is not None:
+                    for k, v in self.metadata.items():
+                        if k in f.attrs:
+                            raise ValueError(f"{k} already exists in attributes")
+                        else:
+                            f.attrs[k] = v
         self._density_loc = density_loc
 
     @property
@@ -939,6 +999,11 @@ def main(
 
     out_sampler_dir.mkdir(exist_ok=exist_ok)
     density_loc = out_sampler_dir / "densities.hdf5"
+    try:
+        git_describe = subprocess.check_output(["git", "describe"]).strip()
+    except:
+        git_describe = "unknown"
+    metadata = {"config": yaml.dump(config), "git_describe": git_describe}
     s = TrajectorySet(
         density_loc=density_loc,
         model=model,
@@ -948,6 +1013,7 @@ def main(
         num_trajectories=config["num_trajectories"],
         context_range=config["context_range"],
         device=device,
+        metadata=metadata,
     )
     LOG.info("Making Trajectories")
     s.make_sample_sets()
