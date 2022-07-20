@@ -366,17 +366,18 @@ class TrajectorySet:
                     xc, yc = truncate_samples(xc_all, yc_all, trunc_length)
 
                     xt = targets.reshape(-1, 1, 1)
-                    # xt = targets
                     xt_ag = nps.AggregateInput((xt, 0))
                     pred = self.model(xc, yc, xt_ag)
-                    # TODO: something different for many density eval points?
-                    # ytemp = y_targets.repeat((self.num_trajectories, 1, 1, 1))
-                    densities = B.exp(pred.logpdf(y_targets))
-                    lls = B.transpose(densities).reshape(
-                        self.num_targets, self.num_trajectories, 1
-                    )
-                    llnp = lls.cpu().detach().numpy()
-                    grp["likelihoods"][:, :, :, tl_ind] = llnp
+                    all_lls = torch.Tensor(self.num_targets, self.num_trajectories, y_targets.shape[1])
+                    for i in torch.arange(y_targets.shape[1]):
+                        ytmp = y_targets[:, i].reshape(-1, 1)
+                        dtmp = B.exp(pred.logpdf(ytmp))
+                        lls = B.transpose(dtmp).reshape(
+                            self.num_targets, self.num_trajectories, 1
+                        )
+                        all_lls[:, :, i] = lls.reshape(self.num_targets, self.num_trajectories)
+                    all_llnp = all_lls.cpu().detach().numpy()
+                    grp["likelihoods"][:, :, :, tl_ind] = all_llnp
 
 
 class FunctionTrajectorySet:
