@@ -10,7 +10,7 @@ import yaml
 from collections import namedtuple
 
 import neuralprocesses.torch as nps
-from neuralprocesses.model.sampler import SampleSet, read_hdf5, load_model, \
+from neuralprocesses.model.sampler import FunctionTrajectorySet, read_hdf5, load_model, \
     generate_marginal_densities, get_dxi_and_targets, clean_config
 from neuralprocesses.model.trajectory import construct_trajectory_gens
 
@@ -51,7 +51,7 @@ def generate_samples(config: dict, out_samples: Path, overwrite=False):
     # Move generator dictionary into SampleSet? That way we can reconstruct
     # May also want metadata about what model is made, so just write all config to
     # metadata for SampleSet?
-    ss = SampleSet(out_samples, contexts, gen, overwrite=overwrite)
+    ss = FunctionTrajectorySet(out_samples, contexts, gen, overwrite=overwrite)
     ss.create_samples(model, config["n_mixtures"])
     return ss
 
