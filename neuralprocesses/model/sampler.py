@@ -20,7 +20,7 @@ from tqdm import tqdm
 
 import experiment as exp
 from neuralprocesses import torch as nps
-from neuralprocesses.dist import UniformDiscrete, UniformContinuous
+from neuralprocesses.dist import UniformDiscrete, UniformContinuous, Grid
 from neuralprocesses.model.trajectory import construct_trajectory_gens
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
@@ -488,6 +488,10 @@ class TrajectorySet:
                     xt = targets.reshape(-1, 1, 1)
                     xt_ag = nps.AggregateInput((xt, 0))
                     pred = self.model(xc, yc, xt_ag)
+                    # TODO: save the means and variances for these
+                    # preds and store them. That way we can use them later
+                    # to generate densities and do prediction.
+                    # They are the test-time determined params.
                     all_lls = torch.Tensor(
                         self.num_targets,
                         self.num_trajectories,
@@ -738,6 +742,14 @@ def get_generator(generator_kwargs, num_context=None, specific_x=None, device="c
     # also just grabbing first generator from eval lack clarity.
     gen = gens_eval()[0][1]
     gen.num_context = num_context
+    # TODO: make number of targets an option
+    # gen.num_target = UniformDiscrete(1000, 1000)
+    l = gen.dist_x_target.lowers[0]
+    u = gen.dist_x_target.uppers[0]
+    gen.dist_x_target = Grid(l, u)
+    # TODO: fixing this right now
+    # REMOVE THIS, ONLY FOR GETTING A QUICK TEST OF VISUALS
+    # gen.dist_x_context = UniformContinuous(0, 0)
     if specific_x is not None:
         if num_context.upper == 1:
             gen.dist_x_context = UniformContinuous(specific_x, specific_x)
@@ -1023,9 +1035,12 @@ def main(
         density_kwargs=config["density"]["range"],
     )
     # TODO: overwrite not necessarily true
-    grd = s.grid_loglikelihoods()
-    make_heatmap(grd, config, out_sampler_dir)
-    np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
+    if config["density"]["type"] == "grid":
+        LOG.warning("Not calculating lls for grid density")
+    else:
+        grd = s.grid_loglikelihoods()
+        make_heatmap(grd, config, out_sampler_dir)
+        np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
 
 
 if __name__ == "__main__":
