@@ -6,7 +6,7 @@ import torch
 from .dist import AbstractDistribution
 from .. import _dispatch
 
-__all__ = ["UniformContinuous", "UniformDiscrete"]
+__all__ = ["UniformContinuous", "UniformDiscrete", "Grid"]
 
 
 class UniformContinuous(AbstractDistribution):
@@ -95,10 +95,10 @@ class Grid(AbstractDistribution):
         n = shape[1]
         lowers = B.to_active_device(B.cast(dtype, self.lowers))
         uppers = B.to_active_device(B.cast(dtype, self.uppers))
-        grid = B.linspace(lowers, uppers, n)
+        grid = B.linspace(lowers[0].item(), uppers[0].item(), n.item())
         # repeat the grid for each batch
         grids = [grid for _ in range(batch_size)]
-        tg = torch.Tensor(grids)
+        tg = torch.Tensor(grids).reshape(batch_size, n.item(), 1)
         # tg = B.to_active_device(B.cast(dtype, tg))
         # B.cast(dtype, grids)
         # Wrap everything in `Dimension`s to make dispatch work.
