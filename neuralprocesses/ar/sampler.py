@@ -45,6 +45,22 @@ def read_hdf5(hdf5_loc: Path, group_name: str):
     return ss
 
 
+def get_function_context(contexts: torch.Tensor, i: int) -> torch.Tensor:
+    """
+    Get context for the i-th function the batch of contexts.
+
+    Args:
+        contexts: the contexts for all functions in the batch.
+        i: index of the function
+    Returns:
+        the context for the i-th function.
+    """
+    xc = contexts[0][0][i, :, :].reshape(1, 1, -1)
+    yc = contexts[0][1][i, :, :].reshape(1, 1, -1)
+    contexts_i = [(xc, yc)]
+    return contexts_i
+
+
 def get_func_expected_ll(lh0) -> float:
     """
     Get the log likelihood of for one function with trajectories and multiple target points
@@ -303,22 +319,6 @@ class TrajectorySet:
         # Think about how to adapt this KL using ABC rejection sampling
         # Think about how to adapt to using chain rule of prob on joint
 
-    @staticmethod
-    def get_function_context(contexts: torch.Tensor, i: int) -> torch.Tensor:
-        """
-        Get context for the i-th function the batch of contexts.
-
-        Args:
-            contexts: the contexts for all functions in the batch.
-            i: index of the function
-        Returns:
-            the context for the i-th function.
-        """
-        xc = contexts[0][0][i, :, :].reshape(1, 1, -1)
-        yc = contexts[0][1][i, :, :].reshape(1, 1, -1)
-        contexts_i = [(xc, yc)]
-        return contexts_i
-
     def create_density_grid(
         self,
         density_eval="generated",
@@ -456,9 +456,9 @@ class TrajectorySet:
         density_kwargs=None,
     ):
         xc_all_funcs, yc_all_funcs = append_contexts_to_samples(ss.contexts, ss.traj)
-        outer_pbar = range(ss.num_functions)
+        outer_pbar = tqdm(np.arange(ss.num_functions))
         for func_ind in outer_pbar:
-            pbar.set_description(f"Context Index: {ss_ind}| Function Index: {func_ind}")
+            outer_pbar.set_description(f"Context Index: {ss_ind}| Function Index: {func_ind}")
             xc_all = xc_all_funcs[:, func_ind, ...][:, None, ...]
             yc_all = yc_all_funcs[:, func_ind, ...][:, None, ...]
             targets, y_targets = self.get_targets_and_density_eval_points(
@@ -707,14 +707,20 @@ class FunctionTrajectorySet:
                 dtype="float32",
             )
 
-            inner_samples = (
-                1  # TODO: could tweak this for more speed, but less stochasticity
-            )
+            inner_samples = 1
+            # TODO: could tweak this for more speed, but less stochasticity
             for i in self.tqdm(range(n_samples), leave=False):
                 # TODO: assess whether this is fast enough, can I do it in parallel somehow?
                 x_traj0 = self.trajectory_generator.generate(self.contexts[0][0].cpu())
                 x_traj0 = B.to_active_device(B.cast(self.dtype, x_traj0))
-                y_traj0 = get_trajectories(model, x_traj0, inner_samples, self.contexts)
+                y_traj0 = torch.Tensor(x_traj0.shape)
+                for j in range(x_traj0.shape[0]):
+                    inner_shape = (1, x_traj0.shape[1], x_traj0.shape[2])
+                    inner_context = get_function_context(self.contexts, j)
+                    x_traj0_func0 = x_traj0[j, ...].reshape(inner_shape)
+                    y_traj0_func0 = get_trajectories(
+                        model, x_traj0_func0, inner_samples, inner_context)
+                    y_traj0[j] = y_traj0_func0.reshape(inner_shape)
                 x_traj[i, ...] = x_traj0.cpu().detach().numpy()
                 y_traj[i, ...] = y_traj0.cpu().detach().numpy()
         self.freeze()
@@ -726,7 +732,7 @@ def get_trajectories(model, xi, n_mixtures, contexts):
     mean, var, noiseless_samples, noisy_samples = nps.ar_predict(
         model, contexts, ag, num_samples=n_mixtures, order="given"
     )
-    y_traj = noisy_samples.elements[0].reshape(xi.shape)
+    y_traj = noisy_samples.elements[0]#.reshape(xi.shape)
     # TODO: confirm that this is doing the right thing ^
     return y_traj
 
@@ -767,7 +773,7 @@ def get_generator(generator_kwargs, num_context=None, specific_x=None, device="c
     gen = gens_eval()[0][1]
     gen.num_context = num_context
     # TODO: make number of targets an option
-    gen.num_target = UniformDiscrete(1000, 1000)
+    gen.num_target = UniformDiscrete(100, 100)
     # When this is big, can run out of memory when making preds
     # of course, could remedy by batching, but don't feel like doing that right now
     # When its small, the resulting grid output animation is not as pretty.
