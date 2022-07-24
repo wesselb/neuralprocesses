@@ -18,9 +18,10 @@ def setup(data_task, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_e
     config["transform"] = None
 
     # Configure the convolutional models:
-    num_channels = 8
-    config["points_per_unit"] = 2
-    config["margin"] = 0.25
+    num_channels = 7
+    config["points_per_unit"] = 1
+    # very strange waves pop out when use points per unit of 2
+    config["margin"] = 1
     # config["unet_kernels"] = 8 <- this does not get passed to convcnp
     config["conv_receptive_field"] = None  # not needed for unet architecture
     config["unet_strides"] = (1,) + (2,) * (num_channels-1)
