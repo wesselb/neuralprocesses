@@ -67,7 +67,7 @@ class MyAnimator:
             )
             densities.append(od)
         self.densities = np.stack(densities)
-        self.vmax = np.quantile(self.densities, quantile)
+        self.vmax = np.nanquantile(self.densities, quantile)
         self.nlevels = min(nlevels_min, int(density_eval_locations.shape[0] / 2))
         self.targets = targets  # these should be the same each time
         self.density_eval_locations = density_eval_locations
@@ -146,8 +146,8 @@ class MyAnimator:
         plt.scatter(
             self.cx, self.cy, s=150, marker="+", color="red", label="contexts", zorder=3
         )
-        plt.plot(
-            self.targets, self.true_y_targets, color="black", label="targets", zorder=2
+        plt.scatter(
+            self.xt, self.true_y_targets, color="black", label="targets", zorder=2
         )
         plt.title(f"Densities with {num_traj0} trajectories of length {traj_len0}")
         plt.legend()
