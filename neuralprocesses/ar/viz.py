@@ -15,6 +15,7 @@ import scripts.ar_marginal as sam
 from neuralprocesses.ar.sampler import (
     Groups,
     Datasets,
+    get_func_expected_ll,
 )
 import matplotlib as mpl
 
@@ -149,7 +150,11 @@ class MyAnimator:
         plt.scatter(
             self.xt, self.true_y_targets, color="black", label="targets", zorder=2
         )
-        plt.title(f"Densities with {num_traj0} trajectories of length {traj_len0}")
+        # nt, tl = my_anim.frame_data[j]
+        lh0 = self.lh[:, :num_traj0, 0, traj_len0]
+        ll = get_func_expected_ll(lh0)
+        t0 = f"Densities with {num_traj0} trajectories of length {traj_len0} | L: {ll:.2f}"
+        plt.title(t0)
         plt.legend()
 
     def animate(self, frame_index):
@@ -173,8 +178,21 @@ class MyAnimator:
             zorder=1,
         )
         self.cont = cont
-        plt.title(f"Densities with {num_traj0} trajectories of length {traj_len0}")
+        lh0 = self.lh[:, :num_traj0, 0, traj_len0]
+        ll = get_func_expected_ll(lh0)
+        t0 = f"Densities with {num_traj0} trajectories of length {traj_len0} | L: {ll:.2f}"
+        plt.title(t0)
+        # plt.title(f"Densities with {num_traj0} trajectories of length {traj_len0}")
         return cont
+
+    def write_animation(self, anim_loc, fps):
+        anim = animation.FuncAnimation(
+            self.figure,
+            self.animate,
+            frames=self.frame_data.shape[0],
+            repeat=False,
+        )
+        anim.save(str(anim_loc), writer=animation.FFMpegWriter(fps=fps))
 
 
 def observe_density():
@@ -209,13 +227,7 @@ def observe_density():
     my_anim.set_frame_data(method=frame_data_method, frame_data=frame_data)
     my_anim.set_densities(nlevels_min=nlevels_min, quantile=quantile)
     my_anim.set_first_frame()
-    anim = animation.FuncAnimation(
-        my_anim.figure,
-        my_anim.animate,
-        frames=my_anim.frame_data.shape[0],
-        repeat=False,
-    )
-    anim.save(str(anim_loc), writer=animation.FFMpegWriter(fps=fps))
+    my_anim.write_animation(str(anim_loc), fps)
 
 
 def main():
