@@ -15,6 +15,8 @@ LOG.setLevel(logging.INFO)
 
 
 def permute(xi, seed=None):
+    if seed is not None:
+        torch.manual_seed(seed)
     state = B.global_random_state(B.dtype(xi))
     perm_xi = torch.Tensor(xi.shape)
     for ri in torch.arange(xi.shape[0]):
@@ -47,10 +49,10 @@ class GridGenerator(AbstractTrajectoryGenerator):
         self.min_x = min_x
         self.max_x = max_x
 
-    def generate(self, x_context=None):
+    def generate(self, x_context=None, seed=None):
         grid = B.linspace(torch.float32, self.min_x, self.max_x, self.trajectory_length)
         rep_grid = grid.repeat((x_context.shape[0], 1)).reshape(x_context.shape[0], 1, self.trajectory_length)
-        xi = permute(rep_grid)
+        xi = permute(rep_grid, seed=seed)
         return xi
 
 

@@ -21,7 +21,7 @@ from tqdm import tqdm
 import experiment as exp
 from neuralprocesses import torch as nps
 from neuralprocesses.dist import UniformDiscrete, UniformContinuous, Grid
-from neuralprocesses.model.trajectory import construct_trajectory_gens
+from neuralprocesses.ar.trajectory import construct_trajectory_gens
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -43,6 +43,26 @@ def read_hdf5(hdf5_loc: Path, group_name: str):
         raise FileNotFoundError(f"{hdf5_loc} does not exist")
     ss = FunctionTrajectorySet(hdf5_loc=hdf5_loc, group_name=group_name)
     return ss
+
+
+def get_func_expected_ll(lh0) -> float:
+    """
+    Get the log likelihood of for one function with trajectories and multiple target points
+    Args:
+        lh0: array with shape (num_target_points, trajectory_length)
+
+    Returns:
+        ll:
+    """
+    # Get gmms from component gaussian likelihooods
+    mn = lh0.mean(axis=1)
+    # Get the log of this value for log likelihood
+    target_lls = np.log(mn)
+    # Sum the log likelihoods for each target point
+    # (not using chain rule to factorize, just summing)
+    # We are only assessing quality of marginals here, not the joint.
+    expected_ll = target_lls.sum()
+    return expected_ll
 
 
 class TrajectorySet:
@@ -339,10 +359,15 @@ class TrajectorySet:
             yt0 = torch.arange(
                 density_kwargs["start"], density_kwargs["end"], density_kwargs["step"]
             )
+            # Add the real target to the start of the grid.
+            true_target = self.yt[func_ind, :, :].reshape(-1, 1)
             y_targets = yt0.repeat(targets.shape[0], 1)
+            y_targets = torch.cat([true_target, y_targets], dim=1)
         else:
             raise ValueError(f"density_eval must be one of 'generated' or 'grid'")
         self.num_density_eval_locations = y_targets.shape[1]
+        targets = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, targets))
+        y_targets = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, y_targets))
         return targets, y_targets
 
     def grid_loglikelihoods(self):
@@ -362,36 +387,22 @@ class TrajectorySet:
                 f"trajectory_length must be less than or equal to {self.trajectory_length}"
             )
         # TODO: use size from tensor here instead of the class attribute
-        func_loglikelihoods = np.zeros(
-            (self.num_functions, self.num_density_eval_locations)
-        )
+        func_loglikelihoods = np.zeros((self.num_functions))
         for ss_ind, ss in enumerate(self.function_trajectory_sets):
             for func_ind in range(ss.num_functions):
                 with h5py.File(self.density_loc, "r") as f:
-                    grp = f[Groups.MARGINAL_DENSITIES.value][
-                        f"{ss.num_contexts}|{func_ind}"
-                    ]
+                    gname = f"{ss.num_contexts}|{func_ind}"
+                    grp = f[Groups.MARGINAL_DENSITIES.value][gname]
                     lh = grp[Datasets.LIKELIHOODS.value]
-                    # get mean likelihood of GMM components for all target points
-                    if self.num_density_eval_locations != 1:
-                        LOG.warning(
-                            "Getting mean across all density eval locations for loglikelihood."
-                        )
-                        LOG.warning(
-                            "Are you sure you didn't mean to use a true y values?"
-                        )
-                        LOG.warning(
-                            "Resulting loglikelihood is not something you want to maximize."
-                        )
-                    mn = lh[:, :num_trajectories, :, trajectory_length].mean(axis=1)
-                    # Get the log likelihood for each target point (under the GMM)
-                    target_lls = np.log(mn)
-                    # Sum the log likelihoods for each target point (not using chain rule to factorize, just summing)
-                    all_targets_ll = target_lls.sum()
+                    # the first of the eval points is the true y target
+                    # that is why we evaluate the likelihood there
+                    lh0 = lh[:, :num_trajectories, 0, trajectory_length]
+                    expected_ll = get_func_expected_ll(lh0)
+
                     overall_func_ind = (
                         ss_ind * self.num_functions_per_context_size
                     ) + func_ind
-                    func_loglikelihoods[overall_func_ind] = all_targets_ll
+                    func_loglikelihoods[overall_func_ind] = expected_ll
         return func_loglikelihoods.mean()
 
     def get_choices(self, num_contexts, func_ind, num_trajectories, trajectory_length):
@@ -445,7 +456,9 @@ class TrajectorySet:
         density_kwargs=None,
     ):
         xc_all_funcs, yc_all_funcs = append_contexts_to_samples(ss.contexts, ss.traj)
-        for func_ind in range(ss.num_functions):
+        outer_pbar = range(ss.num_functions)
+        for func_ind in outer_pbar:
+            pbar.set_description(f"Context Index: {ss_ind}| Function Index: {func_ind}")
             xc_all = xc_all_funcs[:, func_ind, ...][:, None, ...]
             yc_all = yc_all_funcs[:, func_ind, ...][:, None, ...]
             targets, y_targets = self.get_targets_and_density_eval_points(
@@ -465,48 +478,62 @@ class TrajectorySet:
                         self.num_density_eval_locations,
                         self.trajectory_length + 1,  # include trajectory length of 0.
                     ),
+                    chunks=( # chunk same size with which we write the data
+                        self.num_targets,
+                        self.num_trajectories,
+                        self.num_density_eval_locations,
+                        1, # we write one trajectory length at a time, so store chunks like this
+                    ),
+                    compression="gzip",
                 )
                 # append to existing if adding more points
                 # make something to store index which tells which experiment it is from
                 # write all config yaml as attributes?
                 # write github hash repo as attribute?
                 grp.create_dataset("y_density_evaluation_points", data=y_targets.cpu())
-                grp.create_dataset(
-                    "x_targets", data=targets.cpu()
-                )  # (x_target locations)
+                grp.create_dataset("x_targets", data=targets.cpu())
+                # (x_target locations)
                 pbar = self.tqdm(
                     range(self.trajectory_length + 1),
                     total=self.trajectory_length + 1,
                     leave=False,
                 )
                 for tl_ind in pbar:
-                    pbar.set_description(f"Trajectory length: {tl_ind}")
-                    # i=0 -> no AR (b/c no trajectory, only context)
-                    trunc_length = tl_ind + ss.num_contexts
-                    xc, yc = truncate_samples(xc_all, yc_all, trunc_length)
+                    if tl_ind in [0, 9]:
+                        pbar.set_description(f"Trajectory length: {tl_ind}")
+                        # i=0 -> no AR (b/c no trajectory, only context)
+                        trunc_length = tl_ind + ss.num_contexts
+                        xc, yc = truncate_samples(xc_all, yc_all, trunc_length)
 
-                    xt = targets.reshape(-1, 1, 1)
-                    xt_ag = nps.AggregateInput((xt, 0))
-                    pred = self.model(xc, yc, xt_ag)
-                    # TODO: save the means and variances for these
-                    # preds and store them. That way we can use them later
-                    # to generate densities and do prediction.
-                    # They are the test-time determined params.
-                    all_lls = torch.Tensor(
-                        self.num_targets,
-                        self.num_trajectories,
-                        self.num_density_eval_locations,
-                    )
-                    for i in torch.arange(self.num_density_eval_locations):
-                        ytmp = y_targets[:, i].reshape(-1, 1)
-                        dtmp = B.exp(pred.logpdf(ytmp))
-                        lls = B.transpose(dtmp).reshape(
-                            self.num_targets, self.num_trajectories, 1
+                        xt = targets.reshape(-1, 1, 1)
+                        xt = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xt))
+                        xt_ag = nps.AggregateInput((xt, 0))
+                        xc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xc))
+                        yc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yc))
+                        # import ipdb; ipdb.set_trace()
+                        pred = self.model(xc, yc, xt_ag)
+                        # TODO: save the means and variances for these
+                        # preds and store them. That way we can use them later
+                        # to generate densities and do prediction.
+                        # They are the test-time determined params.
+                        all_lls = torch.Tensor(
+                            self.num_targets,
+                            self.num_trajectories,
+                            self.num_density_eval_locations,
                         )
-                        all_lls[:, :, i] = lls.reshape(
-                            self.num_targets, self.num_trajectories
-                        )
-                    all_llnp = all_lls.cpu().detach().numpy()
+                        for i in torch.arange(self.num_density_eval_locations):
+                            ytmp = y_targets[:, i].reshape(-1, 1)
+                            ytmp = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, ytmp))
+                            dtmp = B.exp(pred.logpdf(ytmp))
+                            lls = B.transpose(dtmp).reshape(
+                                self.num_targets, self.num_trajectories, 1
+                            )
+                            all_lls[:, :, i] = lls.reshape(
+                                self.num_targets, self.num_trajectories
+                            )
+                        all_llnp = all_lls.cpu().detach().numpy()
+                    else:
+                        all_llnp = np.nan
                     grp["likelihoods"][:, :, :, tl_ind] = all_llnp
 
 
@@ -743,7 +770,10 @@ def get_generator(generator_kwargs, num_context=None, specific_x=None, device="c
     gen = gens_eval()[0][1]
     gen.num_context = num_context
     # TODO: make number of targets an option
-    # gen.num_target = UniformDiscrete(1000, 1000)
+    gen.num_target = UniformDiscrete(1000, 1000)
+    # When this is big, can run out of memory when making preds
+    # of course, could remedy by batching, but don't feel like doing that right now
+    # When its small, the resulting grid output animation is not as pretty.
     l = gen.dist_x_target.lowers[0]
     u = gen.dist_x_target.uppers[0]
     gen.dist_x_target = Grid(l, u)
@@ -854,35 +884,6 @@ def generate_marginal_densities(
                 f["ad"][i, :] = ad0
 
     return out_marginal_densities
-
-
-def quick_dense(model, xc, yc, xt, yt):
-    # xt, yt = xt_yt
-    xt_yts = zip(xt, yt)
-    l = list(xt_yts)
-
-    xt = xt.reshape(-1, 1, 1)
-    yt = yt.repeat(1, 2)
-    xt_ag = nps.AggregateInput((xt, 0))
-    pred = model(xc, yc, xt_ag)
-    density = B.exp(pred.logpdf(yt))
-
-    xt0, yt0 = l[1]
-    xt0 = xt0.reshape(1, 1, -1)
-    xt_ag0 = nps.AggregateInput((xt0, 0))
-    # TODO: Find out how to do this while setting the seed for reproducibility
-    # Could do this in a batched fashion, I think
-    pred0 = model(xc, yc, xt_ag0)
-
-    m2 = pred0.mean.elements[0].cpu().detach().numpy().reshape(-1)
-    v2 = pred0.var.elements[0].cpu().detach().numpy().reshape(-1)
-    # TODO: out put each component of the density and return for use in db
-    densities = torch.zeros(len(m2), len(yt0))
-    for i, (m, v) in enumerate(zip(m2, v2)):
-        d0 = norm.pdf(yt0.cpu(), loc=m, scale=np.sqrt(v))
-        densities[i, :] = torch.Tensor(d0)
-
-    return density
 
 
 class DensityMaker:
@@ -1034,13 +1035,13 @@ def main(
         density_eval=config["density"]["type"],
         density_kwargs=config["density"]["range"],
     )
-    # TODO: overwrite not necessarily true
-    if config["density"]["type"] == "grid":
-        LOG.warning("Not calculating lls for grid density")
-    else:
-        grd = s.grid_loglikelihoods()
-        make_heatmap(grd, config, out_sampler_dir)
-        np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
+    # # TODO: overwrite not necessarily true
+    # if config["density"]["type"] == "grid":
+    #     LOG.warning("Not calculating lls for grid density")
+    # else:
+    grd = s.grid_loglikelihoods()
+    make_heatmap(grd, config, out_sampler_dir)
+    np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
 
 
 if __name__ == "__main__":

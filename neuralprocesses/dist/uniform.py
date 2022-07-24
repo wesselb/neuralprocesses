@@ -103,5 +103,6 @@ class Grid(AbstractDistribution):
         # B.cast(dtype, grids)
         # Wrap everything in `Dimension`s to make dispatch work.
         shape = (Dimension(d) for d in shape)
+        tg = B.to_active_device(B.cast(dtype, tg))
         state, rand = B.rand(state, dtype, *shape, B.shape(lowers, 0))
         return state, tg
