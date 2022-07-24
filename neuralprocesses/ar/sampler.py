@@ -499,41 +499,38 @@ class TrajectorySet:
                     leave=False,
                 )
                 for tl_ind in pbar:
-                    if tl_ind in [0, 9]:
-                        pbar.set_description(f"Trajectory length: {tl_ind}")
-                        # i=0 -> no AR (b/c no trajectory, only context)
-                        trunc_length = tl_ind + ss.num_contexts
-                        xc, yc = truncate_samples(xc_all, yc_all, trunc_length)
+                    pbar.set_description(f"Trajectory length: {tl_ind}")
+                    # i=0 -> no AR (b/c no trajectory, only context)
+                    trunc_length = tl_ind + ss.num_contexts
+                    xc, yc = truncate_samples(xc_all, yc_all, trunc_length)
 
-                        xt = targets.reshape(-1, 1, 1)
-                        xt = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xt))
-                        xt_ag = nps.AggregateInput((xt, 0))
-                        xc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xc))
-                        yc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yc))
-                        # import ipdb; ipdb.set_trace()
-                        pred = self.model(xc, yc, xt_ag)
-                        # TODO: save the means and variances for these
-                        # preds and store them. That way we can use them later
-                        # to generate densities and do prediction.
-                        # They are the test-time determined params.
-                        all_lls = torch.Tensor(
-                            self.num_targets,
-                            self.num_trajectories,
-                            self.num_density_eval_locations,
+                    xt = targets.reshape(-1, 1, 1)
+                    xt = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xt))
+                    xt_ag = nps.AggregateInput((xt, 0))
+                    xc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xc))
+                    yc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yc))
+                    # import ipdb; ipdb.set_trace()
+                    pred = self.model(xc, yc, xt_ag)
+                    # TODO: save the means and variances for these
+                    # preds and store them. That way we can use them later
+                    # to generate densities and do prediction.
+                    # They are the test-time determined params.
+                    all_lls = torch.Tensor(
+                        self.num_targets,
+                        self.num_trajectories,
+                        self.num_density_eval_locations,
+                    )
+                    for i in torch.arange(self.num_density_eval_locations):
+                        ytmp = y_targets[:, i].reshape(-1, 1)
+                        ytmp = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, ytmp))
+                        dtmp = B.exp(pred.logpdf(ytmp))
+                        lls = B.transpose(dtmp).reshape(
+                            self.num_targets, self.num_trajectories, 1
                         )
-                        for i in torch.arange(self.num_density_eval_locations):
-                            ytmp = y_targets[:, i].reshape(-1, 1)
-                            ytmp = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, ytmp))
-                            dtmp = B.exp(pred.logpdf(ytmp))
-                            lls = B.transpose(dtmp).reshape(
-                                self.num_targets, self.num_trajectories, 1
-                            )
-                            all_lls[:, :, i] = lls.reshape(
-                                self.num_targets, self.num_trajectories
-                            )
-                        all_llnp = all_lls.cpu().detach().numpy()
-                    else:
-                        all_llnp = np.nan
+                        all_lls[:, :, i] = lls.reshape(
+                            self.num_targets, self.num_trajectories
+                        )
+                    all_llnp = all_lls.cpu().detach().numpy()
                     grp["likelihoods"][:, :, :, tl_ind] = all_llnp
 
 
@@ -1032,7 +1029,8 @@ def main(
     s.make_sample_sets()
     LOG.info("Getting all loglikelihoods")
     s.create_density_grid(
-        density_eval=config["density"]["type"],
+        # density_eval=config["density"]["type"],
+        density_eval="grid",
         density_kwargs=config["density"]["range"],
     )
     # # TODO: overwrite not necessarily true
