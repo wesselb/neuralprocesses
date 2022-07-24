@@ -32,7 +32,7 @@ def density_loc(tmp_path_factory):
 def tg():
     # tg = tj.GridGenerator(trajectory_length=5, min_x=-2, max_x=2)
     tg = tj.RandomGenerator(trajectory_length=5, min_x=-2, max_x=2)
-    tg = tj.RandomGenerator(trajectory_length=5, min_x=0.45, max_x=.55)
+    # tg = tj.RandomGenerator(trajectory_length=5, min_x=0.45, max_x=.55)
     return tg
 
 
@@ -76,7 +76,7 @@ def test_generate_batch(ts):
 
 
 def make_sawtooth_wave(reps=2):
-    xt = torch.linspace(-2, 2, 1000)
+    xt = torch.linspace(-2, 2, 100)
     yt = (3 * (xt - 0.5)) % 1
 
     xt = xt.reshape(1, 1, -1).repeat((reps, 1, 1))
@@ -134,16 +134,20 @@ def test_generate(ts: sp.TrajectorySet):
     dkwargs = {
         "start": -0.1,
         "end": 1.1,
-        "step": 0.001  # this part is cheap to go dense
+        "step": 0.01  # this part is cheap to go dense
     }
     ts.create_density_grid("grid", density_kwargs=dkwargs)
 
+    j = 4
     my_anim = viz.MyAnimator(ts.density_loc, 1, 0)
     my_anim.set_likelihoods()
     my_anim.set_frame_data(method="all_trajectory_lengths", frame_data=None)
     my_anim.set_densities(nlevels_min=500, quantile=0.95)
     my_anim.set_first_frame()
-    my_anim.animate(5)
+    # my_anim.animate(j)
+    anim_loc = "../notebooks/animation.mp4"
+    fps = 8
+    my_anim.write_animation(str(anim_loc), fps)
 
     my_anim.figure
     plt.show()
