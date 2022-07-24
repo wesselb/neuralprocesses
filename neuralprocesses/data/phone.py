@@ -132,7 +132,7 @@ class PhoneGenerator(DataGenerator):
         batch_size=16,
         num_tasks=2**10,
         mode="interpolation",
-        num_data=UniformDiscrete(20, 300),  # how to choose these?
+        num_data=UniformDiscrete(200, 500),  # how to choose these?
         num_target=UniformDiscrete(50, 200),  # how to choose these?
         forecast_start=UniformDiscrete(50, 300),
         device="cpu",
