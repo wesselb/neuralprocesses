@@ -20,7 +20,7 @@ from neuralprocesses.ar.sampler import (
 import matplotlib as mpl
 
 mpl.rcParams["figure.dpi"] = 300
-plt.rcParams.update({"figure.figsize": (14, 6)})
+# plt.rcParams.update({"figure.figsize": (14, 6)})
 
 
 logging.basicConfig(level=logging.INFO)
@@ -83,11 +83,13 @@ class MyAnimator:
             frame_data[:, 1] = np.arange(self.total_trajectory_len)
         elif method == "all_num_trajectories":
             frame_data = np.empty((self.total_num_trajectories - 1, 2))
-            frame_data[:, 0] = np.arange(self.total_num_trajectories)[1:]  # skip first bc nan
+            frame_data[:, 0] = np.arange(self.total_num_trajectories)[
+                1:
+            ]  # skip first bc nan
             frame_data[:, 1] = self.total_trajectory_len - 1
         elif method == "provided":
             if frame_data is not None:
-                frame_data = np.array(frame_data) # coerce to numpy if list
+                frame_data = np.array(frame_data)  # coerce to numpy if list
             else:
                 raise Exception("No frame data provided.")
         else:
@@ -133,7 +135,9 @@ class MyAnimator:
         od = self.densities[0]
         targets = self.targets
         density_eval_locations = self.density_eval_locations
-        LOG.info(f"Trajectory length: {traj_len0} | Number of trajectories: {num_traj0}")
+        LOG.info(
+            f"Trajectory length: {traj_len0} | Number of trajectories: {num_traj0}"
+        )
 
         self.figure, self.ax = plt.subplots(figsize=(20, 5))
         self.ax.set_xlim(targets.min(), targets.max())
@@ -162,7 +166,9 @@ class MyAnimator:
         od = self.densities[frame_index]
         targets = self.targets
         density_eval_locations = self.density_eval_locations
-        LOG.info(f"Trajectory length: {traj_len0} | Number of trajectories: {num_traj0}")
+        LOG.info(
+            f"Trajectory length: {traj_len0} | Number of trajectories: {num_traj0}"
+        )
         num_traj0, traj_len0 = self.frame_data[frame_index]
         if self.cont is None:
             raise Exception("First frame not set")
@@ -203,7 +209,19 @@ def observe_density():
     # frame_data_method = "all_num_trajectories"
     # frame_data_method = "all_trajectory_lengths"
     frame_data_method = "provided"
-    frame_data = [[1, 1], [2, 1], [4, 1], [8, 1], [16, 1], [32, 1], [64, 1], [128, 1], [256, 1], [512, 1], [1024, 1]]
+    frame_data = [
+        [1, 1],
+        [2, 1],
+        [4, 1],
+        [8, 1],
+        [16, 1],
+        [32, 1],
+        [64, 1],
+        [128, 1],
+        [256, 1],
+        [512, 1],
+        [1024, 1],
+    ]
 
     nlevels_min = 100
     quantile = 0.95
@@ -213,13 +231,18 @@ def observe_density():
     anim_dir.mkdir(exist_ok=True)
     density_loc = density_dir / "densities.hdf5"
 
-    LOG.info(f"Loading density from: {density_loc} | num_contexts: {num_contexts}, func_ind: {func_ind}")
+    LOG.info(
+        f"Loading density from: {density_loc} | num_contexts: {num_contexts}, func_ind: {func_ind}"
+    )
     LOG.info(f"Writing animations to: {anim_dir}")
-    anim_loc = anim_dir / f"density_animate_c{num_contexts}_f{func_ind}_{frame_data_method}.mp4"
+    anim_loc = (
+        anim_dir
+        / f"density_animate_c{num_contexts}_f{func_ind}_{frame_data_method}.mp4"
+    )
     if anim_loc.exists():
         LOG.warning(f"Animation already exists: {anim_loc}")
         anim_loc = anim_loc.parent / f"{anim_loc.name}.{int(time())}.mp4"
-        LOG.warning(f"Writing animation to \"{anim_loc}\" instead")
+        LOG.warning(f'Writing animation to "{anim_loc}" instead')
         # raise Exception(f"Animation already exists: {anim_loc}")
 
     my_anim = MyAnimator(density_loc, num_contexts, func_ind)
@@ -236,7 +259,8 @@ def main():
         config = sam.clean_config(yaml.safe_load(f0))
 
     all_grd = np.load(
-        "../../../models/ar_test-sawtooth-ll_small_emanate/loglikelihoods_grid.npy")
+        "../../../models/ar_test-sawtooth-ll_small_emanate/loglikelihoods_grid.npy"
+    )
     all_grd[all_grd == -np.inf] = np.nan
     grd = all_grd[:, :]
     ind = np.unravel_index(np.nanargmax(grd), grd.shape)
@@ -272,18 +296,30 @@ def main():
                 (col_max_ind), 1, 1, fill=False, edgecolor="yellow", lw=2, clip_on=False
             )
         )
-    # for i, j in out_of_bounds_inds:
-    #     ax.add_patch(Rectangle(((j, i)), 1, 1, fill=False, edgecolor='green', lw=2, clip_on=False))
-    # for i, j in worse_than_baseline_inds:
-    #     ax.add_patch(Rectangle(((j, i)), 1, 1, fill=False, edgecolor='blue', lw=1, clip_on=False))
-    for i, j in worse_than_baseline_inds:
-        ax.add_patch(
-            Rectangle(((j, i)), 1, 1, fill=True, edgecolor="blue", lw=1, clip_on=False)
-        )
     ax.add_patch(
         Rectangle((indf), 1, 1, fill=False, edgecolor="cyan", lw=2, clip_on=False)
     )
     plt.show()
+
+
+def make_heatmap(grd):
+    vanilla_ll = np.nanmax(grd[:, 0])
+    ind = np.unravel_index(np.nanargmax(grd), grd.shape)
+    indf = np.flip(ind)
+
+    grd[grd == -np.inf] = np.nan
+
+    ax = sns.heatmap(grd, vmin=vanilla_ll)
+    plt.xlabel("trajectory length")
+    plt.ylabel("number of trajectories")
+    fig = plt.gcf()
+    for tl, best_nt in enumerate(np.nanargmax(grd, axis=0)):
+        col_max_ind = [tl, best_nt]
+        rec = Rectangle((col_max_ind), 1, 1, fill=False, edgecolor="yellow", lw=2, clip_on=False)
+        ax.add_patch(rec)
+    best_rec = Rectangle((indf), 1, 1, fill=False, edgecolor="cyan", lw=2, clip_on=False)
+    ax.add_patch(best_rec)
+    return fig
 
 
 if __name__ == "__main__":
