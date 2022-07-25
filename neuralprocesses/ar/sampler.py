@@ -74,7 +74,8 @@ def get_func_expected_ll(lh0) -> float:
         ll:
     """
     # Get gmms from component gaussian likelihooods
-    mn = lh0.mean(axis=1)
+    # mn = lh0.mean(axis=1)
+    mn = np.nanmean(lh0, axis=1)
     # Get the log of this value for log likelihood
     target_lls = np.log(mn)
     # Sum the log likelihoods for each target point
@@ -93,7 +94,7 @@ class TrajectorySet:
         trajectory_generator: AbstractTrajectoryGenerator,
         num_functions_per_context_size=10,
         num_trajectories=100,
-        context_range=(0, 10),
+        context_sizes=(1,), # just use one by default
         device="cpu",
         overwrite=True,
         metadata=None,
@@ -122,8 +123,7 @@ class TrajectorySet:
         self._trajectory_length = None
 
         # properties
-        # self.density_loc = density_loc / "density_grid.hdf5"
-        self.context_range = context_range
+        self.context_sizes = context_sizes
         self.device = device
         self.data_generator = data_generator
         self.trajectory_generator = trajectory_generator
@@ -137,20 +137,9 @@ class TrajectorySet:
         with h5py.File(density_loc, "r") as f:
             num_functions_per_context_size = f.attrs["num_functions_per_context_size"]
             num_trajectories = f.attrs["num_trajectories"]
-            context_range = f.attrs["context_range"]
-        #     config = f.attrs["config"]
-        #     git_describe = f.attrs["git_describe"]
-        # LOG.info(f"Loading density from {density_loc}, made at \"{git_describe}\".")
-        # LOG.info(f"Config: \n {config}")
-        # data_generator = get_generator(
-        #     config["generator_kwargs"],
-        #     num_context=config["num_context"],
-        #     specific_x=config["specific_x"],
-        # )
-        # trajectory_generator = construct_trajectory_gens(
-        #     trajectory_length=config["trajectory"]["length"],
-        #     x_range=(config["trajectory"]["low"], config["trajectory"]["high"]),
-        # )[config["trajectory"]["generator"]]
+            context_sizes = f.attrs["context_sizes"]
+        context_sizes = np.arange(num_functions_per_context_size)
+        context_sizes
         return cls(
             density_loc,
             model=None,
@@ -158,7 +147,7 @@ class TrajectorySet:
             trajectory_generator=None,
             num_functions_per_context_size=num_functions_per_context_size,
             num_trajectories=num_trajectories,
-            context_range=context_range,
+            context_sizes=context_sizes,
             load=True
         )
 
@@ -236,7 +225,7 @@ class TrajectorySet:
                 f.create_group(Groups.TRAJECTORIES.value)
                 f.attrs["num_functions_per_context_size"] = self.num_functions_per_context_size
                 f.attrs["num_trajectories"] = self.num_trajectories
-                f.attrs["context_range"] = self.context_range
+                f.attrs["context_sizes"] = self.context_sizes
                 f.attrs["str(model)"] = str(self.model)
                 f.attrs["str(data_generator)"] = str(self.data_generator)
                 f.attrs["str(trajectory_generator)"] = str(self.trajectory_generator)
@@ -253,17 +242,12 @@ class TrajectorySet:
         return self._num_functions
 
     @property
-    def context_range(self):
-        return self._context_range
-
-    @property
     def context_sizes(self):
         return self._context_sizes
 
-    @context_range.setter
-    def context_range(self, context_range):
-        self._context_range = context_range
-        self._context_sizes = np.arange(context_range[0], context_range[1] + 1)
+    @context_sizes.setter
+    def context_sizes(self, context_sizes):
+        self._context_sizes = np.array(context_sizes)
         self._num_functions = (
             self.num_functions_per_context_size * self.context_sizes.shape[0]
         )
@@ -351,6 +335,9 @@ class TrajectorySet:
     def get_targets_and_density_eval_points(
         self, tfunc_ind, ss_ind, density_eval, density_kwargs
     ):
+        # density_grid is not used anymore, but I'm leaving it because
+        # I'm afraid of breaking something right now.
+        # only the target point is used (which is the first col of the density eval points)
         func_ind = (ss_ind * self.num_functions_per_context_size) + tfunc_ind
         targets = self.xt[func_ind, :, :].reshape(-1, 1)
         if density_eval == "generated":
@@ -978,14 +965,6 @@ def plot_densities(pred, dxi):
     return densities
 
 
-def get_dxi_and_targets(config):
-    dr = config["density"]["range"]
-    tr = config["targets"]["range"]
-    dxi = torch.arange(dr["start"], dr["end"], dr["step"])
-    targets = torch.arange(tr["start"], tr["end"], tr["step"])
-    return dxi, targets
-
-
 def get_device(device=None, gpu=None):
     if device:
         device = device
@@ -1023,24 +1002,26 @@ def make_heatmap(grd, config, outdir):
     plt.title(f"{config['name']} log-likelihoods with {gname} trajectory.")
     plt.savefig(outdir / f"heatmap.png")
     plt.clf()
-    # ax = sns.heatmap(grd, norm=SymLogNorm())
-    # plt.xlabel("trajectory length")
-    # plt.ylabel("number of trajectories")
-    # gname = config['trajectory']['generator']
-    # plt.title(f"{config['name']} log-likelihoods with {gname} trajectory.")
-    # plt.savefig(outdir / f"heatmap_log.png")
     return outdir
 
 
 def main(
     in_config: Path,
-    out_sampler_dir: Path,
+    out_model_dir: Path,
     device=None,
     gpu=None,
     exist_ok=False,
 ):
     with open(in_config, "r") as f0:
         config = clean_config(yaml.safe_load(f0))
+
+    out_sampler_dir = out_model_dir / config["experiment"]
+    LOG.info(f"Writing all results to \"{out_sampler_dir}\".")
+    if out_sampler_dir.exists():
+        if exist_ok:
+            LOG.warning(f"{out_sampler_dir} already exists. Overwriting...")
+        else:
+            raise FileExistsError(f"{out_sampler_dir} already exists.")
 
     device = get_device(device, gpu)
     B.set_global_device(device)
@@ -1065,6 +1046,8 @@ def main(
     except:
         git_describe = "unknown"
     metadata = {"config": yaml.dump(config), "git_describe": git_describe}
+    if "context_sizes" in config:
+        context_sizes = np.array(config["context_sizes"])
     s = TrajectorySet(
         density_loc=density_loc,
         model=model,
@@ -1072,7 +1055,7 @@ def main(
         trajectory_generator=trajectory_generator,
         num_functions_per_context_size=config["num_functions"],
         num_trajectories=config["num_trajectories"],
-        context_range=config["context_range"],
+        context_sizes=context_sizes,
         device=device,
         metadata=metadata,
     )
@@ -1080,14 +1063,9 @@ def main(
     s.make_sample_sets()
     LOG.info("Getting all loglikelihoods")
     s.create_density_grid(
-        # density_eval=config["density"]["type"],
         density_eval="grid",
         density_kwargs=config["density"]["range"],
     )
-    # # TODO: overwrite not necessarily true
-    # if config["density"]["type"] == "grid":
-    #     LOG.warning("Not calculating lls for grid density")
-    # else:
     grd = s.grid_loglikelihoods()
     make_heatmap(grd, config, out_sampler_dir)
     np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
