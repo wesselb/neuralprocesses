@@ -37,6 +37,8 @@ class Groups(Enum):
 
 class Datasets(Enum):
     LIKELIHOODS = "likelihoods"
+    MEANS = "means"
+    VARIANCES = "variances"
 
 
 def read_hdf5(hdf5_loc: Path, group_name: str):
@@ -476,17 +478,25 @@ class TrajectorySet:
                     (
                         self.num_targets,
                         self.num_trajectories,
-                        self.num_density_eval_locations,
+                        # self.num_density_eval_locations,
+                        1, # only write to target location
                         self.trajectory_length + 1,  # include trajectory length of 0.
                     ),
                     chunks=( # chunk same size with which we write the data
                         self.num_targets,
                         self.num_trajectories,
-                        self.num_density_eval_locations,
+                        # self.num_density_eval_locations,
+                        1,
                         1, # we write one trajectory length at a time, so store chunks like this
                     ),
                     compression="gzip",
                 )
+                mshape = (self.num_trajectories, self.num_targets, 1, 1, self.trajectory_length + 1)
+                chunks = (self.num_trajectories, self.num_targets, 1, 1, 1)
+                grp.create_dataset(
+                    Datasets.MEANS.value, shape=mshape, chunks=chunks, compression="gzip")
+                grp.create_dataset(
+                    Datasets.VARIANCES.value, shape=mshape, chunks=chunks, compression="gzip")
                 # append to existing if adding more points
                 # make something to store index which tells which experiment it is from
                 # write all config yaml as attributes?
@@ -510,8 +520,14 @@ class TrajectorySet:
                     xt_ag = nps.AggregateInput((xt, 0))
                     xc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xc))
                     yc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yc))
-                    # import ipdb; ipdb.set_trace()
                     pred = self.model(xc, yc, xt_ag)
+
+                    mean_np = pred.mean.elements[0].cpu().detach().numpy()
+                    var_np = pred.var.elements[0].cpu().detach().numpy()
+
+                    grp[Datasets.MEANS.value][..., tl_ind] = mean_np
+                    grp[Datasets.VARIANCES.value][..., tl_ind] = var_np
+
                     # TODO: save the means and variances for these
                     # preds and store them. That way we can use them later
                     # to generate densities and do prediction.
@@ -519,18 +535,20 @@ class TrajectorySet:
                     all_lls = torch.Tensor(
                         self.num_targets,
                         self.num_trajectories,
-                        self.num_density_eval_locations,
+                        # self.num_density_eval_locations,
+                        1, # only eval at true target locations
                     )
-                    for i in torch.arange(self.num_density_eval_locations):
-                        ytmp = y_targets[:, i].reshape(-1, 1)
-                        ytmp = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, ytmp))
-                        dtmp = B.exp(pred.logpdf(ytmp))
-                        lls = B.transpose(dtmp).reshape(
-                            self.num_targets, self.num_trajectories, 1
-                        )
-                        all_lls[:, :, i] = lls.reshape(
-                            self.num_targets, self.num_trajectories
-                        )
+                    # for i in torch.arange(self.num_density_eval_locations):
+                    i = 0
+                    ytmp = y_targets[:, i].reshape(-1, 1)
+                    ytmp = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, ytmp))
+                    dtmp = B.exp(pred.logpdf(ytmp))
+                    lls = B.transpose(dtmp).reshape(
+                        self.num_targets, self.num_trajectories, 1
+                    )
+                    all_lls[:, :, i] = lls.reshape(
+                        self.num_targets, self.num_trajectories
+                    )
                     all_llnp = all_lls.cpu().detach().numpy()
                     grp["likelihoods"][:, :, :, tl_ind] = all_llnp
 
