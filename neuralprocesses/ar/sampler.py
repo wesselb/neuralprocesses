@@ -22,6 +22,7 @@ import experiment as exp
 from neuralprocesses import torch as nps
 from neuralprocesses.dist import UniformDiscrete, UniformContinuous, Grid
 from neuralprocesses.ar.trajectory import construct_trajectory_gens
+from neuralprocesses.ar.trajectory import AbstractTrajectoryGenerator
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -87,7 +88,7 @@ class TrajectorySet:
         density_loc: Path,
         model,
         data_generator,
-        trajectory_generator,
+        trajectory_generator: AbstractTrajectoryGenerator,
         num_functions_per_context_size=10,
         num_trajectories=100,
         context_range=(0, 10),
@@ -752,7 +753,33 @@ def load_model(weights, name, device="cpu"):
 def get_generator(generator_kwargs, num_context=None, specific_x=None, device="cpu"):
     ARGS = namedtuple("args", generator_kwargs)
     args = ARGS(**generator_kwargs)
-    config = {}
+    # General config. (copied from train.py)
+    config = {
+        "default": {
+            "epochs": None,
+            "rate": None,
+            "also_ar": False,
+        },
+        "epsilon": 1e-8,
+        "epsilon_start": 1e-2,
+        "cholesky_retry_factor": 1e6,
+        "fix_noise": None,
+        "fix_noise_epochs": 3,
+        "width": 256,
+        "dim_embedding": 256,
+        "enc_same": False,
+        "num_heads": 8,
+        "num_layers": 6,
+        "unet_channels": (64,) * 6,
+        "unet_strides": (1,) + (2,) * 5,
+        "conv_channels": 64,
+        "encoder_scales": None,
+        "fullconvgnp_kernel_factor": 2,
+        # Performance of the ConvGNP is sensitive to this parameter. Moreover, it
+        # doesn't make sense to set it to a value higher of the last hidden layer of
+        # the CNN architecture. We therefore set it to 64.
+        "num_basis_functions": 64,
+    }
 
     gen_train, gen_cv, gens_eval = exp.data[args.data]["setup"](
         args,
@@ -807,9 +834,9 @@ def get_model_gen():
 def get_model_real_audio():
     # Take these values from experiment/data/phone.py
     # TODO: This should be done in a more clear and automatable way
-    num_channels = 8
+    num_channels = 7
     model = nps.construct_convgnp(
-        points_per_unit=2,
+        points_per_unit=1,
         dim_x=1,
         dim_yc=(1,) * 1,
         dim_yt=1,
