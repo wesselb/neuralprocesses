@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import List
+import librosa
 
 import lab as B
 import numpy as np
@@ -25,9 +26,17 @@ def match_target_amplitude(sound, target_dBFS):
     return sound.apply_gain(change_in_dBFS)
 
 
-def get_train_cv_eval_dfs(data_path, data_task, seed=0):
-    df = load_phone_df(data_path, data_task, frac=1)
-    phn0_df = df.progress_apply(get_signal_data, timit_loc=data_path, axis=1)
+def librosa_resample(samples, orig_fr, target_fr=22050):
+    arr = np.array(samples).astype(np.float32) / 32768  # 16 bit
+    arr = librosa.core.resample(
+        arr, orig_sr=orig_fr, target_sr=target_fr, res_type='kaiser_best')
+    return arr
+
+
+def get_train_cv_eval_dfs(data_path, data_task, seed=0, frac=1):
+    df = load_phone_df(data_path, data_task, frac=frac)
+    df['wav_loc'] = df.apply(get_wav_loc, timit_loc=data_path, axis=1)
+    phn0_df = df.progress_apply(get_signal_data, axis=1)
 
     train_df = phn0_df[phn0_df["dataset"] == "TRAIN"]
     test_df = phn0_df[phn0_df["dataset"] == "TEST"]
@@ -37,11 +46,19 @@ def get_train_cv_eval_dfs(data_path, data_task, seed=0):
     train_seg_df = get_phone_segs(train_df, snippet_start, snippet_len)
     test_seg_df = get_phone_segs(test_df, snippet_start, snippet_len)
 
+    orig_fr = train_df["fs"].iloc[0]  # assume all the same
+    # target_fr = 22050
+    target_fr = orig_fr
+    train_seg_df = train_seg_df.apply(
+        librosa_resample, orig_fr=orig_fr, target_fr=target_fr)
+    test_seg_df = test_seg_df.apply(
+        librosa_resample, orig_fr=orig_fr, target_fr=target_fr)
+
     splits = [int(0.5 * len(test_seg_df))]
     cv_seg_df, eval_seg_df = np.split(
         test_seg_df.sample(frac=1, random_state=seed), splits
     )
-    return train_seg_df, cv_seg_df, eval_seg_df
+    return train_seg_df, cv_seg_df, eval_seg_df, target_fr
 
 
 class _PhoneData:
@@ -64,7 +81,7 @@ class _PhoneData:
             self.cv_phones = np.load(task_dir / "cv_phones.npy", allow_pickle=True)
             self.eval_phones = np.load(task_dir / "eval_phones.npy", allow_pickle=True)
         else:
-            train_seg_df, cv_seg_df, eval_seg_df = get_train_cv_eval_dfs(data_path, data_task, seed=0)
+            train_seg_df, cv_seg_df, eval_seg_df, fs = get_train_cv_eval_dfs(data_path, data_task, seed=0)
 
             train_ind = train_seg_df.index.values
             cv_ind = cv_seg_df.index.values
@@ -239,6 +256,8 @@ def get_speaker_dirs(timit_loc: Path):
     for ds in timit_loc.iterdir():
         if (ds.is_dir()) and (ds.name in ("TRAIN", "TEST")):
             for dialect in ds.iterdir():
+                if not dialect.is_dir():
+                    continue
                 for speaker in dialect.iterdir():
                     speaker_dirs.append(speaker)
     return speaker_dirs
@@ -262,13 +281,17 @@ def load_phones(phn_loc: Path):
     return phn_df
 
 
-# TODO: Do all of this ahead of time so don't need to redo for training each time.
-def get_signal_data(
-    phn_row: pd.Series, timit_loc: Path, full_wav=False, normalize_gain=-20
-):
-    phn_row = phn_row.copy()
+def get_wav_loc(phn_row, timit_loc: Path):
     subdir = timit_loc / phn_row["dataset"] / phn_row["dialect"] / phn_row["speaker"]
     wav_loc = subdir / f"{phn_row['sentence']}.WAV"
+    return wav_loc
+
+
+# TODO: Do all of this ahead of time so don't need to redo for training each time.
+def get_signal_data(
+    phn_row: pd.Series, full_wav=False, normalize_gain=-20
+):
+    wav_loc = phn_row['wav_loc']
     aseg = AudioSegment.from_file(wav_loc)
     if normalize_gain is not None:
         aseg = match_target_amplitude(aseg, normalize_gain)
