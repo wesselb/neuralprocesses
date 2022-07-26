@@ -6,6 +6,7 @@ from collections import namedtuple
 from enum import Enum
 from functools import cached_property
 from pathlib import Path
+from scipy.special import logsumexp
 import subprocess
 
 import h5py
@@ -37,7 +38,7 @@ class Groups(Enum):
 
 
 class Datasets(Enum):
-    LIKELIHOODS = "log_likelihoods"
+    LOG_LIKELIHOODS = "log_likelihoods"
     MEANS = "means"
     VARIANCES = "variances"
 
@@ -76,14 +77,23 @@ def get_func_expected_ll(lh0) -> float:
     """
     # Get gmms from component gaussian likelihooods
     # mn = lh0.mean(axis=1)
-    mn = np.nanmean(lh0, axis=1)
-    # Get the log of this value for log likelihood
-    target_lls = np.log(mn)
+    # # Get the log of this value for log likelihood
     # Sum the log likelihoods for each target point
     # (not using chain rule to factorize, just summing)
     # We are only assessing quality of marginals here, not the joint.
-    expected_ll = target_lls.sum()
-    return expected_ll
+
+    num_components = lh0.shape[1]
+    num_targets = lh0.shape[0]
+    v2 = logsumexp(lh0, axis=1).sum()
+    v1 = num_targets * np.log(num_components)
+    expected_ll1 = v2 - v1
+
+    # mn = np.nanmean(B.exp(lh0), axis=1)
+    # target_lls = np.log(mn)
+    # expected_ll2 = target_lls.sum()
+    # print(np.isclose(expected_ll1, expected_ll2))
+
+    return expected_ll1
 
 
 class TrajectorySet:
@@ -278,7 +288,7 @@ class TrajectorySet:
         return batch
 
     def make_sample_sets(self):
-        pbar = tqdm(enumerate(self.context_sizes), leave=False)
+        pbar = tqdm(enumerate(self.context_sizes), total=len(self.context_sizes))
         for ci, context_size in pbar:
             pbar.set_description(f"context set size: {context_size}")
 
@@ -391,7 +401,7 @@ class TrajectorySet:
                 with h5py.File(self.density_loc, "r") as f:
                     gname = f"{ss.num_contexts}|{func_ind}"
                     grp = f[Groups.MARGINAL_DENSITIES.value][gname]
-                    lh = grp[Datasets.LIKELIHOODS.value]
+                    lh = grp[Datasets.LOG_LIKELIHOODS.value]
                     # the first of the eval points is the true y target
                     # that is why we evaluate the likelihood there
                     lh0 = lh[:, :num_trajectories, 0, trajectory_length]
@@ -442,7 +452,7 @@ class TrajectorySet:
             grp = f[Groups.MARGINAL_DENSITIES.value][
                 f"{num_contexts}|{func_ind}"
             ]
-            lh = grp[Datasets.LIKELIHOODS.value]
+            lh = grp[Datasets.LOG_LIKELIHOODS.value]
             density = lh[:, :num_trajectories, :, trajectory_length]
         return density
 
@@ -469,7 +479,7 @@ class TrajectorySet:
                 # Always the same number of targets throughout the batch.
                 # Technically could add function draw as a dimension and add to tensor.
                 grp.create_dataset(
-                    Datasets.LIKELIHOODS.value,
+                    Datasets.LOG_LIKELIHOODS.value,
                     (
                         self.num_targets,
                         self.num_trajectories,
@@ -537,8 +547,8 @@ class TrajectorySet:
                     i = 0
                     ytmp = y_targets[:, i].reshape(-1, 1)
                     ytmp = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, ytmp))
-                    dtmp = B.exp(pred.logpdf(ytmp))
-                    # dtmp = pred.logpdf(ytmp)
+                    # dtmp = B.exp(pred.logpdf(ytmp))
+                    dtmp = pred.logpdf(ytmp)
                     lls = B.transpose(dtmp).reshape(
                         self.num_targets, self.num_trajectories, 1
                     )
@@ -546,7 +556,7 @@ class TrajectorySet:
                         self.num_targets, self.num_trajectories
                     )
                     all_llnp = all_lls.cpu().detach().numpy()
-                    grp[Datasets.LIKELIHOODS.value][:, :, :, tl_ind] = all_llnp
+                    grp[Datasets.LOG_LIKELIHOODS.value][:, :, :, tl_ind] = all_llnp
 
 
 class FunctionTrajectorySet:
@@ -1078,8 +1088,8 @@ def main(
         density_kwargs=config["density"]["range"],
     )
     grd = s.grid_loglikelihoods()
-    make_heatmap(grd, config, out_sampler_dir)
-    np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
+    # make_heatmap(grd, config, out_sampler_dir)
+    # np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
 
 
 if __name__ == "__main__":
