@@ -23,6 +23,7 @@ from neuralprocesses import torch as nps
 from neuralprocesses.dist import UniformDiscrete, UniformContinuous, Grid
 from neuralprocesses.ar.trajectory import construct_trajectory_gens
 from neuralprocesses.ar.trajectory import AbstractTrajectoryGenerator
+from neuralprocesses.aggregate import AggregateInput
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -36,7 +37,7 @@ class Groups(Enum):
 
 
 class Datasets(Enum):
-    LIKELIHOODS = "likelihoods"
+    LIKELIHOODS = "log_likelihoods"
     MEANS = "means"
     VARIANCES = "variances"
 
@@ -288,8 +289,15 @@ class TrajectorySet:
             batch = self.generate_batch(
                 batch_size=self.num_functions_per_context_size, num_context=context_size
             )
-            self._xt[start_ind:end_ind, :, :] = batch["xt"]
-            self._yt[start_ind:end_ind, :, :] = batch["yt"]
+            if isinstance(batch["xt"], AggregateInput):
+                tmp_xt = batch["xt"].elements[0][0]  # only one output assumed
+                tmp_yt = batch["yt"].elements[0]
+                # I don't quite understand why it is indexed like this.
+            else:
+                tmp_xt = batch["xt"]
+                tmp_yt = batch["yt"]
+            self._xt[start_ind:end_ind, :, :] = tmp_xt
+            self._yt[start_ind:end_ind, :, :] = tmp_yt
             contexts = batch["contexts"]
 
             # for fi in self.tqdm(range(self.num_functions_per_context_size)):
@@ -530,6 +538,7 @@ class TrajectorySet:
                     ytmp = y_targets[:, i].reshape(-1, 1)
                     ytmp = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, ytmp))
                     dtmp = B.exp(pred.logpdf(ytmp))
+                    # dtmp = pred.logpdf(ytmp)
                     lls = B.transpose(dtmp).reshape(
                         self.num_targets, self.num_trajectories, 1
                     )
@@ -537,7 +546,7 @@ class TrajectorySet:
                         self.num_targets, self.num_trajectories
                     )
                     all_llnp = all_lls.cpu().detach().numpy()
-                    grp["likelihoods"][:, :, :, tl_ind] = all_llnp
+                    grp[Datasets.LIKELIHOODS.value][:, :, :, tl_ind] = all_llnp
 
 
 class FunctionTrajectorySet:
@@ -812,6 +821,7 @@ def get_generator(generator_kwargs, num_context=None, specific_x=None, device="c
     l = gen.dist_x_target.lowers[0]
     u = gen.dist_x_target.uppers[0]
     gen.dist_x_target = Grid(l, u)
+    # This doesn't do anything in phone case
     # TODO: fixing this right now
     # REMOVE THIS, ONLY FOR GETTING A QUICK TEST OF VISUALS
     # gen.dist_x_context = UniformContinuous(0, 0)
@@ -1036,6 +1046,7 @@ def main(
         trajectory_length=config["trajectory"]["length"],
         x_range=(config["trajectory"]["low"], config["trajectory"]["high"]),
     )[config["trajectory"]["generator"]]
+    # import ipdb; ipdb.set_trace()
     model = load_model(config["model_weights"], config["name"], device=device)
     model = model.to(device)
 
@@ -1079,7 +1090,7 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", help="gpu to use", type=int, default=None)
     parser.add_argument("--exist_ok", dest="exist_ok", action="store_true")
     parser.add_argument("--no-exist_ok", dest="exist_ok", action="store_false")
-    parser.set_defaults(exist_ok=True)
+    parser.set_defaults(exist_ok=False)
 
     args = parser.parse_args()
     main(

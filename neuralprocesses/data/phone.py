@@ -42,6 +42,7 @@ def get_train_cv_eval_dfs(data_path, data_task, seed=0, frac=1):
     train_df = phn0_df[phn0_df["dataset"] == "TRAIN"]
     test_df = phn0_df[phn0_df["dataset"] == "TEST"]
 
+    # This information is duplicated in dist_x_target
     snippet_start = 0  # put this in some config somewhere?
     snippet_len = 800
     train_seg_df = get_phone_segs(train_df, snippet_start, snippet_len)
@@ -173,6 +174,9 @@ class PhoneGenerator(DataGenerator):
         super().__init__(dtype, seed, num_tasks, batch_size, device=device)
         self.data_path = data_path
         self.data_task = data_task
+        self.dist_x_target = convert(UniformContinuous(1, 799), AbstractDistribution)
+        # ^ This doens't do anything, it's just there for sampler thing to
+        # work, should fix at some point.
 
         self.num_data = convert(num_data, AbstractDistribution)
 
