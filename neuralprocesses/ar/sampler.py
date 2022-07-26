@@ -816,15 +816,16 @@ def get_generator(generator_kwargs, num_context=None, specific_x=None, device="c
     if isinstance(num_context, int):
         num_context = UniformDiscrete(num_context, num_context)
     elif num_context is None:
-        num_context = UniformDiscrete(0, 50)
+        num_context = UniformDiscrete(50, 50)
     # TODO: Should probably get generator more manually...
     # That way have more control of what is passed.
     # including control of batch size
     # also just grabbing first generator from eval lack clarity.
     gen = gens_eval()[0][1]
-    gen.num_context = num_context
     # TODO: make number of targets an option
     gen.num_target = UniformDiscrete(100, 100)
+    gen.num_context = num_context
+    # has to be set after num_target b/c messy code with PhoneGenerator
     # When this is big, can run out of memory when making preds
     # of course, could remedy by batching, but don't feel like doing that right now
     # When its small, the resulting grid output animation is not as pretty.
@@ -1033,15 +1034,21 @@ def main(
     exist_ok=False,
 ):
     with open(in_config, "r") as f0:
-        config = clean_config(yaml.safe_load(f0))
+        orig_config = yaml.safe_load(f0)
+    config = clean_config(orig_config)
 
     out_sampler_dir = out_model_dir / config["experiment"]
+
     LOG.info(f"Writing all results to \"{out_sampler_dir}\".")
     if out_sampler_dir.exists():
         if exist_ok:
             LOG.warning(f"{out_sampler_dir} already exists. Overwriting...")
         else:
             raise FileExistsError(f"{out_sampler_dir} already exists.")
+
+    out_sampler_dir.mkdir(exist_ok=exist_ok)
+    with open(out_sampler_dir / "config.yaml", "w") as f1:
+        yaml.dump(orig_config, f1)
 
     device = get_device(device, gpu)
     B.set_global_device(device)
@@ -1060,7 +1067,6 @@ def main(
     model = load_model(config["model_weights"], config["name"], device=device)
     model = model.to(device)
 
-    out_sampler_dir.mkdir(exist_ok=exist_ok)
     density_loc = out_sampler_dir / "densities.hdf5"
     try:
         git_describe = subprocess.check_output(["git", "describe"]).strip()

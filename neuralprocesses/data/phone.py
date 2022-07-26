@@ -156,6 +156,7 @@ class PhoneGenerator(DataGenerator):
         num_tasks=2**10,
         mode="interpolation",
         num_data=UniformDiscrete(200, 500),  # how to choose these?
+        num_context=None,
         num_target=UniformDiscrete(50, 200),  # how to choose these?
         forecast_start=UniformDiscrete(50, 300),
         device="cpu",
@@ -180,6 +181,7 @@ class PhoneGenerator(DataGenerator):
 
         self.num_data = convert(num_data, AbstractDistribution)
 
+        self.num_context = num_context
         self.mode = mode
         self.num_target = convert(num_target, AbstractDistribution)
         self.forecast_start = convert(forecast_start, AbstractDistribution)
@@ -197,6 +199,31 @@ class PhoneGenerator(DataGenerator):
         else:
             raise ValueError(f"`subset` must be one of ['train', 'cv', 'eval']")
         self._utterances_i = 0
+
+    @property
+    def num_context(self):
+        return self._num_context
+
+    @num_context.setter
+    def num_context(self, num_context):
+        if num_context is None:
+            self._num_context = None
+        else:
+            # if setting num_context, assuming we are working from sampler.py,
+            # because PhoneGenerator uses num_data, and num_target, we need to alter
+            # the num_data distribution to match the new num_context
+            # Assuming num_target is just one value, since this is how sampler.py
+            # works
+            num_context_int = num_context.lower
+            if num_context.lower != num_context.upper:
+                raise ValueError("num_context must be a single value when setting num_context")
+            # should be the same as upper
+            num_targets = self.num_target.lower
+            if self.num_target.lower != self.num_target.upper:
+                raise ValueError("num_target must be a single value when setting num_context")
+            num_data_int = num_targets + num_context_int
+            num_data = UniformDiscrete(num_data_int, num_data_int)
+            self.num_data = convert(num_data, AbstractDistribution)
 
     @staticmethod
     @cache
