@@ -6,6 +6,7 @@ from tqdm import tqdm
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LogNorm, Normalize
 from time import time
 import seaborn as sns
 from scipy.stats import norm
@@ -14,11 +15,8 @@ from matplotlib.patches import Rectangle
 import matplotlib.animation as animation
 
 import scripts.ar_marginal as sam
-from neuralprocesses.ar.sampler import (
-    Groups,
-    Datasets,
-    get_func_expected_ll,
-)
+from neuralprocesses.ar.loglik import get_func_expected_ll
+from neuralprocesses.ar.enums import Groups, Datasets
 import matplotlib as mpl
 
 mpl.rcParams["figure.dpi"] = 300
@@ -182,6 +180,7 @@ class MyAnimator:
 
         self.vmax = None
         self.nlevels = None
+        self.norm = None
 
         self.figure = None
         self.ax = None
@@ -202,11 +201,15 @@ class MyAnimator:
         self.targets = targets # should be the same each time
         self.densities = np.stack(densities)
 
-    def set_contour_prefs(self, nlevels_min=100, max_quantile=0.95, min_quantile=0.05):
-        self.vmax = np.nanquantile(self.densities, max_quantile)
-        self.vmin = np.nanquantile(self.densities, min_quantile)
+    def set_contour_prefs(self, nlevels_min=100, max_quantile=0.95, min_quantile=0.05, norm=None):
+        vmax = np.nanquantile(self.densities, max_quantile)
+        vmin = np.nanquantile(self.densities, min_quantile)
+        if norm is None:
+            self.norm = Normalize(vmin=vmin, vmax=vmax)
+        else:
+            self.norm = norm
         self.nlevels = min(nlevels_min, int(self.density_eval_locations.shape[0] / 2))
-        LOG.info(f"Using {self.nlevels} levels with vmax={self.vmax:.2f}")
+        LOG.info(f"Using {self.nlevels} levels with norm={self.norm}")
         LOG.info(f"Density shape: {self.densities.shape}")
 
     def set_frame_data(self, method="all_trajectory_lengths", frame_data=None):
@@ -233,14 +236,10 @@ class MyAnimator:
 
     def set_likelihoods(self):
         with h5py.File(self.density_loc, "a") as f:
-            print(self.num_contexts)
             print(f[Groups.MARGINAL_DENSITIES.value].keys())
             gname = f"{self.num_contexts}|{self.func_ind}"
             grp = f[Groups.MARGINAL_DENSITIES.value][gname]
             tgrp = f[Groups.TRAJECTORIES.value]
-            print(tgrp.keys())
-            # tmp_t = 0 # <- TODO: this has to be fixed, don't save this!
-            # t0 = tgrp[f"{tmp_t}"]
             t0 = tgrp[f"{self.num_contexts}"]
 
             lh = grp[Datasets.LOG_LIKELIHOODS.value][:]
@@ -251,12 +250,17 @@ class MyAnimator:
 
         self.lh = lh
         self.xt = xt
-        # self.eval_points = eval_points
         self.true_y_targets = eval_points[:, 0]
         self.cx = cx
         self.cy = cy
         self.total_num_trajectories = lh.shape[1]
         self.total_trajectory_len = lh.shape[-1]
+        LOG.info("Adding true y targets and y contexts to evaluation points.")
+        self.eval_points = np.concatenate([
+            self.true_y_targets,
+            self.eval_points,
+            cy.reshape(-1),
+        ])
 
         self.means, self.variances, _, _ = get_function_predictive_params(
             self.density_loc,
@@ -299,7 +303,7 @@ class MyAnimator:
         x = targets
         y = density_eval_locations
         self.cont = plt.contourf(
-            x, y, od, self.nlevels, vmax=self.vmax, vmin=self.vmin, zorder=1
+            x, y, od, self.nlevels, norm=self.norm, zorder=1
         )  # first image on screen
         plt.scatter(
             self.cx, self.cy, s=150, marker="+", color="red", label="contexts", zorder=3
@@ -334,8 +338,9 @@ class MyAnimator:
             od,
             self.nlevels,
             cmap="viridis",
-            vmin=self.vmin,
-            vmax=self.vmax,
+            # vmin=self.vmin,
+            # vmax=self.vmax,
+            norm=self.norm,
             zorder=1,
         )
         self.cont = cont
@@ -457,14 +462,16 @@ def main():
     plt.show()
 
 
-def make_heatmap(grd):
+def make_heatmap(grd, vmin="vanilla", **kwargs):
     vanilla_ll = np.nanmax(grd[:, 0])
+    if vmin is "vanilla":
+        vmin = vanilla_ll
     ind = np.unravel_index(np.nanargmax(grd), grd.shape)
     indf = np.flip(ind)
 
     grd[grd == -np.inf] = np.nan
 
-    ax = sns.heatmap(grd, vmin=vanilla_ll)
+    ax = sns.heatmap(grd, vmin=vmin, **kwargs)
     plt.xlabel("trajectory length")
     plt.ylabel("number of trajectories")
     fig = plt.gcf()

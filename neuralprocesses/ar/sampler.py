@@ -1,19 +1,16 @@
 import argparse
+import sys
 import concurrent.futures
 import logging
 import os
+import subprocess
 from collections import namedtuple
-from enum import Enum
 from functools import cached_property
 from pathlib import Path
-from scipy.special import logsumexp
-import subprocess
 
 import h5py
 import lab as B
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 import torch
 import yaml
 from scipy.stats import norm
@@ -21,10 +18,13 @@ from tqdm import tqdm
 
 import experiment as exp
 from neuralprocesses import torch as nps
-from neuralprocesses.dist import UniformDiscrete, UniformContinuous, Grid
-from neuralprocesses.ar.trajectory import construct_trajectory_gens
-from neuralprocesses.ar.trajectory import AbstractTrajectoryGenerator
 from neuralprocesses.aggregate import AggregateInput
+from neuralprocesses.ar.enums import Groups, Datasets
+from neuralprocesses.ar.loglik import LikelihoodCalculator, get_func_expected_ll
+from neuralprocesses.ar.trajectory import construct_trajectory_gens, \
+    AbstractTrajectoryGenerator
+from neuralprocesses.ar.viz import make_heatmap
+from neuralprocesses.dist import UniformDiscrete, UniformContinuous, Grid
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
 logging.basicConfig(level=LOGLEVEL)
@@ -40,17 +40,6 @@ def group_list(l, group_size):
     """
     for i in np.arange(0, len(l), group_size):
         yield l[i:i+group_size]
-
-
-class Groups(Enum):
-    MARGINAL_DENSITIES = "marginal_densities"
-    TRAJECTORIES = "trajectories"
-
-
-class Datasets(Enum):
-    LOG_LIKELIHOODS = "log_likelihoods"
-    MEANS = "means"
-    VARIANCES = "variances"
 
 
 def read_hdf5(hdf5_loc: Path, group_name: str):
@@ -74,36 +63,6 @@ def get_function_context(contexts: torch.Tensor, i: int) -> torch.Tensor:
     yc = contexts[0][1][i, :, :].reshape(1, 1, -1)
     contexts_i = [(xc, yc)]
     return contexts_i
-
-
-def get_func_expected_ll(lh0) -> float:
-    """
-    Get the log likelihood of for one function with trajectories and multiple target points
-    Args:
-        lh0: array with shape (num_target_points, trajectory_length)
-
-    Returns:
-        ll:
-    """
-    # Get gmms from component gaussian likelihooods
-    # mn = lh0.mean(axis=1)
-    # # Get the log of this value for log likelihood
-    # Sum the log likelihoods for each target point
-    # (not using chain rule to factorize, just summing)
-    # We are only assessing quality of marginals here, not the joint.
-
-    num_components = lh0.shape[1]
-    num_targets = lh0.shape[0]
-    v2 = logsumexp(lh0, axis=1).sum()
-    v1 = num_targets * np.log(num_components)
-    expected_ll1 = v2 - v1
-
-    # mn = np.nanmean(B.exp(lh0), axis=1)
-    # target_lls = np.log(mn)
-    # expected_ll2 = target_lls.sum()
-    # print(np.isclose(expected_ll1, expected_ll2))
-
-    return expected_ll1
 
 
 class TrajectorySet:
@@ -386,8 +345,8 @@ class TrajectorySet:
         else:
             raise ValueError(f"density_eval must be one of 'generated' or 'grid'")
         self.num_density_eval_locations = y_targets.shape[1]
-        targets = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, targets))
-        y_targets = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, y_targets))
+        # targets = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, targets))
+        # y_targets = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, y_targets))
         return targets, y_targets
 
     def grid_loglikelihoods(self):
@@ -540,24 +499,26 @@ class TrajectorySet:
                     all_vars = torch.Tensor(ntraj, ntarg, 1, 1)
 
                     xt = targets.reshape(-1, 1, 1)
-                    xt = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xt))
                     xc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xc))
                     yc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yc))
 
                     # Batch the xts here to avoid CUDA memory issues.
-                    for batch_inds in group_list(np.arange(xt.shape[0]), batch_size):
-                        xt_batch = xt[batch_inds, ...]
+                    pbar = tqdm(group_list(np.arange(xt.shape[0]), batch_size))
+                    for bi, batch_inds in enumerate(pbar):
+                        pbar.set_description(f"Batch: {bi}")
+                        # xt_batch = xt[batch_inds, ...]
+                        xt_batch = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xt[batch_inds, ...]))
                         xt_ag_batch = nps.AggregateInput((xt_batch, 0))
                         pred_batch = self.model(xc, yc, xt_ag_batch)
-                        all_means[:, batch_inds, :, :] = pred_batch.mean.elements[0]
-                        all_vars[:, batch_inds, :, :] = pred_batch.var.elements[0]
+                        all_means[:, batch_inds, :, :] = pred_batch.mean.elements[0].cpu()
+                        all_vars[:, batch_inds, :, :] = pred_batch.var.elements[0].cpu()
 
                         yt_batch = y_targets[batch_inds, 0].reshape(-1, 1)
                         yt_batch = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yt_batch))
                         yt_ll = pred_batch.logpdf(yt_batch)
 
                         lls = B.transpose(yt_ll).reshape(batch_size, ntraj)
-                        all_lls[batch_inds, :, 0] = lls
+                        all_lls[batch_inds, :, 0] = lls.cpu()
 
                     all_means_np = all_means.cpu().detach().numpy()
                     all_vars_np = all_vars.cpu().detach().numpy()
@@ -1026,41 +987,71 @@ def clean_config(config: dict) -> dict:
     return config
 
 
-def make_heatmap(grd, config, outdir):
-    grd[grd == -np.inf] = np.nan
-    ax = sns.heatmap(grd)
-    plt.xlabel("trajectory length")
-    plt.ylabel("number of trajectories")
-    gname = config["trajectory"]["generator"]
-    plt.title(f"{config['name']} log-likelihoods with {gname} trajectory.")
-    plt.savefig(outdir / f"heatmap.png")
-    plt.clf()
-    return outdir
+def check_user_want_overwrite(out_sampler_dir):
+    while True:
+        cont = input(f"Overwrite \"{out_sampler_dir}\" ? [y/n] ")
+        if cont == "y":
+            return 0
+        elif cont == "n":
+            sys.exit(0)
+
+
+def setup(in_config, out_model_dir, exist_ok):
+    with open(in_config, "r") as f0:
+        orig_config = yaml.safe_load(f0)
+    config = clean_config(orig_config)
+
+    if "experiment" in config:
+        exp_name = config["experiment"]
+    else:
+        exp_name = in_config.stem
+
+    out_sampler_dir = out_model_dir / exp_name
+    if out_sampler_dir.exists():
+        if exist_ok:
+            LOG.warning(f"{out_sampler_dir} already exists. Overwriting...")
+        else:
+            check_user_want_overwrite(out_sampler_dir)
+    LOG.info(f"Experiment name: {exp_name}")
+    LOG.info(f"Writing all results to \"{out_sampler_dir}\".")
+
+    out_sampler_dir.mkdir(exist_ok=True)
+    with open(out_sampler_dir / "config.yaml", "w") as f1:
+        yaml.dump(orig_config, f1)
+    density_loc = out_sampler_dir / "densities.hdf5"
+    return config, out_sampler_dir, density_loc
+
+
+def make_menu(active_config_dir):
+    if not active_config_dir.exists():
+        raise FileNotFoundError(f"{active_config_dir} does not exist.")
+    paths = sorted(Path(active_config_dir).iterdir(), key=os.path.getmtime,
+                   reverse=True)
+    cfgs = {i: cfg for i, cfg in enumerate(paths) if cfg.suffix == ".yaml"}
+    menu = {str(i): cfg.stem for i, cfg in cfgs.items()}
+    menu["q"] = "quit"
+    while True:
+        for entry in menu:
+            print(entry, menu[entry])
+        selection = input("Please Select:")
+        i = menu[selection]
+        if i == "quit":
+            sys.exit(0)
+        else:
+            p = cfgs[int(selection)]
+            break
+    return p
 
 
 def main(
-    in_config: Path,
+    active_config_dir: Path,
     out_model_dir: Path,
     device=None,
     gpu=None,
     exist_ok=False,
 ):
-    with open(in_config, "r") as f0:
-        orig_config = yaml.safe_load(f0)
-    config = clean_config(orig_config)
-
-    out_sampler_dir = out_model_dir / config["experiment"]
-
-    LOG.info(f"Writing all results to \"{out_sampler_dir}\".")
-    if out_sampler_dir.exists():
-        if exist_ok:
-            LOG.warning(f"{out_sampler_dir} already exists. Overwriting...")
-        else:
-            raise FileExistsError(f"{out_sampler_dir} already exists.")
-
-    out_sampler_dir.mkdir(exist_ok=exist_ok)
-    with open(out_sampler_dir / "config.yaml", "w") as f1:
-        yaml.dump(orig_config, f1)
+    in_config = make_menu(active_config_dir)
+    config, out_sampler_dir, density_loc = setup(in_config, out_model_dir, exist_ok)
 
     device = get_device(device, gpu)
     B.set_global_device(device)
@@ -1076,18 +1067,16 @@ def main(
         trajectory_length=config["trajectory"]["length"],
         x_range=(config["trajectory"]["low"], config["trajectory"]["high"]),
     )[config["trajectory"]["generator"]]
-    # import ipdb; ipdb.set_trace()
     model = load_model(config["model_weights"], config["name"], device=device)
     model = model.to(device)
 
-    density_loc = out_sampler_dir / "densities.hdf5"
     try:
         git_describe = subprocess.check_output(["git", "describe"]).strip()
     except:
         git_describe = "unknown"
     metadata = {"config": yaml.dump(config), "git_describe": git_describe}
-    if "context_sizes" in config:
-        context_sizes = np.array(config["context_sizes"])
+
+    context_sizes = np.array(config["context_sizes"])
     s = TrajectorySet(
         density_loc=density_loc,
         model=model,
@@ -1101,20 +1090,27 @@ def main(
     )
     LOG.info("Making Trajectories")
     s.make_sample_sets()
-    LOG.info("Getting all loglikelihoods")
+    LOG.info("Getting log-likelihoods for all points and all GMM components.")
     s.create_density_grid(
         density_eval="grid",
         density_kwargs=config["density"]["range"],
         batch_size=config["batch_size"],
     )
-    # grd = s.grid_loglikelihoods()
-    # make_heatmap(grd, config, out_sampler_dir)
-    # np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
+
+    LOG.info("Calculating log-likelihoods expectation over functions.")
+    lc = LikelihoodCalculator(density_loc)
+    all_lls = lc.grid_lls(context_size=None)
+    all_lls_func_means = np.mean(all_lls, axis=-1)
+    fig = make_heatmap(all_lls_func_means)
+
+    LOG.info("Saving heatmap and loglikelihoods grid over parameters")
+    np.save(str(out_sampler_dir / "log_likelihoods.npy"), all_lls)
+    fig.savefig(str(out_sampler_dir / "log_likelihoods.png"))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Say hello")
-    parser.add_argument("--in_config", help="input yaml config file", type=Path)
+    parser.add_argument("--active_config_dir", help="input directory where active configs reside", type=Path)
     parser.add_argument("--out_sampler_dir", help="output directory", type=Path)
     parser.add_argument("--device", help="device to use", default=None)
     parser.add_argument("--gpu", help="gpu to use", type=int, default=None)
@@ -1124,7 +1120,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(
-        args.in_config,
+        args.active_config_dir,
         args.out_sampler_dir,
         args.device,
         args.gpu,
