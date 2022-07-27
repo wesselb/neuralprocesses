@@ -782,7 +782,7 @@ def load_model(weights, name, device="cpu"):
     return model
 
 
-def get_generator(generator_kwargs, num_context=None, specific_x=None, device="cpu"):
+def get_generator(generator_kwargs, num_context=None, num_targets=100, specific_x=None, device="cpu"):
     ARGS = namedtuple("args", generator_kwargs)
     args = ARGS(**generator_kwargs)
     # General config. (copied from train.py)
@@ -831,7 +831,7 @@ def get_generator(generator_kwargs, num_context=None, specific_x=None, device="c
     # also just grabbing first generator from eval lack clarity.
     gen = gens_eval()[0][1]
     # TODO: make number of targets an option
-    gen.num_target = UniformDiscrete(500, 500)
+    gen.num_target = UniformDiscrete(num_targets, num_targets)
     gen.num_context = num_context
     # has to be set after num_target b/c messy code with PhoneGenerator
     # When this is big, can run out of memory when making preds
@@ -1020,6 +1020,8 @@ def clean_config(config: dict) -> dict:
         config["specific_x"] = None
     if "batch_size" not in config:
         config["batch_size"] = 100  # default batch size if missing
+    if "num_targets" not in config:
+        config["num_targets"] = 100  # default to 100 targets
     config["model_weights"] = Path(config["model_weights"])
     return config
 
@@ -1066,6 +1068,7 @@ def main(
     data_generator = get_generator(
         config["generator_kwargs"],
         num_context=config["num_context"],
+        num_targets=config["num_targets"],
         specific_x=config["specific_x"],
         device=device,
     )
