@@ -32,6 +32,16 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
+def group_list(l, group_size):
+    """
+    :param l:           list
+    :param group_size:  size of each group
+    :return:            Yields successive group-sized lists from l.
+    """
+    for i in np.arange(0, len(l), group_size):
+        yield l[i:i+group_size]
+
+
 class Groups(Enum):
     MARGINAL_DENSITIES = "marginal_densities"
     TRAJECTORIES = "trajectories"
@@ -328,6 +338,7 @@ class TrajectorySet:
         self,
         density_eval="generated",
         density_kwargs=None,
+        batch_size=100,
         # TODO: allow passing of group name to make separate densities from same
     ):
         if len(self.function_trajectory_sets) == 0:
@@ -348,6 +359,7 @@ class TrajectorySet:
                 ss_ind,
                 density_eval=density_eval,
                 density_kwargs=density_kwargs,
+                batch_size=batch_size,
             )
 
     def get_targets_and_density_eval_points(
@@ -462,6 +474,7 @@ class TrajectorySet:
         ss_ind,
         density_eval="generated",
         density_kwargs=None,
+        batch_size=100, # batch over target points to avoid memory issues
     ):
         xc_all_funcs, yc_all_funcs = append_contexts_to_samples(ss.contexts, ss.traj)
         outer_pbar = tqdm(np.arange(ss.num_functions))
@@ -520,42 +533,37 @@ class TrajectorySet:
                     trunc_length = tl_ind + ss.num_contexts
                     xc, yc = truncate_samples(xc_all, yc_all, trunc_length)
 
+                    ntarg = self.num_targets
+                    ntraj = self.num_trajectories
+                    all_lls = torch.Tensor(ntarg, ntraj, 1)
+                    all_means = torch.Tensor(ntraj, ntarg, 1, 1)
+                    all_vars = torch.Tensor(ntraj, ntarg, 1, 1)
+
                     xt = targets.reshape(-1, 1, 1)
                     xt = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xt))
-                    xt_ag = nps.AggregateInput((xt, 0))
                     xc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xc))
                     yc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yc))
-                    pred = self.model(xc, yc, xt_ag)
 
-                    mean_np = pred.mean.elements[0].cpu().detach().numpy()
-                    var_np = pred.var.elements[0].cpu().detach().numpy()
+                    # Batch the xts here to avoid CUDA memory issues.
+                    for batch_inds in group_list(np.arange(xt.shape[0]), batch_size):
+                        xt_batch = xt[batch_inds, ...]
+                        xt_ag_batch = nps.AggregateInput((xt_batch, 0))
+                        pred_batch = self.model(xc, yc, xt_ag_batch)
+                        all_means[:, batch_inds, :, :] = pred_batch.mean.elements[0]
+                        all_vars[:, batch_inds, :, :] = pred_batch.var.elements[0]
 
-                    grp[Datasets.MEANS.value][..., tl_ind] = mean_np
-                    grp[Datasets.VARIANCES.value][..., tl_ind] = var_np
+                        yt_batch = y_targets[batch_inds, 0].reshape(-1, 1)
+                        yt_batch = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yt_batch))
+                        yt_ll = pred_batch.logpdf(yt_batch)
 
-                    # TODO: save the means and variances for these
-                    # preds and store them. That way we can use them later
-                    # to generate densities and do prediction.
-                    # They are the test-time determined params.
-                    all_lls = torch.Tensor(
-                        self.num_targets,
-                        self.num_trajectories,
-                        # self.num_density_eval_locations,
-                        1, # only eval at true target locations
-                    )
-                    # for i in torch.arange(self.num_density_eval_locations):
-                    i = 0
-                    ytmp = y_targets[:, i].reshape(-1, 1)
-                    ytmp = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, ytmp))
-                    # dtmp = B.exp(pred.logpdf(ytmp))
-                    dtmp = pred.logpdf(ytmp)
-                    lls = B.transpose(dtmp).reshape(
-                        self.num_targets, self.num_trajectories, 1
-                    )
-                    all_lls[:, :, i] = lls.reshape(
-                        self.num_targets, self.num_trajectories
-                    )
+                        lls = B.transpose(yt_ll).reshape(batch_size, ntraj)
+                        all_lls[batch_inds, :, 0] = lls
+
+                    all_means_np = all_means.cpu().detach().numpy()
+                    all_vars_np = all_vars.cpu().detach().numpy()
                     all_llnp = all_lls.cpu().detach().numpy()
+                    grp[Datasets.MEANS.value][..., tl_ind] = all_means_np
+                    grp[Datasets.VARIANCES.value][..., tl_ind] = all_vars_np
                     grp[Datasets.LOG_LIKELIHOODS.value][:, :, :, tl_ind] = all_llnp
 
 
@@ -823,7 +831,7 @@ def get_generator(generator_kwargs, num_context=None, specific_x=None, device="c
     # also just grabbing first generator from eval lack clarity.
     gen = gens_eval()[0][1]
     # TODO: make number of targets an option
-    gen.num_target = UniformDiscrete(100, 100)
+    gen.num_target = UniformDiscrete(500, 500)
     gen.num_context = num_context
     # has to be set after num_target b/c messy code with PhoneGenerator
     # When this is big, can run out of memory when making preds
@@ -1010,6 +1018,8 @@ def clean_config(config: dict) -> dict:
         config["num_context"] = None
     if "specific_x" not in config:
         config["specific_x"] = None
+    if "batch_size" not in config:
+        config["batch_size"] = 100  # default batch size if missing
     config["model_weights"] = Path(config["model_weights"])
     return config
 
@@ -1092,8 +1102,9 @@ def main(
     s.create_density_grid(
         density_eval="grid",
         density_kwargs=config["density"]["range"],
+        batch_size=config["batch_size"],
     )
-    grd = s.grid_loglikelihoods()
+    # grd = s.grid_loglikelihoods()
     # make_heatmap(grd, config, out_sampler_dir)
     # np.save(str(out_sampler_dir / "loglikelihoods_grid.npy"), grd)
 
