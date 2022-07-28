@@ -1,5 +1,4 @@
 import argparse
-import sys
 import concurrent.futures
 import logging
 import os
@@ -23,7 +22,8 @@ from neuralprocesses.ar.enums import Groups, Datasets
 from neuralprocesses.ar.loglik import LikelihoodCalculator, get_func_expected_ll
 from neuralprocesses.ar.trajectory import construct_trajectory_gens, \
     AbstractTrajectoryGenerator
-from neuralprocesses.ar.viz import make_heatmap
+from neuralprocesses.ar.utils import clean_config, check_user_want_overwrite, make_menu
+import neuralprocesses.ar.viz as viz
 from neuralprocesses.dist import UniformDiscrete, UniformContinuous, Grid
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
@@ -439,6 +439,7 @@ class TrajectorySet:
         outer_pbar = tqdm(np.arange(ss.num_functions))
         for func_ind in outer_pbar:
             outer_pbar.set_description(f"Context Index: {ss_ind}| Function Index: {func_ind}")
+            torch.cuda.empty_cache()
             xc_all = xc_all_funcs[:, func_ind, ...][:, None, ...]
             yc_all = yc_all_funcs[:, func_ind, ...][:, None, ...]
             targets, y_targets = self.get_targets_and_density_eval_points(
@@ -503,22 +504,29 @@ class TrajectorySet:
                     yc = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yc))
 
                     # Batch the xts here to avoid CUDA memory issues.
-                    pbar = tqdm(group_list(np.arange(xt.shape[0]), batch_size))
+                    pbar = tqdm(group_list(np.arange(xt.shape[0]), batch_size), leave=False)
                     for bi, batch_inds in enumerate(pbar):
                         pbar.set_description(f"Batch: {bi}")
                         # xt_batch = xt[batch_inds, ...]
                         xt_batch = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, xt[batch_inds, ...]))
                         xt_ag_batch = nps.AggregateInput((xt_batch, 0))
-                        pred_batch = self.model(xc, yc, xt_ag_batch)
+                        del xt_batch
+                        with torch.no_grad():
+                            pred_batch = self.model(xc, yc, xt_ag_batch)
                         all_means[:, batch_inds, :, :] = pred_batch.mean.elements[0].cpu()
                         all_vars[:, batch_inds, :, :] = pred_batch.var.elements[0].cpu()
 
                         yt_batch = y_targets[batch_inds, 0].reshape(-1, 1)
                         yt_batch = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, yt_batch))
-                        yt_ll = pred_batch.logpdf(yt_batch)
+                        yt_ll = pred_batch.logpdf(yt_batch).cpu()
 
-                        lls = B.transpose(yt_ll).reshape(batch_size, ntraj)
-                        all_lls[batch_inds, :, 0] = lls.cpu()
+                        del yt_batch
+                        del pred_batch
+
+                        lls = B.transpose(yt_ll).reshape(len(batch_inds), ntraj)
+                        all_lls[batch_inds, :, 0] = lls
+
+                        torch.cuda.empty_cache()
 
                     all_means_np = all_means.cpu().detach().numpy()
                     all_vars_np = all_vars.cpu().detach().numpy()
@@ -967,35 +975,6 @@ def get_device(device=None, gpu=None):
     return device
 
 
-def clean_config(config: dict) -> dict:
-    # TODO: use defaultdict
-    if "max_len" not in config:
-        config["max_len"] = None
-    if "num_samples" not in config:
-        config["num_samples"] = None
-    if "generator_kwargs" not in config:
-        config["generator_kwargs"] = {}
-    if "num_context" not in config:
-        config["num_context"] = None
-    if "specific_x" not in config:
-        config["specific_x"] = None
-    if "batch_size" not in config:
-        config["batch_size"] = 100  # default batch size if missing
-    if "num_targets" not in config:
-        config["num_targets"] = 100  # default to 100 targets
-    config["model_weights"] = Path(config["model_weights"])
-    return config
-
-
-def check_user_want_overwrite(out_sampler_dir):
-    while True:
-        cont = input(f"Overwrite \"{out_sampler_dir}\" ? [y/n] ")
-        if cont == "y":
-            return 0
-        elif cont == "n":
-            sys.exit(0)
-
-
 def setup(in_config, out_model_dir, exist_ok):
     with open(in_config, "r") as f0:
         orig_config = yaml.safe_load(f0)
@@ -1020,27 +999,6 @@ def setup(in_config, out_model_dir, exist_ok):
         yaml.dump(orig_config, f1)
     density_loc = out_sampler_dir / "densities.hdf5"
     return config, out_sampler_dir, density_loc
-
-
-def make_menu(active_config_dir):
-    if not active_config_dir.exists():
-        raise FileNotFoundError(f"{active_config_dir} does not exist.")
-    paths = sorted(Path(active_config_dir).iterdir(), key=os.path.getmtime,
-                   reverse=True)
-    cfgs = {i: cfg for i, cfg in enumerate(paths) if cfg.suffix == ".yaml"}
-    menu = {str(i): cfg.stem for i, cfg in cfgs.items()}
-    menu["q"] = "quit"
-    while True:
-        for entry in menu:
-            print(entry, menu[entry])
-        selection = input("Please Select:")
-        i = menu[selection]
-        if i == "quit":
-            sys.exit(0)
-        else:
-            p = cfgs[int(selection)]
-            break
-    return p
 
 
 def main(
@@ -1101,11 +1059,15 @@ def main(
     lc = LikelihoodCalculator(density_loc)
     all_lls = lc.grid_lls(context_size=None)
     all_lls_func_means = np.mean(all_lls, axis=-1)
-    fig = make_heatmap(all_lls_func_means)
+    fig = viz.make_heatmap(all_lls_func_means)
 
     LOG.info("Saving heatmap and loglikelihoods grid over parameters")
     np.save(str(out_sampler_dir / "log_likelihoods.npy"), all_lls)
     fig.savefig(str(out_sampler_dir / "log_likelihoods.png"))
+
+    if "animations" in config:
+        LOG.info("Creating animations")
+        viz.make_animations(exp_dir=out_sampler_dir, config=config)
 
 
 if __name__ == "__main__":

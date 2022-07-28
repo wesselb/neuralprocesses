@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+import argparse
 from pathlib import Path
 from tqdm import tqdm
 
@@ -17,6 +18,7 @@ import matplotlib.animation as animation
 import scripts.ar_marginal as sam
 from neuralprocesses.ar.loglik import get_func_expected_ll
 from neuralprocesses.ar.enums import Groups, Datasets
+import neuralprocesses.ar.utils as utils
 import matplotlib as mpl
 
 mpl.rcParams["figure.dpi"] = 300
@@ -236,7 +238,6 @@ class MyAnimator:
 
     def set_likelihoods(self):
         with h5py.File(self.density_loc, "a") as f:
-            print(f[Groups.MARGINAL_DENSITIES.value].keys())
             gname = f"{self.num_contexts}|{self.func_ind}"
             grp = f[Groups.MARGINAL_DENSITIES.value][gname]
             tgrp = f[Groups.TRAJECTORIES.value]
@@ -287,7 +288,7 @@ class MyAnimator:
         density_eval_locations = self.eval_points[y_order]
         return od, targets, density_eval_locations
 
-    def set_first_frame(self):
+    def set_first_frame(self, target_model="scatter"):
         num_traj0, traj_len0 = self.frame_data[0]
         od = self.densities[0]
         targets = self.targets
@@ -302,14 +303,21 @@ class MyAnimator:
 
         x = targets
         y = density_eval_locations
-        self.cont = plt.contourf(
-            x, y, od, self.nlevels, norm=self.norm, zorder=1
-        )  # first image on screen
+        self.cont = plt.contourf(x, y, od, self.nlevels, norm=self.norm, zorder=1)
+        # first image on screen
         plt.scatter(
             self.cx, self.cy, s=150, marker="+", color="red", label="contexts", zorder=3
         )
-        plt.scatter(
-            self.xt, self.true_y_targets, color="black", label="targets", zorder=2
+        target_order = np.argsort(self.xt, axis=0).reshape(-1)
+        xt_ordered = self.xt[target_order]
+        yt_ordered = self.true_y_targets[target_order]
+        plt.plot(
+            xt_ordered,
+            yt_ordered,
+            color="black",
+            label="targets",
+            zorder=2,
+            alpha=0.5
         )
         # nt, tl = my_anim.frame_data[j]
         lh0 = self.lh[:, :num_traj0, 0, traj_len0]
@@ -361,110 +369,94 @@ class MyAnimator:
         anim.save(str(anim_loc), writer=animation.FFMpegWriter(fps=fps))
 
 
-def observe_density():
-    density_dir = Path("../../../models/ar_test-sawtooth-ll_small_emanate")
-    num_contexts = 1
-    func_ind = 0
+def setup(active_config_dir, model_dir):
+    in_config = utils.make_menu(active_config_dir)
+    with open(in_config, "r") as f0:
+        orig_config = yaml.safe_load(f0)
+    config = utils.clean_config(orig_config)
 
-    # frame_data_method = "all_num_trajectories"
-    # frame_data_method = "all_trajectory_lengths"
-    frame_data_method = "provided"
-    frame_data = [
-        [1, 1],
-        [2, 1],
-        [4, 1],
-        [8, 1],
-        [16, 1],
-        [32, 1],
-        [64, 1],
-        [128, 1],
-        [256, 1],
-        [512, 1],
-        [1024, 1],
-    ]
+    if "experiment" in config:
+        exp_name = config["experiment"]
+    else:
+        exp_name = in_config.stem
+    exp_dir = Path(model_dir) / exp_name
 
-    nlevels_min = 100
-    quantile = 0.95
-    fps = 8
+    if "animations" not in config:
+        raise Exception("No animations section in config")
+    print(yaml.dump(config["animations"]))
+    return config, exp_dir
+
+
+def make_animations(config, exp_dir, only_first_frame=False):
+    pbar = tqdm(config["animations"])
+    for ac in pbar:
+        cs = ac['num_contexts']
+        func_ind = ac['func_ind']
+        pbar.set_description(f"Context Size: {cs} | Function: {func_ind}")
+        make_animation(exp_dir, ac, only_first_frame)
+    LOG.info(f"Saved to \"{exp_dir}\".")
+
+
+def main(active_config_dir, model_dir: Path, only_first_frame: bool = False):
+    config, exp_dir = setup(active_config_dir, model_dir)
+    make_animations(config, exp_dir, only_first_frame)
+
+
+def make_animation(density_dir, config, only_first_frame=False):
+    func_ind = config["func_ind"]
+    num_contexts = config["num_contexts"]
+
+    frame_data_method = config["frame_data_method"]
+    frame_data = config["frame_data"]
+
+    nlevels_min = config["nlevels_min"]
+    max_quantile = config["max_quantile"]
+    min_quantile = config["min_quantile"]
+    fps = config["fps"]
 
     anim_dir = density_dir / "animations"
     anim_dir.mkdir(exist_ok=True)
     density_loc = density_dir / "densities.hdf5"
 
-    LOG.info(
-        f"Loading density from: {density_loc} | num_contexts: {num_contexts}, func_ind: {func_ind}"
-    )
+    LOG.info(f"Loading density from: {density_loc} | num_contexts: {num_contexts}, func_ind: {func_ind}")
     LOG.info(f"Writing animations to: {anim_dir}")
-    anim_loc = (
-        anim_dir
-        / f"density_animate_c{num_contexts}_f{func_ind}_{frame_data_method}.mp4"
-    )
+    outname = f"density_animate_c{num_contexts}_f{func_ind}_{frame_data_method}.mp4"
+    anim_loc = anim_dir / outname
     if anim_loc.exists():
         LOG.warning(f"Animation already exists: {anim_loc}")
         anim_loc = anim_loc.parent / f"{anim_loc.name}.{int(time())}.mp4"
         LOG.warning(f'Writing animation to "{anim_loc}" instead')
-        # raise Exception(f"Animation already exists: {anim_loc}")
-
-    my_anim = MyAnimator(density_loc, num_contexts, func_ind)
+    eval_points = np.arange(config['start'], config['end'], config['step'])
+    my_anim = MyAnimator(
+        density_loc,
+        num_contexts=num_contexts,
+        func_ind=func_ind,
+        eval_points=eval_points,
+    )
     my_anim.set_likelihoods()
     my_anim.set_frame_data(method=frame_data_method, frame_data=frame_data)
-    my_anim.set_densities(nlevels_min=nlevels_min, quantile=quantile)
+    my_anim.set_densities()
+
+    vmax = np.nanquantile(my_anim.densities, max_quantile)
+    vmin = np.nanquantile(my_anim.densities, min_quantile)
+    norm = Normalize(vmin=vmin, vmax=vmax)
+    if "norm" in config:
+        if config["norm"] == "log":
+            norm = LogNorm()
+            LOG.warning("Using log norm, ignoring vmin and vmax")
+
+    my_anim.set_contour_prefs(nlevels_min=nlevels_min, norm=norm)
     my_anim.set_first_frame()
-    my_anim.write_animation(str(anim_loc), fps)
-
-
-def main():
-    tname = "test-sawtooth-ll_small_emanate"
-    with open(f"../config/{tname}.yaml") as f0:
-        config = sam.clean_config(yaml.safe_load(f0))
-
-    all_grd = np.load(
-        "../../../models/ar_test-sawtooth-ll_small_emanate/loglikelihoods_grid.npy"
-    )
-    all_grd[all_grd == -np.inf] = np.nan
-    grd = all_grd[:, :]
-    ind = np.unravel_index(np.nanargmax(grd), grd.shape)
-    indf = np.flip(ind)
-    all_grd
-    np.nanmax(grd)
-    vmin = np.nanquantile(grd, 0.05)
-    out_of_bounds_inds = np.transpose((grd < vmin).nonzero())
-    vanilla_ll = np.nanmax(grd[:, 0])
-    print(vanilla_ll)
-    best_ll = grd[ind]
-    print(best_ll)
-    print(best_ll - vanilla_ll)
-    worse_than_baseline_inds = np.transpose((grd < vanilla_ll).nonzero())
-    # norm=None
-    # norm = SymLogNorm(linthresh=0.01)
-    # ax = sns.heatmap(grd, norm=norm, vmax=-20)
-    ax = sns.heatmap(grd, vmin=vanilla_ll)
-    plt.xlabel("trajectory length")
-    plt.ylabel("number of trajectories")
-    plt.title(
-        f"{config['name']} log-likelihoods with {config['trajectory']['generator']} trajectory."
-    )
-    todays_date = f"{datetime.now():%Y-%m-%d}"
-    outfile = f"../reports/figures/{tname}_{todays_date}.png"
-    print(outfile)
-    plt.savefig(outfile)
-    np.save(f"../reports/figures/{tname}_{todays_date}.npy", grd)
-    for tl, best_nt in enumerate(np.nanargmax(grd, axis=0)):
-        col_max_ind = [tl, best_nt]
-        ax.add_patch(
-            Rectangle(
-                (col_max_ind), 1, 1, fill=False, edgecolor="yellow", lw=2, clip_on=False
-            )
-        )
-    ax.add_patch(
-        Rectangle((indf), 1, 1, fill=False, edgecolor="cyan", lw=2, clip_on=False)
-    )
-    plt.show()
+    if only_first_frame:
+        plt.show()
+        return
+    else:
+        my_anim.write_animation(str(anim_loc), fps)
 
 
 def make_heatmap(grd, vmin="vanilla", **kwargs):
     vanilla_ll = np.nanmax(grd[:, 0])
-    if vmin is "vanilla":
+    if vmin == "vanilla":
         vmin = vanilla_ll
     ind = np.unravel_index(np.nanargmax(grd), grd.shape)
     indf = np.flip(ind)
@@ -485,9 +477,10 @@ def make_heatmap(grd, vmin="vanilla", **kwargs):
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser(description='Say hello')
-    # parser.add_argument('i', help='input txt file')
-    # args = parser.parse_args()
-    # main(args.i)
-    # main()
-    observe_density()
+    parser = argparse.ArgumentParser(description='Create animations from density')
+    parser.add_argument('i', help='input config file', type=Path)
+    parser.add_argument('m', help='input models dir', type=Path)
+    parser.add_argument('--only_first_frame', help='only show first frame', action='store_true')
+    parser.set_defaults(only_first_frame=False)
+    args = parser.parse_args()
+    main(args.i, args.m, args.only_first_frame)
