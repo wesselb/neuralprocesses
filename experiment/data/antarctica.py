@@ -1,0 +1,53 @@
+import torch
+
+import neuralprocesses.torch as nps
+from .util import register_data
+
+__all__ = []
+
+
+def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
+    
+    config["default"]["rate"] = 2e-4
+    config["default"]["epochs"] = 200
+    config["dim_x"] = 2
+    config["dim_y"] = 2
+
+    # Configure the convolutional models:
+    config["points_per_unit"] = 1e-3
+    config["margin"] = 1e4
+    config["conv_receptive_field"] = 1e4
+    config["unet_strides"] = (1,) + (2,) * 5
+    
+    config["unet_channels"] = (64,) * 6
+    config["encoder_scales"] = 2 / config["points_per_unit"]
+
+    # Other settings specific to the EEG experiments:
+    config["plot"] = {1: {"range": (0, 1), "axvline": []}}
+
+    gen_train = nps.AntarcticaGenerator(
+        dtype=torch.float32,
+        seed=0,
+        batch_size=args.batch_size,
+        num_tasks=num_tasks_train,
+        subset="train",
+        device=device,
+    )
+
+    gen_cv = lambda: (
+        gen_train = nps.AntarcticaGenerator(
+            dtype=torch.float32,
+            seed=0,
+            batch_size=args.batch_size,
+            num_tasks=num_tasks_cv,
+            device=device,
+        )
+    )
+
+    def gens_eval():
+        return []
+
+    return gen_train, gen_cv, gens_eval
+
+
+register_data("antarctica", setup)
