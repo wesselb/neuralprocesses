@@ -59,4 +59,4 @@ class UniformDiscrete(AbstractDistribution):
         self.upper = upper
 
     def sample(self, state, dtype, *shape):
-        return B.randint(state, dtype, lower=self.lower, upper=self.upper + 1)
+        return B.randint(state, dtype, lower=self.lower, upper=self.upper + 1, *shape)

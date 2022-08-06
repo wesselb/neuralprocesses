@@ -3,6 +3,7 @@ from stheno import EQ, Matern52
 
 from .gp import GPGenerator
 from .mixture import MixtureGenerator
+from .mixgp import MixtureGPGenerator
 from .sawtooth import SawtoothGenerator
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
@@ -16,6 +17,7 @@ def construct_predefined_gens(
     num_tasks=2**14,
     dim_x=1,
     dim_y=1,
+    mean_diff=0.,
     x_range_context=(-2, 2),
     x_range_target=(-2, 2),
     pred_logpdf=True,
@@ -117,4 +119,5 @@ def construct_predefined_gens(
         ),
         seed=seed,
     )
+        
     return gens
