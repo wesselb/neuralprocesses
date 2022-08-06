@@ -8,7 +8,7 @@ __all__ = []
 
 def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
     
-    root_dir = "/Users/stratis/repos/EnvSensors_WP1/data/antarctica"
+    root_dir = None
     
     config["default"]["rate"] = 2e-4
     config["default"]["epochs"] = 200
