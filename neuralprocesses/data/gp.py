@@ -95,5 +95,31 @@ class GPGenerator(SyntheticGenerator):
                 batch["pred_logpdf"] = post(ft).logpdf(yt)
             if self.pred_logpdf_diag:
                 batch["pred_logpdf_diag"] = post(ft).diagonalise().logpdf(yt)
+                
+            print("\n")
+            print(type(batch))
+            print(type(batch["contexts"]), len(batch["contexts"]))
+            print(type(batch["contexts"][0]), len(batch["contexts"][0]))
+            
+            print(type(batch["contexts"][0][0]), batch["contexts"][0][0].shape)
+            print(type(batch["contexts"][0][1]), batch["contexts"][0][1].shape)
+            
+            print(type(batch["contexts"][1][0]), batch["contexts"][1][0].shape)
+            print(type(batch["contexts"][1][1]), batch["contexts"][1][1].shape)
+            print("\n")
+            
+            print(type(batch["xt"]))
+            print(type(batch["xt"].elements), len(batch["xt"].elements))
+            print(type(batch["xt"].elements[0]), len(batch["xt"].elements[0]))
+            print(type(batch["xt"].elements[0][0]), batch["xt"].elements[0][0].shape, batch["xt"].elements[0][1])
+            print(type(batch["xt"].elements[1][0]), batch["xt"].elements[1][0].shape, batch["xt"].elements[1][1])
+            
+            print("\n")
+            print(type(batch["yt"]))
+            print(type(batch["yt"].elements), len(batch["yt"].elements))
+            print(type(batch["yt"].elements[0]), batch["yt"].elements[0].shape)
+            print(type(batch["yt"].elements[1]), batch["yt"].elements[1].shape)
+            print("\n")
+            raise Exception
 
             return batch

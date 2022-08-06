@@ -30,31 +30,44 @@ class AntarcticaGenerator(DataGenerator):
             batch_size=16,
             num_sim_context=UniformDiscrete(0, 30),
             num_sim_target=UniformDiscrete(0, 30),
+            min_stations=30,
             subset="train",
-            mode="both",
             device="cpu",
         ):
         
         super().__init__(dtype, seed, num_tasks, batch_size, device)
         
+        self.subset = subset
+        
         self.load_sim_data(
             root_dir=f"{root_dir}/gridded/interim/tas",
-            mode=mode
         )
         
         self.load_real_data(
             root_dir=f"{root_dir}/station/interim",
-            mode=mode
         )
         
         self.num_sim_context = num_sim_context
         self.num_sim_target = num_sim_target
+        self.min_stations = min_stations
             
         
-    def load_sim_data(self, root_dir, mode):
+    def load_sim_data(self, root_dir):
         
         # Years to load
-        self.years = list(range(1950, 2021))
+        if self.subset == "train":
+            self.years = list(range(1950, 2014))
+            
+        elif self.subset == "cv":
+            self.years = list(range(2014, 2018))
+            
+        elif self.subset == "eval":
+            self.years = list(range(2018, 2021))
+            
+        else:
+            raise ValueError(
+                "Generator mode {mode} must be 'train', 'cv' or 'eval'."
+            )
         
         # Load ERA5 data
         self.sim_data = {
@@ -77,7 +90,7 @@ class AntarcticaGenerator(DataGenerator):
         self.sim_idx_y = self.sim_idx[1]
             
         
-    def load_real_data(self, root_dir, mode):
+    def load_real_data(self, root_dir):
         
         # Load real data and metadata
         self.real_data = pd.read_csv(
@@ -90,7 +103,14 @@ class AntarcticaGenerator(DataGenerator):
         
         # Arrange by date to avoid slicing each time a new batch is made
         self.real_data = dict(tuple(self.real_data.groupby("date")))
-        self.real_dates = np.array(list(self.real_data.keys()))
+        self.real_dates = np.array(
+            list(
+                filter(
+                    lambda date: int(date[:4]) in self.years,
+                    list(self.real_data.keys())
+                )
+            )
+        )
         
 
     def generate_batch(self):
@@ -135,7 +155,7 @@ class AntarcticaGenerator(DataGenerator):
 
                 real_x, real_y, real_temp = real_data
 
-                if int(date[:4]) not in self.years or real_x.shape[0] <= 30:
+                if int(date[:4]) not in self.years or real_x.shape[0] <= self.min_stations:
                     continue
 
                 sim_data = self.unpack_daily_sim_data(date)
@@ -206,28 +226,44 @@ class AntarcticaGenerator(DataGenerator):
             )
             
             # Cast all tensors and send to device
-            convert = lambda x: B.to_active_device(x)
-
-            sim_ctx_x = convert(batch["sim_x"][:, None, :num_sim_context])
-            sim_ctx_y = convert(batch["sim_y"][:, None, :num_sim_context])
-            sim_ctx_in = np.concatenate([sim_ctx_x, sim_ctx_y], axis=1)
-            sim_ctx_temp = convert(batch["sim_temp"][:, :num_sim_context])
-
-            real_ctx_x = convert(batch["real_x"][:, None, :num_real_context])
-            real_ctx_y = convert(batch["real_y"][:, None, :num_real_context])
-            real_ctx_in = np.concatenate([real_ctx_x, real_ctx_y], axis=1)
-            real_ctx_temp = convert(batch["real_temp"][:, None, :num_real_context])
-
-            sim_trg_x = convert(batch["sim_x"][:, None, num_sim_context:])
-            sim_trg_y = convert(batch["sim_y"][:, None, num_sim_context:])
-            sim_trg_in = np.concatenate([sim_trg_x, sim_trg_y], axis=1)
-            sim_trg_temp = convert(batch["sim_temp"][:, None, num_sim_context:])
-
-            real_trg_x = convert(batch["real_x"][:, None, num_real_context:])
-            real_trg_y = convert(batch["real_y"][:, None, num_real_context:])
-            real_trg_in = np.concatenate([real_trg_x, real_trg_y], axis=1)
-            real_trg_temp = convert(batch["real_temp"][:, None, num_real_context:])
+            convert = lambda x: B.to_active_device(torch.tensor(x, dtype=self.dtype))
             
+            scale_x = self.sim_x.max()
+            scale_y = self.sim_y.max()
+            scale_temp = 10.
+
+            sim_ctx_x = convert(batch["sim_x"][:, None, :num_sim_context]) / scale_x
+            sim_ctx_y = convert(batch["sim_y"][:, None, :num_sim_context]) / scale_y
+            sim_ctx_in = torch.tensor(np.concatenate([sim_ctx_x, sim_ctx_y], axis=1), dtype=self.dtype)
+            sim_ctx_temp = convert(batch["sim_temp"][:, None, :num_sim_context]) / scale_temp
+                
+            sim_trg_x = convert(batch["sim_x"][:, None, num_sim_context:]) / scale_x
+            sim_trg_y = convert(batch["sim_y"][:, None, num_sim_context:]) / scale_y
+            sim_trg_in = torch.tensor(np.concatenate([sim_trg_x, sim_trg_y], axis=1), dtype=self.dtype)
+            sim_trg_temp = convert(batch["sim_temp"][:, None, num_sim_context:]) / scale_temp
+            
+            if self.subset in ["cv", "eval"]:
+                
+                sim_trg_x = sim_trg_x[:, :, :0]
+                sim_trg_y = sim_trg_y[:, :, :0]
+                sim_trg_in = sim_trg_in[:, :, :0]
+                sim_trg_temp = sim_trg_temp[:, :, :0]
+                
+                sim_trg_x = sim_trg_x[:, :, :0]
+                sim_trg_y = sim_trg_y[:, :, :0]
+                sim_trg_in = sim_trg_in[:, :, :0]
+                sim_trg_temp = sim_trg_temp[:, :, :0]
+                
+            real_ctx_x = convert(batch["real_x"][:, None, :num_real_context]) / scale_x
+            real_ctx_y = convert(batch["real_y"][:, None, :num_real_context]) / scale_y
+            real_ctx_in = torch.tensor(np.concatenate([real_ctx_x, real_ctx_y], axis=1), dtype=self.dtype)
+            real_ctx_temp = convert(batch["real_temp"][:, None, :num_real_context]) / scale_temp
+
+            real_trg_x = convert(batch["real_x"][:, None, num_real_context:]) / scale_x
+            real_trg_y = convert(batch["real_y"][:, None, num_real_context:]) / scale_y
+            real_trg_in = torch.tensor(np.concatenate([real_trg_x, real_trg_y], axis=1), dtype=self.dtype)
+            real_trg_temp = convert(batch["real_temp"][:, None, num_real_context:]) / scale_temp
+                
             # Create context dictionary
             batch["contexts"] = [
                 (sim_ctx_in, sim_ctx_temp),
