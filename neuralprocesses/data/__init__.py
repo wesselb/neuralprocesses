@@ -7,3 +7,4 @@ from .predefined import *
 from .predprey import *
 from .sawtooth import *
 from .temperature import *
+from .antarctica import *
