@@ -145,7 +145,7 @@ class AntarcticaGenerator(DataGenerator):
         with B.on_device(self.device):
             while batch_size < self.batch_size:
 
-                date = B.random.choice(self.real_dates)
+                date = str(np.random.choice(self.real_dates))
 
                 # Unpack station data and ERA5 data
                 real_data = self.unpack_daily_real_data(
@@ -178,7 +178,7 @@ class AntarcticaGenerator(DataGenerator):
                 sim_idx = np.random.choice(
                     np.arange(self.sim_grid_size),
                     replace=False,
-                    size=(num_sim,)
+                    size=(num_sim.cpu().numpy(),)
                 )
 
                 i = self.sim_idx_x[sim_idx]
@@ -234,12 +234,12 @@ class AntarcticaGenerator(DataGenerator):
 
             sim_ctx_x = convert(batch["sim_x"][:, None, :num_sim_context]) / scale_x
             sim_ctx_y = convert(batch["sim_y"][:, None, :num_sim_context]) / scale_y
-            sim_ctx_in = torch.tensor(np.concatenate([sim_ctx_x, sim_ctx_y], axis=1), dtype=self.dtype)
+            sim_ctx_in = torch.tensor(B.concat(*[sim_ctx_x, sim_ctx_y], axis=1), dtype=self.dtype)
             sim_ctx_temp = convert(batch["sim_temp"][:, None, :num_sim_context]) / scale_temp
                 
             sim_trg_x = convert(batch["sim_x"][:, None, num_sim_context:]) / scale_x
             sim_trg_y = convert(batch["sim_y"][:, None, num_sim_context:]) / scale_y
-            sim_trg_in = torch.tensor(np.concatenate([sim_trg_x, sim_trg_y], axis=1), dtype=self.dtype)
+            sim_trg_in = torch.tensor(B.concat(*[sim_trg_x, sim_trg_y], axis=1), dtype=self.dtype)
             sim_trg_temp = convert(batch["sim_temp"][:, None, num_sim_context:]) / scale_temp
             
             if self.subset in ["cv", "eval"]:
@@ -256,12 +256,12 @@ class AntarcticaGenerator(DataGenerator):
                 
             real_ctx_x = convert(batch["real_x"][:, None, :num_real_context]) / scale_x
             real_ctx_y = convert(batch["real_y"][:, None, :num_real_context]) / scale_y
-            real_ctx_in = torch.tensor(np.concatenate([real_ctx_x, real_ctx_y], axis=1), dtype=self.dtype)
+            real_ctx_in = torch.tensor(B.concat(*[real_ctx_x, real_ctx_y], axis=1), dtype=self.dtype)
             real_ctx_temp = convert(batch["real_temp"][:, None, :num_real_context]) / scale_temp
 
             real_trg_x = convert(batch["real_x"][:, None, num_real_context:]) / scale_x
             real_trg_y = convert(batch["real_y"][:, None, num_real_context:]) / scale_y
-            real_trg_in = torch.tensor(np.concatenate([real_trg_x, real_trg_y], axis=1), dtype=self.dtype)
+            real_trg_in = torch.tensor(B.concat(*[real_trg_x, real_trg_y], axis=1), dtype=self.dtype)
             real_trg_temp = convert(batch["real_temp"][:, None, num_real_context:]) / scale_temp
                 
             # Create context dictionary

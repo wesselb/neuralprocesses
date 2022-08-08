@@ -1,3 +1,4 @@
+import os
 import torch
 
 import neuralprocesses.torch as nps
@@ -8,20 +9,20 @@ __all__ = []
 
 def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
     
-    root_dir = None
+    root_dir = f"{os.getcwd()}/antarctica-data"
     
     config["default"]["rate"] = 2e-4
     config["default"]["epochs"] = 200
     config["dim_x"] = 2
     config["dim_y"] = 2
     
-    num_tasks_train = 10
-    num_tasks_cv = 10
-    num_tasks_eval = 10
+    num_tasks_train = 10**3
+    num_tasks_cv = 10**3
+    num_tasks_eval = 10**3
 
     # Configure the convolutional models:
-    config["points_per_unit"] = 64
-    config["margin"] = 0.1
+    config["points_per_unit"] = 256
+    config["margin"] = 0.2
     config["conv_receptive_field"] = 1.
     config["unet_strides"] = (1,) + (2,) * 5
     
