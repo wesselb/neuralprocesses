@@ -11,12 +11,12 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     
     root_dir = f"{os.getcwd()}/antarctica-data"
     
-    config["default"]["rate"] = 2e-4
+    config["default"]["rate"] = 1e-4
     config["default"]["epochs"] = 200
     config["dim_x"] = 2
     config["dim_y"] = 2
     
-    num_tasks_train = 10**3
+    num_tasks_train = 10**4
     num_tasks_cv = 10**3
     num_tasks_eval = 10**3
 
@@ -26,7 +26,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["conv_receptive_field"] = 1.
     config["unet_strides"] = (1,) + (2,) * 5
     
-    config["unet_channels"] = (64,) * 6
+    config["unet_channels"] = (64, 64, 64, 64, 64, 64)
     config["encoder_scales"] = 2 / config["points_per_unit"]
     config["transform"] = None
 

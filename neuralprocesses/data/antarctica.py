@@ -228,9 +228,9 @@ class AntarcticaGenerator(DataGenerator):
             # Cast all tensors and send to device
             convert = lambda x: B.to_active_device(torch.tensor(x, dtype=self.dtype))
             
-            scale_x = self.sim_x.max()
-            scale_y = self.sim_y.max()
-            scale_temp = 10.
+            scale_x = 1.2 * np.abs(self.sim_x).max()
+            scale_y = 1.2 * np.abs(self.sim_y).max()
+            scale_temp = 1.
 
             sim_ctx_x = convert(batch["sim_x"][:, None, :num_sim_context]) / scale_x
             sim_ctx_y = convert(batch["sim_y"][:, None, :num_sim_context]) / scale_y
@@ -263,7 +263,19 @@ class AntarcticaGenerator(DataGenerator):
             real_trg_y = convert(batch["real_y"][:, None, num_real_context:]) / scale_y
             real_trg_in = torch.tensor(B.concat(*[real_trg_x, real_trg_y], axis=1), dtype=self.dtype)
             real_trg_temp = convert(batch["real_temp"][:, None, num_real_context:]) / scale_temp
+
+            if torch.any(torch.isnan(sim_ctx_temp)):
+                raise ValueError("sim_ctx_temp has nan")
                 
+            if torch.any(torch.isnan(sim_trg_temp)):
+                raise ValueError("sim_trg_temp has nan")
+
+            if torch.any(torch.isnan(real_ctx_temp)):
+                raise ValueError("real_ctx_temp has nan")
+
+            if torch.any(torch.isnan(real_trg_temp)):
+                raise ValueError("real_trg_temp has nan")
+
             # Create context dictionary
             batch["contexts"] = [
                 (sim_ctx_in, sim_ctx_temp),
@@ -307,7 +319,13 @@ class AntarcticaGenerator(DataGenerator):
         real_x = np.array(real_x)
         real_y = np.array(real_y)
         real_temp = np.array(real_temp)
-        
+
+        not_nan = np.where(np.logical_not(np.isnan(real_temp)))
+
+        real_x = real_x[not_nan]
+        real_y = real_y[not_nan]
+        real_temp = real_temp[not_nan]
+
         return real_x, real_y, real_temp
 
     
