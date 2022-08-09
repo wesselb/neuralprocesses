@@ -128,6 +128,7 @@ def main(**kw_args):
         choices=exp.data,
         default="eq",
     )
+    parser.add_argument("--mean-diff", type=float, default=0.)
     parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
     parser.add_argument("--num-samples", type=int, default=20)
     parser.add_argument("--resume-at-epoch", type=int)
@@ -251,6 +252,7 @@ def main(**kw_args):
         "conv_channels": 64,
         "encoder_scales": None,
         "fullconvgnp_kernel_factor": 2,
+        "mean_diff": args.mean_diff,
         # Performance of the ConvGNP is sensitive to this parameter. Moreover, it
         # doesn't make sense to set it to a value higher of the last hidden layer of
         # the CNN architecture. We therefore set it to 64.

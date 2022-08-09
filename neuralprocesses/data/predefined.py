@@ -119,5 +119,19 @@ def construct_predefined_gens(
         ),
         seed=seed,
     )
+    
+    for i, kernel in enumerate(kernels.keys()):
+        gens[f"mix-{kernel}"] = MixtureGPGenerator(
+            dtype,
+            seed=seed + len(kernels.items()) + i + 1,
+            noise=0.05,
+            kernel=kernels[kernel],
+            num_context=UniformDiscrete(0, 30 * dim_x),
+            num_target=UniformDiscrete(50 * dim_x, 50 * dim_x),
+            pred_logpdf=False,
+            pred_logpdf_diag=False,
+            mean_diff=mean_diff,
+            **config,
+        )
         
     return gens
