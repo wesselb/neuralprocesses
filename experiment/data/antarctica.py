@@ -16,17 +16,17 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["dim_x"] = 2
     config["dim_y"] = 2
     
-    num_tasks_train = 10**4
+    num_tasks_train = 10**3
     num_tasks_cv = 10**3
     num_tasks_eval = 10**3
 
     # Configure the convolutional models:
-    config["points_per_unit"] = 256
+    config["points_per_unit"] = 512
     config["margin"] = 0.2
     config["conv_receptive_field"] = 1.
     config["unet_strides"] = (1,) + (2,) * 5
     
-    config["unet_channels"] = (64, 64, 64, 64, 64, 64)
+    config["unet_channels"] = (8, 16, 32, 64, 128, 256)
     config["encoder_scales"] = 2 / config["points_per_unit"]
     config["transform"] = None
 

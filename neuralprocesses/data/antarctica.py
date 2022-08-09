@@ -228,9 +228,9 @@ class AntarcticaGenerator(DataGenerator):
             # Cast all tensors and send to device
             convert = lambda x: B.to_active_device(torch.tensor(x, dtype=self.dtype))
             
-            scale_x = 1.2 * np.abs(self.sim_x).max()
-            scale_y = 1.2 * np.abs(self.sim_y).max()
-            scale_temp = 1.
+            scale_x = 1.1 * np.abs(self.sim_x).max()
+            scale_y = 1.1 * np.abs(self.sim_y).max()
+            scale_temp = 10.
 
             sim_ctx_x = convert(batch["sim_x"][:, None, :num_sim_context]) / scale_x
             sim_ctx_y = convert(batch["sim_y"][:, None, :num_sim_context]) / scale_y
