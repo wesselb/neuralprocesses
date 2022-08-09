@@ -128,7 +128,7 @@ def main(**kw_args):
         choices=exp.data,
         default="eq",
     )
-    parser.add_argument("--mean-diff", type=float, default=0.)
+    parser.add_argument("--mean-diff", type=float, default=None)
     parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
     parser.add_argument("--num-samples", type=int, default=20)
     parser.add_argument("--resume-at-epoch", type=int)
@@ -206,7 +206,7 @@ def main(**kw_args):
     wd = WorkingDirectory(
         *args.root,
         *(args.subdir or ()),
-        args.data,
+        args.data if args.mean_diff is None else f"{args.data}-{args.mean_diff}",
         *((f"x{args.dim_x}_y{args.dim_y}",) if hasattr(args, "dim_x") else ()),
         args.model,
         *((args.arch,) if hasattr(args, "arch") else ()),
