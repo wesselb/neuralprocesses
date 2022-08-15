@@ -34,21 +34,6 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         2: {"range": ((-2, 2), (-2, 2))},
     }
     config["transform"] = None
-    
-    print(
-        nps.construct_predefined_gens(
-        torch.float32,
-        seed=10,
-        batch_size=args.batch_size,
-        num_tasks=num_tasks_train,
-        dim_x=args.dim_x,
-        dim_y=args.dim_y,
-        pred_logpdf=False,
-        pred_logpdf_diag=False,
-        device=device,
-        mean_diff=config["mean_diff"],
-    ).keys()
-    )
 
     gen_train = nps.construct_predefined_gens(
         torch.float32,
