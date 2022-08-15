@@ -83,6 +83,7 @@ def main(**kw_args):
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
+    parser.add_argument("--checkpoint-every", type=int, default=None)
     parser.add_argument("--dim-x", type=int, default=1)
     parser.add_argument("--dim-y", type=int, default=1)
     parser.add_argument("--epochs", type=int)
@@ -128,6 +129,7 @@ def main(**kw_args):
         choices=exp.data,
         default="eq",
     )
+    parser.add_argument("--mean-diff", type=float, default=None)
     parser.add_argument("--objective", choices=["loglik", "elbo"], default="loglik")
     parser.add_argument("--num-samples", type=int, default=20)
     parser.add_argument("--resume-at-epoch", type=int)
@@ -205,7 +207,7 @@ def main(**kw_args):
     wd = WorkingDirectory(
         *args.root,
         *(args.subdir or ()),
-        args.data,
+        args.data if args.mean_diff is None else f"{args.data}-{args.mean_diff}",
         *((f"x{args.dim_x}_y{args.dim_y}",) if hasattr(args, "dim_x") else ()),
         args.model,
         *((args.arch,) if hasattr(args, "arch") else ()),
@@ -251,6 +253,7 @@ def main(**kw_args):
         "conv_channels": 64,
         "encoder_scales": None,
         "fullconvgnp_kernel_factor": 2,
+        "mean_diff": args.mean_diff,
         # Performance of the ConvGNP is sensitive to this parameter. Moreover, it
         # doesn't make sense to set it to a value higher of the last hidden layer of
         # the CNN architecture. We therefore set it to 64.
@@ -631,6 +634,18 @@ def main(**kw_args):
                 # Set regularisation to normal after the first epoch.
                 if i > 0:
                     B.epsilon = original_epsilon
+
+                # Checkpoint at regular intervals if specified
+                if args.checkpoint_every is not None and i % args.checkpoint_every == 0:
+                    out.out("Checkpointing...")
+                    torch.save(
+                        {
+                            "weights": model.state_dict(),
+                            "epoch": i + 1,
+                        },
+                        wd.file(f"model-epoch-{i+1}.torch"),
+                    )
+
 
                 # Perform an epoch.
                 if config["fix_noise"] and i < config["fix_noise_epochs"]:

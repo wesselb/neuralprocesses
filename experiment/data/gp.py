@@ -46,6 +46,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         pred_logpdf=False,
         pred_logpdf_diag=False,
         device=device,
+        mean_diff=config["mean_diff"],
     )[name]
 
     gen_cv = lambda: nps.construct_predefined_gens(
@@ -58,6 +59,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         pred_logpdf=True,
         pred_logpdf_diag=True,
         device=device,
+        mean_diff=config["mean_diff"],
     )[name]
 
     def gens_eval():
@@ -76,6 +78,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
                     device=device,
                     x_range_context=x_range_context,
                     x_range_target=x_range_target,
+                    mean_diff=config["mean_diff"],
                 )[args.data],
             )
             for eval_name, x_range_context, x_range_target in [
@@ -87,8 +90,18 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
 
     return gen_train, gen_cv, gens_eval
 
+names = [
+    "eq",
+    "matern",
+    "weakly-periodic",
+    "mix-eq",
+    "mix-matern",
+    "mix-weakly-periodic",
+    "sawtooth",
+    "mixture",
+]
 
-for name in ["eq", "matern", "weakly-periodic", "sawtooth", "mixture"]:
+for name in names:
     register_data(
         name,
         partial(setup, name),

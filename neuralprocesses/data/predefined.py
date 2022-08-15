@@ -3,6 +3,7 @@ from stheno import EQ, Matern52
 
 from .gp import GPGenerator
 from .mixture import MixtureGenerator
+from .mixgp import MixtureGPGenerator
 from .sawtooth import SawtoothGenerator
 from ..dist.uniform import UniformDiscrete, UniformContinuous
 
@@ -16,6 +17,7 @@ def construct_predefined_gens(
     num_tasks=2**14,
     dim_x=1,
     dim_y=1,
+    mean_diff=0.,
     x_range_context=(-2, 2),
     x_range_target=(-2, 2),
     pred_logpdf=True,
@@ -117,4 +119,19 @@ def construct_predefined_gens(
         ),
         seed=seed,
     )
+    
+    for i, kernel in enumerate(kernels.keys()):
+        gens[f"mix-{kernel}"] = MixtureGPGenerator(
+            dtype,
+            seed=seed + len(kernels.items()) + i + 1,
+            noise=0.05,
+            kernel=kernels[kernel],
+            num_context=UniformDiscrete(0, 30 * dim_x),
+            num_target=UniformDiscrete(50 * dim_x, 50 * dim_x),
+            pred_logpdf=False,
+            pred_logpdf_diag=False,
+            mean_diff=mean_diff,
+            **config,
+        )
+        
     return gens
