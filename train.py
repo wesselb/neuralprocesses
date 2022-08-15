@@ -83,6 +83,7 @@ def main(**kw_args):
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
+    parser.add_argument("--checkpoint-every", type=int, default=None)
     parser.add_argument("--dim-x", type=int, default=1)
     parser.add_argument("--dim-y", type=int, default=1)
     parser.add_argument("--epochs", type=int)
@@ -633,6 +634,18 @@ def main(**kw_args):
                 # Set regularisation to normal after the first epoch.
                 if i > 0:
                     B.epsilon = original_epsilon
+
+                # Checkpoint at regular intervals if specified
+                if args.checkpoint_every is not None and i % args.checkpoint_every == 0:
+                    out.out("Checkpointing...")
+                    torch.save(
+                        {
+                            "weights": model.state_dict(),
+                            "epoch": i + 1,
+                        },
+                        wd.file(f"model-epoch-{i+1}.torch"),
+                    )
+
 
                 # Perform an epoch.
                 if config["fix_noise"] and i < config["fix_noise_epochs"]:
