@@ -17,8 +17,10 @@ LOG.setLevel(logging.INFO)
 def permute(xi, seed=None):
     if seed is not None:
         torch.manual_seed(seed)
-    state = B.global_random_state(B.dtype(xi))
+    # state = B.global_random_state(xi)
     perm_xi = torch.Tensor(xi.shape)
+    # same values will be present in each row (corresponding to one function)
+    # there will be a difference in the order for each one
     for ri in torch.arange(xi.shape[0]):
         perm_xi[ri, :, ] = xi[ri, :, torch.randperm(xi.shape[-1])]
     return perm_xi
@@ -90,18 +92,63 @@ class EmanateGridGenerator(AbstractTrajectoryGenerator):
         self.max_x = max_x
 
     def generate(self, x_context, seed=None):
-        xi = B.linspace(torch.float32, self.min_x, self.max_x, self.trajectory_length)[
-            None, None, :
-        ].cpu()
+        xi = B.linspace(self.min_x, self.max_x, self.trajectory_length)
+        xi = torch.Tensor(xi).to(torch.float32).cpu()
+        xi = xi.repeat((x_context.shape[0], 1)).reshape(x_context.shape[0], 1, self.trajectory_length)
         xi = emanate(xi, x_context, seed=seed)
         return xi
 
 
+class EmanateRandomGenerator(AbstractTrajectoryGenerator):
+    """
+    Create a grid, and then randomly pick one context point. Choose the order of
+    x points on the grid by choosing the grid point closest to this chosen context.
+    Then choose the following point which is closest the last chosen point. Continue
+    until you've exhausted the grid.
+    """
+
+    def __init__(
+            self,
+            trajectory_length: int,
+            min_x: float,
+            max_x: float,
+    ):
+        self.trajectory_length = trajectory_length
+        self.min_x = min_x
+        self.max_x = max_x
+
+    def generate(self, x_context, seed=None):
+        if seed is not None:
+            torch.manual_seed(seed)
+        xi = torch.distributions.Uniform(low=self.min_x, high=self.max_x).sample(
+            [self.trajectory_length]
+        )
+        xi = xi.repeat((x_context.shape[0], 1)).reshape(x_context.shape[0], 1, self.trajectory_length)
+        if x_context.nelement() == 0:
+            LOG.warning("Cannot use emanate with no context, using random instead for this trajectory.")
+            xi = permute(xi)
+        else:
+            xi = emanate(xi, x_context, seed=seed)
+        return xi
+
+
 def emanate(xi, x_context, seed=None):
-    xin = xi[0, 0, :]
+    if seed is not None:
+        seeds = [seed + s for s in np.arange(x_context.shape[0])]
+    else:
+        seeds = [None for _ in np.arange(x_context.shape[0])]
+    for i, s in zip(np.arange(xi.shape[0]), seeds):
+        xin = xi[i, 0, :]
+        xin_context = x_context[i, 0, :]
+        xin_ordered = inner_emanate(xin, xin_context, seed=s)
+        xi[i, 0, :] = xin_ordered
+    return xi
+
+
+def inner_emanate(xin, xin_context, seed=None):
     state = np.random.RandomState(seed)
-    state, coin = UniformDiscrete(1, x_context.shape[-1]).sample(state, np.int64)
-    start = x_context[0, 0, coin - 1].item()
+    state, coin = UniformDiscrete(1, xin_context.shape[0]).sample(state, np.int64)
+    start = xin_context[coin - 1].item()
 
     i = 0
     next_x = start
@@ -118,7 +165,7 @@ def emanate(xi, x_context, seed=None):
         i += 1
     if len(np.unique(order)) != len(order):
         raise ValueError("Duplicate points in trajectory!")
-    return xi[:, :, order]
+    return xin[order]
 
 
 def construct_trajectory_gens(
@@ -128,5 +175,6 @@ def construct_trajectory_gens(
         "grid": GridGenerator(trajectory_length, x_range[0], x_range[1]),
         "random": RandomGenerator(trajectory_length, x_range[0], x_range[1]),
         "emanate": EmanateGridGenerator(trajectory_length, x_range[0], x_range[1]),
+        "emanate-random": EmanateRandomGenerator(trajectory_length, x_range[0], x_range[1]),
     }
     return gens

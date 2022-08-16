@@ -49,70 +49,77 @@ class SoundlikeGenerator(SyntheticGenerator):
             y[x_shift > bounds[1]] = 0  # set positive values to zero
         return y
 
+    def get_stochastic_parameters(self):
+        self.state, D = self.dist_decay.sample(
+            self.state,
+            self.float64,
+            self.batch_size,
+            self.dim_y_latent,
+        )
+        # Sample the period
+        self.state, T = self.dist_period.sample(
+            self.state,
+            self.float64,
+            self.batch_size,
+            self.dim_y_latent,
+        )
+        # Sample the frequencies
+        self.state, w1 = self.dist_w1.sample(
+            self.state,
+            self.float64,
+            self.batch_size,
+            self.dim_y_latent,
+        )
+        self.state, w2 = self.dist_w2.sample(
+            self.state,
+            self.float64,
+            self.batch_size,
+            self.dim_y_latent,
+        )
+        dist_phase = UniformContinuous(-1, 1)
+        self.state, shift = dist_phase.sample(
+            self.state,
+            self.float64,
+            self.batch_size,
+            self.dim_y_latent,
+        )
+        shift = shift * T
+
+        return D, T, w1, w2, shift
+
+    def get_noiseless_func(self, x):
+        D, T, w1, w2, shift = self.get_stochastic_parameters()
+        bounds = (-2, 2)  # we should get these values from elsewhere
+        z_upper = B.ceil((bounds[1] - shift) / T)
+        z_lower = B.floor((bounds[0] - shift) / T)
+        t = x.transpose(1, 2)
+        ss = []
+        for l, u in zip(z_lower, z_upper):
+            ss.append(B.range(l, u))
+        # s = B.range(z_lower, z_upper)
+        waves = B.zeros(t)
+        for i, s in enumerate(ss):
+            for k in s:
+                w = self._wave(
+                    t[i] - T[i] * k - shift[i],
+                    tao=D[i],
+                    w1=w1[i],
+                    w2=w2[i],
+                    bounds=(0, T[i]),
+                    )
+                # wave is set to 0 when outside of bounds
+                # as defined, t won't be out of bounds.
+                w[t[i] < bounds[0]] = 0
+                w[t[i] > bounds[1]] = 0
+                waves[i] += w
+        response = waves
+        return response
+
     def generate_batch(self):
         with B.on_device(self.device):
             set_batch, xcs, xc, nc, xts, xt, nt = new_batch(self, self.dim_y)
             x = B.concat(xc, xt, axis=1)
-
-            bounds = (-2, 2)  # we should get these values from elsewhere
-            # Sample the decay
-            self.state, D = self.dist_decay.sample(
-                self.state,
-                self.float64,
-                self.batch_size,
-                self.dim_y_latent,
-            )
-            # Sample the period
-            self.state, T = self.dist_period.sample(
-                self.state,
-                self.float64,
-                self.batch_size,
-                self.dim_y_latent,
-            )
-            # Sample the frequencies
-            self.state, w1 = self.dist_w1.sample(
-                self.state,
-                self.float64,
-                self.batch_size,
-                self.dim_y_latent,
-            )
-            self.state, w2 = self.dist_w2.sample(
-                self.state,
-                self.float64,
-                self.batch_size,
-                self.dim_y_latent,
-            )
-            dist_phase = UniformContinuous(-1, 1)
-            self.state, shift = dist_phase.sample(
-                self.state,
-                self.float64,
-                self.batch_size,
-                self.dim_y_latent,
-            )
-            shift = shift * T
-            z_upper = B.ceil((bounds[1] - shift) / T)
-            z_lower = B.floor((bounds[0] - shift) / T)
-            t = x.transpose(1, 2)
-            ss = []
-            for l, u in zip(z_lower, z_upper):
-                ss.append(B.range(l, u))
-            # s = B.range(z_lower, z_upper)
-            waves = B.zeros(t)
-            for i, s in enumerate(ss):
-                for k in s:
-                    w = self._wave(
-                        t[i] - T[i] * k - shift[i],
-                        tao=D[i],
-                        w1=w1[i],
-                        w2=w2[i],
-                        bounds=(0, T[i]),
-                    )
-                    # wave is set to 0 when outside of bounds
-                    # as defined, t won't be out of bounds.
-                    w[t[i] < bounds[0]] = 0
-                    w[t[i] > bounds[1]] = 0
-                    waves[i] += w
-            response = waves
+            response = self.get_noiseless_func(x)
             # TODO: figure out what self.h does
             # if self.h is not None:
             #     f = B.matmul(self.h, f)

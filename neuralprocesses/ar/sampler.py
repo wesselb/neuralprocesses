@@ -118,7 +118,9 @@ class TrajectorySet:
             num_functions_per_context_size = f.attrs["num_functions_per_context_size"]
             num_trajectories = f.attrs["num_trajectories"]
             context_sizes = f.attrs["context_sizes"]
-        context_sizes = np.arange(num_functions_per_context_size)
+        import ipdb; ipdb.set_trace()
+        # context_sizes = np.arange(num_functions_per_context_size)
+        # ^ This is wrong!
         context_sizes
         return cls(
             density_loc,
@@ -235,6 +237,7 @@ class TrajectorySet:
     @cached_property
     def function_trajectory_sets(self):
         group_names = []
+        ft_sets = []
         with h5py.File(self.density_loc, "r") as f:
             for gn in f[Groups.TRAJECTORIES.value].keys():
                 group_names.append(gn)
@@ -242,7 +245,9 @@ class TrajectorySet:
             ss = FunctionTrajectorySet.from_hdf5(
                 hdf5_loc=self.density_loc, group_name=gn
             )
-            self._function_trajectory_sets.append(ss)
+            ft_sets.append(ss)
+        order = np.argsort([s.num_contexts for s in ft_sets])
+        self._function_trajectory_sets = [ft_sets[i] for i in order]
         return self._function_trajectory_sets
 
     def generate_batch(self, batch_size=16, num_context=None):
@@ -308,6 +313,8 @@ class TrajectorySet:
                 for func_ind in range(ss.num_functions):
                     md_grp.create_group(f"{ss.num_contexts}|{func_ind}")
         LOG.info(f"Creating density grid for {self.num_functions} sampled functions.")
+        ncs = [ts.num_contexts for ts in self.function_trajectory_sets]
+
         pbar = self.tqdm(
             enumerate(self.function_trajectory_sets),
             total=len(self.function_trajectory_sets),
@@ -349,83 +356,83 @@ class TrajectorySet:
         # y_targets = B.to_active_device(B.cast(FunctionTrajectorySet.dtype, y_targets))
         return targets, y_targets
 
-    def grid_loglikelihoods(self):
-        grid = np.zeros((self.num_trajectories + 1, self.trajectory_length + 1))
-        for nt in self.tqdm(range(self.num_trajectories + 1)):
-            for tl in range(self.trajectory_length + 1):
-                grid[nt, tl] = self.calc_loglikelihood(nt, tl)
-        return grid
+    # def grid_loglikelihoods(self):
+    #     grid = np.zeros((self.num_trajectories + 1, self.trajectory_length + 1))
+    #     for nt in self.tqdm(range(self.num_trajectories + 1)):
+    #         for tl in range(self.trajectory_length + 1):
+    #             grid[nt, tl] = self.calc_loglikelihood(nt, tl)
+    #     return grid
+    #
+    # def calc_loglikelihood(self, num_trajectories, trajectory_length):
+    #     if num_trajectories > self.num_trajectories:
+    #         raise ValueError(
+    #             f"num_trajectories must be less than or equal to {self.num_trajectories}"
+    #         )
+    #     if trajectory_length > self.trajectory_length:
+    #         raise ValueError(
+    #             f"trajectory_length must be less than or equal to {self.trajectory_length}"
+    #         )
+    #     # TODO: use size from tensor here instead of the class attribute
+    #     func_loglikelihoods = np.zeros((self.num_functions))
+    #     for ss_ind, ss in enumerate(self.function_trajectory_sets):
+    #         for func_ind in range(ss.num_functions):
+    #             with h5py.File(self.density_loc, "r") as f:
+    #                 gname = f"{ss.num_contexts}|{func_ind}"
+    #                 grp = f[Groups.MARGINAL_DENSITIES.value][gname]
+    #                 lh = grp[Datasets.LOG_LIKELIHOODS.value]
+    #                 # the first of the eval points is the true y target
+    #                 # that is why we evaluate the likelihood there
+    #                 lh0 = lh[:, :num_trajectories, 0, trajectory_length]
+    #                 expected_ll = get_func_expected_ll(lh0)
+    #
+    #                 overall_func_ind = (
+    #                     ss_ind * self.num_functions_per_context_size
+    #                 ) + func_ind
+    #                 func_loglikelihoods[overall_func_ind] = expected_ll
+    #     return func_loglikelihoods.mean()
 
-    def calc_loglikelihood(self, num_trajectories, trajectory_length):
-        if num_trajectories > self.num_trajectories:
-            raise ValueError(
-                f"num_trajectories must be less than or equal to {self.num_trajectories}"
-            )
-        if trajectory_length > self.trajectory_length:
-            raise ValueError(
-                f"trajectory_length must be less than or equal to {self.trajectory_length}"
-            )
-        # TODO: use size from tensor here instead of the class attribute
-        func_loglikelihoods = np.zeros((self.num_functions))
-        for ss_ind, ss in enumerate(self.function_trajectory_sets):
-            for func_ind in range(ss.num_functions):
-                with h5py.File(self.density_loc, "r") as f:
-                    gname = f"{ss.num_contexts}|{func_ind}"
-                    grp = f[Groups.MARGINAL_DENSITIES.value][gname]
-                    lh = grp[Datasets.LOG_LIKELIHOODS.value]
-                    # the first of the eval points is the true y target
-                    # that is why we evaluate the likelihood there
-                    lh0 = lh[:, :num_trajectories, 0, trajectory_length]
-                    expected_ll = get_func_expected_ll(lh0)
+    # def get_choices(self, num_contexts, func_ind, num_trajectories, trajectory_length):
+    #     if num_contexts is None:
+    #         num_contexts = np.random.choice(self.context_sizes)
+    #     if num_contexts not in self.context_sizes:
+    #         raise ValueError(f"num_contexts must be one of {self.context_sizes}")
+    #     if func_ind is None:
+    #         func_ind = np.random.choice(self.num_functions_per_context_size)
+    #     if func_ind >= self.num_functions_per_context_size:
+    #         raise ValueError(
+    #             f"func_ind must be less than {self.num_functions_per_context_size}"
+    #         )
+    #     if num_trajectories is None:
+    #         num_trajectories = np.random.choice(self.num_trajectories)
+    #     if num_trajectories > self.num_trajectories:
+    #         raise ValueError(
+    #             f"num_trajectories must be less than or equal to {self.num_trajectories}"
+    #         )
+    #     if trajectory_length is None:
+    #         trajectory_length = np.random.choice(self.trajectory_length)
+    #     if trajectory_length > self.trajectory_length:
+    #         raise ValueError(
+    #             f"trajectory_length must be less than or equal to {self.trajectory_length}"
+    #         )
+    #     return num_contexts, func_ind, num_trajectories, trajectory_length
 
-                    overall_func_ind = (
-                        ss_ind * self.num_functions_per_context_size
-                    ) + func_ind
-                    func_loglikelihoods[overall_func_ind] = expected_ll
-        return func_loglikelihoods.mean()
-
-    def get_choices(self, num_contexts, func_ind, num_trajectories, trajectory_length):
-        if num_contexts is None:
-            num_contexts = np.random.choice(self.context_sizes)
-        if num_contexts not in self.context_sizes:
-            raise ValueError(f"num_contexts must be one of {self.context_sizes}")
-        if func_ind is None:
-            func_ind = np.random.choice(self.num_functions_per_context_size)
-        if func_ind >= self.num_functions_per_context_size:
-            raise ValueError(
-                f"func_ind must be less than {self.num_functions_per_context_size}"
-            )
-        if num_trajectories is None:
-            num_trajectories = np.random.choice(self.num_trajectories)
-        if num_trajectories > self.num_trajectories:
-            raise ValueError(
-                f"num_trajectories must be less than or equal to {self.num_trajectories}"
-            )
-        if trajectory_length is None:
-            trajectory_length = np.random.choice(self.trajectory_length)
-        if trajectory_length > self.trajectory_length:
-            raise ValueError(
-                f"trajectory_length must be less than or equal to {self.trajectory_length}"
-            )
-        return num_contexts, func_ind, num_trajectories, trajectory_length
-
-    def get_density(
-        self,
-        num_contexts=None,
-        func_ind=None,
-        num_trajectories=None,
-        trajectory_length=None,
-    ):
-        num_contexts, func_ind, num_trajectories, trajectory_length = self.get_choices(
-            num_contexts, func_ind, num_trajectories, trajectory_length
-        )
-        with h5py.File(self.density_loc, "a") as f:
-            grp = f[Groups.MARGINAL_DENSITIES.value][
-                f"{num_contexts}|{func_ind}"
-            ]
-            lh = grp[Datasets.LOG_LIKELIHOODS.value]
-            density = lh[:, :num_trajectories, :, trajectory_length]
-        return density
+    # def get_density(
+    #     self,
+    #     num_contexts=None,
+    #     func_ind=None,
+    #     num_trajectories=None,
+    #     trajectory_length=None,
+    # ):
+    #     num_contexts, func_ind, num_trajectories, trajectory_length = self.get_choices(
+    #         num_contexts, func_ind, num_trajectories, trajectory_length
+    #     )
+    #     with h5py.File(self.density_loc, "a") as f:
+    #         grp = f[Groups.MARGINAL_DENSITIES.value][
+    #             f"{num_contexts}|{func_ind}"
+    #         ]
+    #         lh = grp[Datasets.LOG_LIKELIHOODS.value]
+    #         density = lh[:, :num_trajectories, :, trajectory_length]
+    #     return density
 
     def inner_create_density_grid(
         self,
@@ -741,7 +748,7 @@ def get_trajectories(model, xi, n_mixtures, contexts):
 
 def load_model(weights, name, device="cpu"):
     print("Name:", name)
-    if name in ["sawtooth", "synthetic-audio", "simple-mixture"]:
+    if name in ["sawtooth", "synthetic-audio", "simple-mixture", "eq"]:
         model = get_model_gen()
     elif name in ["real-audio"]:
         model = get_model_real_audio()
@@ -1008,7 +1015,7 @@ def main(
     gpu=None,
     exist_ok=False,
 ):
-    in_config = make_menu(active_config_dir)
+    in_config = make_menu(active_config_dir, out_model_dir)
     config, out_sampler_dir, density_loc = setup(in_config, out_model_dir, exist_ok)
 
     device = get_device(device, gpu)
@@ -1064,6 +1071,9 @@ def main(
     LOG.info("Saving heatmap and loglikelihoods grid over parameters")
     np.save(str(out_sampler_dir / "log_likelihoods.npy"), all_lls)
     fig.savefig(str(out_sampler_dir / "log_likelihoods.png"))
+
+    LOG.info("Creating heatmap for all context sizes")
+    viz.make_heatmaps(out_sampler_dir)
 
     if "animations" in config:
         LOG.info("Creating animations")
