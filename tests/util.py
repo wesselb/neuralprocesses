@@ -9,7 +9,7 @@ import torch
 from numpy.testing import assert_allclose
 from plum import Dispatcher
 
-__all__ = ["approx", "nps", "generate_data", "remote_xfail"]
+__all__ = ["approx", "nps", "generate_data", "remote_xfail", "remote_skip"]
 
 _dispatch = Dispatcher()
 
@@ -50,7 +50,7 @@ nps_tf.dtype32 = tf.float32
 nps_tf.dtype64 = tf.float64
 
 
-@pytest.fixture(params=[nps_torch], scope="module")
+@pytest.fixture(params=[nps_torch, nps_tf], scope="module")
 def nps(request):
     return request.param
 
