@@ -8,11 +8,10 @@ __all__ = ["MixtureGPGenerator"]
 
 
 class MixtureGPGenerator(GPGenerator):
-
     def __init__(
         self,
         *args,
-        mean_diff=0.,
+        mean_diff=0.0,
         **kw_args,
     ):
         super().__init__(*args, **kw_args)
@@ -61,14 +60,14 @@ class MixtureGPGenerator(GPGenerator):
 
             # Sample context and target set.
             self.state, yc, yt = prior.sample(self.state, fc, ft)
-        
+
             self.state, i = UniformDiscrete(0, 1).sample(
                 self.state,
                 self.int64,
                 self.batch_size,
             )
             mean = self.mean_diff / 2 - i * self.mean_diff
-            
+
             yc = yc + mean[:, None, None]
             yt = yt + mean[:, None, None]
 

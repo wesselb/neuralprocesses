@@ -17,7 +17,7 @@ def construct_predefined_gens(
     num_tasks=2**14,
     dim_x=1,
     dim_y=1,
-    mean_diff=0.,
+    mean_diff=0.0,
     x_range_context=(-2, 2),
     x_range_target=(-2, 2),
     pred_logpdf=True,
@@ -119,7 +119,7 @@ def construct_predefined_gens(
         ),
         seed=seed,
     )
-    
+
     for i, kernel in enumerate(kernels.keys()):
         gens[f"mix-{kernel}"] = MixtureGPGenerator(
             dtype,
@@ -133,5 +133,5 @@ def construct_predefined_gens(
             mean_diff=mean_diff,
             **config,
         )
-        
+
     return gens
