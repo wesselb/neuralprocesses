@@ -50,7 +50,7 @@ nps_tf.dtype32 = tf.float32
 nps_tf.dtype64 = tf.float64
 
 
-@pytest.fixture(params=[nps_torch, nps_tf], scope="module")
+@pytest.fixture(params=[nps_torch], scope="module")
 def nps(request):
     return request.param
 
@@ -65,5 +65,7 @@ def generate_data(nps, batch_size=4, dim_x=1, dim_y=1, n_context=5, n_target=7):
 
 if socket.gethostname() == "Wessels-Crib":
     remote_xfail = lambda f: f  #: `xfail` only on CI.
+    remote_skip = lambda f: f  #: `skip` only on CI.
 else:
     remote_xfail = pytest.mark.xfail  #: `xfail` only on CI.
+    remote_skip = pytest.mark.skip  #: `skip` only on CI.

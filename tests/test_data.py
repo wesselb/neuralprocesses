@@ -5,7 +5,7 @@ from plum import Dispatcher
 
 from neuralprocesses.augment import AugmentedInput
 from neuralprocesses.mask import Masked
-from .util import nps, remote_xfail  # noqa
+from .util import nps, remote_xfail, remote_skip  # noqa
 
 _dispatch = Dispatcher()
 
@@ -114,6 +114,7 @@ def test_predprey(nps, generator, mode):
     check_batch_simple(nps, g.generate_batch())
 
 
+@remote_skip
 @pytest.mark.parametrize(
     "mode", ["interpolation", "forecasting", "reconstruction", "random"]
 )
