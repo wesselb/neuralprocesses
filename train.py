@@ -646,7 +646,6 @@ def main(**kw_args):
                         wd.file(f"model-epoch-{i+1}.torch"),
                     )
 
-
                 # Perform an epoch.
                 if config["fix_noise"] and i < config["fix_noise_epochs"]:
                     fix_noise = 1e-4
