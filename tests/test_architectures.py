@@ -50,7 +50,7 @@ def product_kw_args(config, **kw_args):
 
 @pytest.fixture(
     params=[]
-    # CNP:
+    # CNP and GNP:
     + product_kw_args(
         {
             "constructor": "construct_gnp",
@@ -106,7 +106,7 @@ def product_kw_args(config, **kw_args):
         likelihood=["het", "lowrank"],
         lv_likelihood=["het", "dense"],
     )
-    # ConvCNP:
+    # ConvCNP and ConvGNP:
     + generate_conv_arch_variations(
         product_kw_args(
             {
@@ -194,21 +194,19 @@ def model_sample(request, nps, config):
     # initialisations.
 
     if isinstance(nps.dtype, B.TFDType):
-        magnitudes = [B.abs(p) for p in model.get_weights()]
 
         def construct_model():
             new_weights = []
-            for p, magnitude in zip(model.get_weights(), magnitudes):
-                new_weights.append(magnitude * B.randn(p))
+            for p in model.get_weights():
+                new_weights.append(p + 1e-2 * B.randn(p))
             model.set_weights(new_weights)
             return model
 
     elif isinstance(nps.dtype, B.TorchDType):
-        magnitudes = [B.abs(x.data) for x in model.parameters()]
 
         def construct_model():
-            for p, magnitude in zip(model.parameters(), magnitudes):
-                p.data = magnitude * B.randn(p)
+            for p in model.parameters():
+                p.data = p.data + 1e-2 * B.randn(p)
             return model
 
     else:
@@ -221,6 +219,12 @@ def model_sample(request, nps, config):
 
 
 def check_prediction(nps, pred, yt):
+    # Ensure that there is sufficient noise.
+    try:
+        pred._noise = pred._noise + 1e-2 * B.eye(pred._noise)
+    except AttributeError:
+        pass
+
     # Check that the log-pdf at the target data is finite and of the right data type.
     objective = pred.logpdf(yt)
     assert B.rank(objective) == 1
