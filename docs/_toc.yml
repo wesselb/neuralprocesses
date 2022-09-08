@@ -4,4 +4,8 @@
 format: jb-book
 root: intro
 chapters:
-- file: api
+- file: basic_usage
+- file: architectures
+- file: advanced_usage
+- file: build_your_own_model
+- file: coders

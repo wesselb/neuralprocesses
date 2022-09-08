@@ -1,3 +1,3 @@
 # NeuralProcesses
 
-Documentation coming soon!
+Welcome to the package!
