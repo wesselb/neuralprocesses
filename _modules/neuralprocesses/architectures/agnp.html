@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>neuralprocesses.coders.augment &#8212; NeuralProcesses</title>
+    <title>neuralprocesses.architectures.agnp &#8212; NeuralProcesses</title>
     
   <!-- Loaded before other Sphinx assets -->
   <link href="../../../_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
@@ -226,7 +226,7 @@ title="Source repository"
       </li>
       
       <li>
-        <a href="https://github.com/wesselb/NeuralProcesses/issues/new?title=Issue%20on%20page%20%2F_modules/neuralprocesses/coders/augment.html&body=Your%20issue%20content%20here."
+        <a href="https://github.com/wesselb/NeuralProcesses/issues/new?title=Issue%20on%20page%20%2F_modules/neuralprocesses/architectures/agnp.html&body=Your%20issue%20content%20here."
    class="headerbtn"
    data-toggle="tooltip"
 data-placement="left"
@@ -269,56 +269,61 @@ title="Open an issue"
                 
               <div>
                 
-  <h1>Source code for neuralprocesses.coders.augment</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">lab</span> <span class="k">as</span> <span class="nn">B</span>
+  <h1>Source code for neuralprocesses.architectures.agnp</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">neuralprocesses</span> <span class="k">as</span> <span class="nn">nps</span>  <span class="c1"># This fixes inspection below.</span>
+<span class="kn">from</span> <span class="nn">..util</span> <span class="kn">import</span> <span class="n">register_model</span>
 
-<span class="kn">from</span> <span class="nn">..</span> <span class="kn">import</span> <span class="n">_dispatch</span>
-<span class="kn">from</span> <span class="nn">..augment</span> <span class="kn">import</span> <span class="n">AugmentedInput</span>
-<span class="kn">from</span> <span class="nn">..datadims</span> <span class="kn">import</span> <span class="n">data_dims</span>
-<span class="kn">from</span> <span class="nn">..materialise</span> <span class="kn">import</span> <span class="n">_repeat_concat</span>
-<span class="kn">from</span> <span class="nn">..util</span> <span class="kn">import</span> <span class="n">register_module</span><span class="p">,</span> <span class="n">register_composite_coder</span>
-
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Augment&quot;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;construct_agnp&quot;</span><span class="p">]</span>
 
 
-<div class="viewcode-block" id="Augment"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.augment.Augment">[docs]</a><span class="nd">@register_composite_coder</span>
-<span class="nd">@register_module</span>
-<span class="k">class</span> <span class="nc">Augment</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Concatenate the augmentation of the input to the encoding, and remove any</span>
-<span class="sd">    augmentation of target inputs.</span>
+<div class="viewcode-block" id="construct_agnp"><a class="viewcode-back" href="../../../architectures.html#neuralprocesses.architectures.agnp.construct_agnp">[docs]</a><span class="nd">@register_model</span>
+<span class="k">def</span> <span class="nf">construct_agnp</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">nps</span><span class="o">=</span><span class="n">nps</span><span class="p">,</span> <span class="n">num_heads</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An Attentive Gaussian Neural Process.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        coder (coder): Coder to run after the augmentation.</span>
+<span class="sd">        dim_x (int, optional): Dimensionality of the inputs. Defaults to 1.</span>
+<span class="sd">        dim_y (int, optional): Dimensionality of the outputs. Defaults to 1.</span>
+<span class="sd">        dim_yc (int or tuple[int], optional): Dimensionality of the outputs of the</span>
+<span class="sd">            context set. You should set this if the dimensionality of the outputs</span>
+<span class="sd">            of the context set is not equal to the dimensionality of the outputs</span>
+<span class="sd">            of the target set. You should also set this if you want to use multiple</span>
+<span class="sd">            context sets. In that case, set this equal to a tuple of integers</span>
+<span class="sd">            indicating the respective output dimensionalities.</span>
+<span class="sd">        dim_yt (int, optional): Dimensionality of the outputs of the target set. You</span>
+<span class="sd">            should set this if the dimensionality of the outputs of the target set is</span>
+<span class="sd">            not equal to the dimensionality of the outputs of the context set.</span>
+<span class="sd">        dim_embedding (int, optional): Dimensionality of the embedding. Defaults to 128.</span>
+<span class="sd">        num_heads (int, optional): Number of heads. Defaults to `8`.</span>
+<span class="sd">        num_enc_layers (int, optional): Number of layers in the encoder. Defaults to 3.</span>
+<span class="sd">        enc_same (bool, optional): Use the same encoder for all context sets. This</span>
+<span class="sd">            only works if all context sets have the same dimensionality. Defaults to</span>
+<span class="sd">            `False`.</span>
+<span class="sd">        num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.</span>
+<span class="sd">        width (int, optional): Widths of all intermediate MLPs. Defaults to 512.</span>
+<span class="sd">        likelihood (str, optional): Likelihood. Must be one of `&quot;het&quot;` or `&quot;lowrank&quot;`.</span>
+<span class="sd">            Defaults to `&quot;lowrank&quot;`.</span>
+<span class="sd">        num_basis_functions (int, optional): Number of basis functions for the</span>
+<span class="sd">            low-rank likelihood. Defaults to 512.</span>
+<span class="sd">        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.</span>
+<span class="sd">        lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of</span>
+<span class="sd">            `&quot;het&quot;` or `&quot;dense&quot;`. Defaults to `&quot;het&quot;`.</span>
+<span class="sd">        transform (str or tuple[float, float]): Bijection applied to the</span>
+<span class="sd">            output of the model. This can help deal with positive of bounded data.</span>
+<span class="sd">            Must be either `&quot;positive&quot;`, `&quot;exp&quot;`, `&quot;softplus&quot;`, or</span>
+<span class="sd">            `&quot;softplus_of_square&quot;` for positive data or `(lower, upper)` for data in</span>
+<span class="sd">            this open interval.</span>
+<span class="sd">        dtype (dtype, optional): Data type.</span>
 
-<span class="sd">    Attributes:</span>
-<span class="sd">        coder (coder): Coder to run after the augmentation.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        :class:`.model.Model`: AGNP model.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coder</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">coder</span> <span class="o">=</span> <span class="n">coder</span></div>
-
-
-<span class="nd">@_dispatch</span>
-<span class="k">def</span> <span class="nf">code</span><span class="p">(</span>
-    <span class="n">coder</span><span class="p">:</span> <span class="n">Augment</span><span class="p">,</span>
-    <span class="n">xz</span><span class="p">,</span>
-    <span class="n">z</span><span class="p">,</span>
-    <span class="n">x</span><span class="p">,</span>
-    <span class="o">**</span><span class="n">kw_args</span><span class="p">,</span>
-<span class="p">):</span>
-    <span class="n">xz</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">_augment</span><span class="p">(</span><span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
-    <span class="n">x</span> <span class="o">=</span> <span class="n">_augment</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">code</span><span class="p">(</span><span class="n">coder</span><span class="o">.</span><span class="n">coder</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">)</span>
-
-
-<span class="nd">@_dispatch</span>
-<span class="k">def</span> <span class="nf">_augment</span><span class="p">(</span><span class="n">xz</span><span class="p">:</span> <span class="n">AugmentedInput</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">B</span><span class="o">.</span><span class="n">Numeric</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">xz</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">_repeat_concat</span><span class="p">(</span><span class="n">data_dims</span><span class="p">(</span><span class="n">xz</span><span class="p">),</span> <span class="n">z</span><span class="p">,</span> <span class="n">xz</span><span class="o">.</span><span class="n">augmentation</span><span class="p">)</span>
-
-
-<span class="nd">@_dispatch</span>
-<span class="k">def</span> <span class="nf">_augment</span><span class="p">(</span><span class="n">xz</span><span class="p">:</span> <span class="n">AugmentedInput</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">xz</span><span class="o">.</span><span class="n">x</span>
+    <span class="k">return</span> <span class="n">nps</span><span class="o">.</span><span class="n">construct_gnp</span><span class="p">(</span>
+        <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+        <span class="n">nps</span><span class="o">=</span><span class="n">nps</span><span class="p">,</span>
+        <span class="n">attention</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">attention_num_heads</span><span class="o">=</span><span class="n">num_heads</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kw_args</span><span class="p">,</span>
+    <span class="p">)</span></div>
 </pre></div>
 
               </div>

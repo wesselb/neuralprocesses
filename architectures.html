@@ -1,0 +1,799 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>List of Predefined Architectures &#8212; NeuralProcesses</title>
+    
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+<link href="_static/styles/pydata-sphinx-theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
+
+    
+  <link rel="stylesheet"
+    href="_static/vendor/fontawesome/5.13.0/css/all.min.css">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-solid-900.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin
+    href="_static/vendor/fontawesome/5.13.0/webfonts/fa-brands-400.woff2">
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css" />
+    <link rel="stylesheet" href="_static/styles/sphinx-book-theme.css?digest=5115cc725059bd94278eecd172e13a965bf8f5a9" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/togglebutton.css" />
+    <link rel="stylesheet" type="text/css" href="_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="_static/mystnb.css" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-thebe.css" />
+    <link rel="stylesheet" type="text/css" href="_static/design-style.b7bb847fb20b106c3d81b95245e65545.min.css" />
+    
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf">
+
+    <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/clipboard.min.js"></script>
+    <script src="_static/copybutton.js"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?digest=9c920249402e914e316237a7dbc6769907cce411"></script>
+    <script>let toggleHintShow = 'Click to show';</script>
+    <script>let toggleHintHide = 'Click to hide';</script>
+    <script>let toggleOpenOnPrint = 'true';</script>
+    <script src="_static/togglebutton.js"></script>
+    <script>var togglebuttonSelector = '.toggle, .admonition.dropdown, .tag_hide_input div.cell_input, .tag_hide-input div.cell_input, .tag_hide_output div.cell_output, .tag_hide-output div.cell_output, .tag_hide_cell.cell, .tag_hide-cell.cell';</script>
+    <script src="_static/design-tabs.js"></script>
+    <script>const THEBE_JS_URL = "https://unpkg.com/thebe@0.8.2/lib/index.js"
+const thebe_selector = ".thebe,.cell"
+const thebe_selector_input = "pre"
+const thebe_selector_output = ".output, .cell_output"
+</script>
+    <script async="async" src="_static/sphinx-thebe.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Advanced Usage" href="advanced_usage.html" />
+    <link rel="prev" title="Basic Usage" href="basic_usage.html" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="docsearch:language" content="None">
+    
+
+    <!-- Google Analytics -->
+    
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="60">
+<!-- Checkboxes to toggle the left sidebar -->
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle navigation sidebar">
+<label class="overlay overlay-navbar" for="__navigation">
+    <div class="visually-hidden">Toggle navigation sidebar</div>
+</label>
+<!-- Checkboxes to toggle the in-page toc -->
+<input type="checkbox" class="sidebar-toggle" name="__page-toc" id="__page-toc" aria-label="Toggle in-page Table of Contents">
+<label class="overlay overlay-pagetoc" for="__page-toc">
+    <div class="visually-hidden">Toggle in-page Table of Contents</div>
+</label>
+<!-- Headers at the top -->
+<div class="announcement header-item noprint"></div>
+<div class="header header-item noprint"></div>
+
+    
+    <div class="container-fluid" id="banner"></div>
+
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<!-- Sidebar -->
+<div class="bd-sidebar noprint" id="site-navigation">
+    <div class="bd-sidebar__content">
+        <div class="bd-sidebar__top"><div class="navbar-brand-box">
+    <a class="navbar-brand text-wrap" href="index.html">
+      
+        <!-- `logo` is deprecated in Sphinx 4.0, so remove this when we stop supporting 3 -->
+        
+      
+      
+      <img src="_static/logo.png" class="logo" alt="logo">
+      
+      
+      <h1 class="site-logo" id="site-title">NeuralProcesses</h1>
+      
+    </a>
+</div><form class="bd-search d-flex align-items-center" action="search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search this book..." aria-label="Search this book..." autocomplete="off" >
+</form><nav class="bd-links" id="bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="intro.html">
+                    NeuralProcesses
+                </a>
+            </li>
+        </ul>
+        <ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="basic_usage.html">
+   Basic Usage
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   List of Predefined Architectures
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="advanced_usage.html">
+   Advanced Usage
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="build_your_own_model.html">
+   Build Your Own Model
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="coders.html">
+   List of Coders
+  </a>
+ </li>
+</ul>
+
+    </div>
+</nav></div>
+        <div class="bd-sidebar__bottom">
+             <!-- To handle the deprecated key -->
+            
+            <div class="navbar_extra_footer">
+            Powered by <a href="https://jupyterbook.org">Jupyter Book</a>
+            </div>
+            
+        </div>
+    </div>
+    <div id="rtd-footer-container"></div>
+</div>
+
+
+          
+
+
+          
+<!-- A tiny helper pixel to detect if we've scrolled -->
+<div class="sbt-scroll-pixel-helper"></div>
+<!-- Main content -->
+<div class="col py-0 content-container">
+    
+    <div class="header-article row sticky-top noprint">
+        
+
+
+
+<div class="col py-1 d-flex header-article-main">
+    <div class="header-article__left">
+        
+        <label for="__navigation"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="right"
+title="Toggle navigation"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-bars"></i>
+  </span>
+
+</label>
+
+        
+    </div>
+    <div class="header-article__right">
+<button onclick="toggleFullScreen()"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="bottom"
+title="Fullscreen mode"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+<div class="menu-dropdown menu-dropdown-repository-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Source repositories">
+      <i class="fab fa-github"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="https://github.com/wesselb/NeuralProcesses"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Source repository"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+<span class="headerbtn__text-container">repository</span>
+</a>
+
+      </li>
+      
+      <li>
+        <a href="https://github.com/wesselb/NeuralProcesses/issues/new?title=Issue%20on%20page%20%2Farchitectures.html&body=Your%20issue%20content%20here."
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Open an issue"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-lightbulb"></i>
+  </span>
+<span class="headerbtn__text-container">open issue</span>
+</a>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+
+<div class="menu-dropdown menu-dropdown-download-buttons">
+  <button class="headerbtn menu-dropdown__trigger"
+      aria-label="Download this page">
+      <i class="fas fa-download"></i>
+  </button>
+  <div class="menu-dropdown__content">
+    <ul>
+      <li>
+        <a href="_sources/architectures.rst"
+   class="headerbtn"
+   data-toggle="tooltip"
+data-placement="left"
+title="Download source file"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="headerbtn__text-container">.rst</span>
+</a>
+
+      </li>
+      
+      <li>
+        
+<button onclick="printPdf(this)"
+  class="headerbtn"
+  data-toggle="tooltip"
+data-placement="left"
+title="Print to PDF"
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="headerbtn__text-container">.pdf</span>
+</button>
+
+      </li>
+      
+    </ul>
+  </div>
+</div>
+<label for="__page-toc"
+  class="headerbtn headerbtn-page-toc"
+  
+>
+  
+
+<span class="headerbtn__icon-container">
+  <i class="fas fa-list"></i>
+  </span>
+
+</label>
+
+    </div>
+</div>
+
+<!-- Table of contents -->
+<div class="col-md-3 bd-toc show noprint">
+    <div class="tocsection onthispage pt-5 pb-3">
+        <i class="fas fa-list"></i> Contents
+    </div>
+    <nav id="bd-toc-nav" aria-label="Page">
+        <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.gnp">
+   Deep-Set-Based NPs
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.agnp">
+   Attentive NPs
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.convgnp">
+   Convolutional NPs
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.fullconvgnp">
+   Fully Convolutional NPs
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.climate">
+   Specific Models for Climate Experiments
+  </a>
+ </li>
+</ul>
+
+    </nav>
+</div>
+    </div>
+    <div class="article row">
+        <div class="col pl-md-3 pl-lg-5 content-container">
+            <!-- Table of contents that is only displayed when printing the page -->
+            <div id="jb-print-docs-body" class="onlyprint">
+                <h1>List of Predefined Architectures</h1>
+                <!-- Table of contents -->
+                <div id="print-main-content">
+                    <div id="jb-print-toc">
+                        
+                        <div>
+                            <h2> Contents </h2>
+                        </div>
+                        <nav aria-label="Page">
+                            <ul class="visible nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.gnp">
+   Deep-Set-Based NPs
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.agnp">
+   Attentive NPs
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.convgnp">
+   Convolutional NPs
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.fullconvgnp">
+   Fully Convolutional NPs
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.architectures.climate">
+   Specific Models for Climate Experiments
+  </a>
+ </li>
+</ul>
+
+                        </nav>
+                    </div>
+                </div>
+            </div>
+            <main id="main-content" role="main">
+                
+              <div>
+                
+  <section id="list-of-predefined-architectures">
+<h1>List of Predefined Architectures<a class="headerlink" href="#list-of-predefined-architectures" title="Permalink to this headline">#</a></h1>
+<section id="module-neuralprocesses.architectures.gnp">
+<span id="deep-set-based-nps"></span><h2>Deep-Set-Based NPs<a class="headerlink" href="#module-neuralprocesses.architectures.gnp" title="Permalink to this headline">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="neuralprocesses.architectures.gnp.construct_gnp">
+<span class="sig-prename descclassname"><span class="pre">neuralprocesses.architectures.gnp.</span></span><span class="sig-name descname"><span class="pre">construct_gnp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim_x=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_y=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_yc=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_yt=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_embedding=256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">attention_num_heads=8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_enc_layers=3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enc_same=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_dec_layers=6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width=512</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">likelihood='lowrank'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_basis_functions=512</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_lv=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lv_likelihood='het'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nps=&lt;module</span> <span class="pre">'neuralprocesses'</span> <span class="pre">from</span> <span class="pre">'/home/runner/work/neuralprocesses/neuralprocesses/neuralprocesses/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/architectures/gnp.html#construct_gnp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.architectures.gnp.construct_gnp" title="Permalink to this definition">#</a></dt>
+<dd><p>A Gaussian Neural Process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dim_x</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the inputs. Defaults to 1.</p></li>
+<li><p><strong>dim_y</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the outputs. Defaults to 1.</p></li>
+<li><p><strong>dim_yc</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Dimensionality of the outputs of the
+context set. You should set this if the dimensionality of the outputs
+of the context set is not equal to the dimensionality of the outputs
+of the target set. You should also set this if you want to use multiple
+context sets. In that case, set this equal to a tuple of integers
+indicating the respective output dimensionalities.</p></li>
+<li><p><strong>dim_yt</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the outputs of the target set. You
+should set this if the dimensionality of the outputs of the target set is
+not equal to the dimensionality of the outputs of the context set.</p></li>
+<li><p><strong>dim_embedding</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the embedding. Defaults to 128.</p></li>
+<li><p><strong>attention</strong> (<em>bool</em><em>, </em><em>optional</em>) – Use attention for the deterministic encoder.
+Defaults to <cite>False</cite>.</p></li>
+<li><p><strong>attention_num_heads</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of heads. Defaults to <cite>8</cite>.</p></li>
+<li><p><strong>num_enc_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of layers in the encoder. Defaults to 3.</p></li>
+<li><p><strong>enc_same</strong> (<em>bool</em><em>, </em><em>optional</em>) – Use the same encoder for all context sets. This
+only works if all context sets have the same dimensionality. Defaults to
+<cite>False</cite>.</p></li>
+<li><p><strong>num_dec_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of layers in the decoder. Defaults to 6.</p></li>
+<li><p><strong>width</strong> (<em>int</em><em>, </em><em>optional</em>) – Widths of all intermediate MLPs. Defaults to 512.</p></li>
+<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”</cite>.
+Defaults to <cite>“lowrank”</cite>.</p></li>
+<li><p><strong>num_basis_functions</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of basis functions for the
+low-rank likelihood. Defaults to 512.</p></li>
+<li><p><strong>dim_lv</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the latent variable. Defaults to 0.</p></li>
+<li><p><strong>lv_likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood of the latent variable. Must be one of
+<cite>“het”</cite> or <cite>“dense”</cite>. Defaults to <cite>“het”</cite>.</p></li>
+<li><p><strong>transform</strong> (<em>str</em><em> or </em><em>tuple</em><em>[</em><em>float</em><em>, </em><em>float</em><em>]</em>) – Bijection applied to the
+output of the model. This can help deal with positive of bounded data.
+Must be either <cite>“positive”</cite>, <cite>“exp”</cite>, <cite>“softplus”</cite>, or
+<cite>“softplus_of_square”</cite> for positive data or <cite>(lower, upper)</cite> for data in
+this open interval.</p></li>
+<li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>GNP model.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">model.Model</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-neuralprocesses.architectures.agnp">
+<span id="attentive-nps"></span><h2>Attentive NPs<a class="headerlink" href="#module-neuralprocesses.architectures.agnp" title="Permalink to this headline">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="neuralprocesses.architectures.agnp.construct_agnp">
+<span class="sig-prename descclassname"><span class="pre">neuralprocesses.architectures.agnp.</span></span><span class="sig-name descname"><span class="pre">construct_agnp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">*args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nps=&lt;module</span> <span class="pre">'neuralprocesses'</span> <span class="pre">from</span> <span class="pre">'/home/runner/work/neuralprocesses/neuralprocesses/neuralprocesses/__init__.py'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_heads=8</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">**kw_args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/architectures/agnp.html#construct_agnp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.architectures.agnp.construct_agnp" title="Permalink to this definition">#</a></dt>
+<dd><p>An Attentive Gaussian Neural Process.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dim_x</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the inputs. Defaults to 1.</p></li>
+<li><p><strong>dim_y</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the outputs. Defaults to 1.</p></li>
+<li><p><strong>dim_yc</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Dimensionality of the outputs of the
+context set. You should set this if the dimensionality of the outputs
+of the context set is not equal to the dimensionality of the outputs
+of the target set. You should also set this if you want to use multiple
+context sets. In that case, set this equal to a tuple of integers
+indicating the respective output dimensionalities.</p></li>
+<li><p><strong>dim_yt</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the outputs of the target set. You
+should set this if the dimensionality of the outputs of the target set is
+not equal to the dimensionality of the outputs of the context set.</p></li>
+<li><p><strong>dim_embedding</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the embedding. Defaults to 128.</p></li>
+<li><p><strong>num_heads</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of heads. Defaults to <cite>8</cite>.</p></li>
+<li><p><strong>num_enc_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of layers in the encoder. Defaults to 3.</p></li>
+<li><p><strong>enc_same</strong> (<em>bool</em><em>, </em><em>optional</em>) – Use the same encoder for all context sets. This
+only works if all context sets have the same dimensionality. Defaults to
+<cite>False</cite>.</p></li>
+<li><p><strong>num_dec_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of layers in the decoder. Defaults to 6.</p></li>
+<li><p><strong>width</strong> (<em>int</em><em>, </em><em>optional</em>) – Widths of all intermediate MLPs. Defaults to 512.</p></li>
+<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”</cite>.
+Defaults to <cite>“lowrank”</cite>.</p></li>
+<li><p><strong>num_basis_functions</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of basis functions for the
+low-rank likelihood. Defaults to 512.</p></li>
+<li><p><strong>dim_lv</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the latent variable. Defaults to 0.</p></li>
+<li><p><strong>lv_likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood of the latent variable. Must be one of
+<cite>“het”</cite> or <cite>“dense”</cite>. Defaults to <cite>“het”</cite>.</p></li>
+<li><p><strong>transform</strong> (<em>str</em><em> or </em><em>tuple</em><em>[</em><em>float</em><em>, </em><em>float</em><em>]</em>) – Bijection applied to the
+output of the model. This can help deal with positive of bounded data.
+Must be either <cite>“positive”</cite>, <cite>“exp”</cite>, <cite>“softplus”</cite>, or
+<cite>“softplus_of_square”</cite> for positive data or <cite>(lower, upper)</cite> for data in
+this open interval.</p></li>
+<li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>AGNP model.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">model.Model</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-neuralprocesses.architectures.convgnp">
+<span id="convolutional-nps"></span><h2>Convolutional NPs<a class="headerlink" href="#module-neuralprocesses.architectures.convgnp" title="Permalink to this headline">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="neuralprocesses.architectures.convgnp.construct_convgnp">
+<span class="sig-prename descclassname"><span class="pre">neuralprocesses.architectures.convgnp.</span></span><span class="sig-name descname"><span class="pre">construct_convgnp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim_x=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_y=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_yc=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_yt=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_aux_t=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">points_per_unit=64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">margin=0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">likelihood='lowrank'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_arch='unet'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_channels=(64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_kernels=5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_strides=2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_activations=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_resize_convs=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_resize_conv_interp_method='nearest'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_receptive_field=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_layers=6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_channels=64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_basis_functions=64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_lv=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lv_likelihood='het'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoder_scales=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoder_scales_learnable=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">decoder_scale=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">decoder_scale_learnable=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aux_t_mlp_layers=(128</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">128</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">128)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">divide_by_density=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon=0.0001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nps=&lt;module</span> <span class="pre">'neuralprocesses'</span> <span class="pre">from</span> <span class="pre">'/home/runner/work/neuralprocesses/neuralprocesses/neuralprocesses/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/architectures/convgnp.html#construct_convgnp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.architectures.convgnp.construct_convgnp" title="Permalink to this definition">#</a></dt>
+<dd><p>A Convolutional Gaussian Neural Process.</p>
+<p>Sets the attribute <cite>receptive_field</cite> to the receptive field of the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dim_x</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the inputs. Defaults to 1.</p></li>
+<li><p><strong>dim_y</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the outputs. Defaults to 1.</p></li>
+<li><p><strong>dim_yc</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Dimensionality of the outputs of the
+context set. You should set this if the dimensionality of the outputs
+of the context set is not equal to the dimensionality of the outputs
+of the target set. You should also set this if you want to use multiple
+context sets. In that case, set this equal to a tuple of integers
+indicating the respective output dimensionalities.</p></li>
+<li><p><strong>dim_yt</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the outputs of the target set. You
+should set this if the dimensionality of the outputs of the target set is
+not equal to the dimensionality of the outputs of the context set.</p></li>
+<li><p><strong>dim_aux_t</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of target-specific auxiliary
+variables.</p></li>
+<li><p><strong>points_per_unit</strong> (<em>float</em><em>, </em><em>optional</em>) – Density of the internal discretisation.
+Defaults to 64.</p></li>
+<li><p><strong>margin</strong> (<em>float</em><em>, </em><em>optional</em>) – Margin of the internal discretisation. Defaults to
+0.1.</p></li>
+<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”.
+Defaults to `”lowrank”</cite>.</p></li>
+<li><p><strong>conv_arch</strong> (<em>str</em><em>, </em><em>optional</em>) – Convolutional architecture to use. Must be one of
+<cite>“unet[-res][-sep]”</cite> or <cite>“conv[-res][-sep]”</cite>. Defaults to <cite>“unet”</cite>.</p></li>
+<li><p><strong>unet_channels</strong> (<em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Channels of every layer of the UNet.
+Defaults to six layers each with 64 channels.</p></li>
+<li><p><strong>unet_kernels</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Sizes of the kernels in the UNet.
+Defaults to 5.</p></li>
+<li><p><strong>unet_strides</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Strides in the UNet. Defaults to 2.</p></li>
+<li><p><strong>unet_activations</strong> (<em>object</em><em> or </em><em>tuple</em><em>[</em><em>object</em><em>]</em><em>, </em><em>optional</em>) – Activation functions
+used by the UNet. If <cite>None</cite>, ReLUs are used.</p></li>
+<li><p><strong>unet_resize_convs</strong> (<em>bool</em><em>, </em><em>optional</em>) – Use resize convolutions rather than
+transposed convolutions in the UNet. Defaults to <cite>False</cite>.</p></li>
+<li><p><strong>unet_resize_conv_interp_method</strong> (<em>str</em><em>, </em><em>optional</em>) – Interpolation method for the
+resize convolutions in the UNet. Can be set to <cite>“bilinear”</cite>. Defaults
+to “nearest”.</p></li>
+<li><p><strong>conv_receptive_field</strong> (<em>float</em><em>, </em><em>optional</em>) – Receptive field of the standard
+architecture. Must be specified if <cite>conv_arch</cite> is set to <cite>“conv”</cite>.</p></li>
+<li><p><strong>conv_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – Layers of the standard architecture. Defaults to 8.</p></li>
+<li><p><strong>conv_channels</strong> (<em>int</em><em>, </em><em>optional</em>) – Channels of the standard architecture. Defaults to
+64.</p></li>
+<li><p><strong>num_basis_functions</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of basis functions for the
+low-rank likelihood. Defaults to <cite>512</cite>.</p></li>
+<li><p><strong>dim_lv</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the latent variable. Defaults to 0.</p></li>
+<li><p><strong>lv_likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood of the latent variable. Must be one of
+<cite>“het”</cite> or <cite>“lowrank”</cite>. Defaults to <cite>“het”</cite>.</p></li>
+<li><p><strong>encoder_scales</strong> (<em>float</em><em> or </em><em>tuple</em><em>[</em><em>float</em><em>]</em><em>, </em><em>optional</em>) – Initial value for the length
+scales of the set convolutions for the context sets embeddings. Defaults
+to <cite>1 / points_per_unit</cite>.</p></li>
+<li><p><strong>encoder_scales_learnable</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether the encoder SetConv
+length scale(s) are learnable.</p></li>
+<li><p><strong>decoder_scale</strong> (<em>float</em><em>, </em><em>optional</em>) – Initial value for the length scale of the
+set convolution in the decoder. Defaults to <cite>1 / points_per_unit</cite>.</p></li>
+<li><p><strong>decoder_scale_learnable</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether the decoder SetConv
+length scale(s) are learnable.</p></li>
+<li><p><strong>aux_t_mlp_layers</strong> (<em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Widths of the layers of the MLP
+for the target-specific auxiliary variable. Defaults to three layers of
+width 128.</p></li>
+<li><p><strong>divide_by_density</strong> (<em>bool</em><em>, </em><em>optional</em>) – Divide by the density channel. Defaults
+to <cite>True</cite>.</p></li>
+<li><p><strong>epsilon</strong> (<em>float</em><em>, </em><em>optional</em>) – Epsilon added by the set convolutions before
+dividing by the density channel. Defaults to <cite>1e-4</cite>.</p></li>
+<li><p><strong>transform</strong> (<em>str</em><em> or </em><em>tuple</em><em>[</em><em>float</em><em>, </em><em>float</em><em>]</em>) – Bijection applied to the
+output of the model. This can help deal with positive of bounded data.
+Must be either <cite>“positive”</cite>, <cite>“exp”</cite>, <cite>“softplus”</cite>, or
+<cite>“softplus_of_square”</cite> for positive data or <cite>(lower, upper)</cite> for data in
+this open interval.</p></li>
+<li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>ConvGNP model.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">model.Model</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-neuralprocesses.architectures.fullconvgnp">
+<span id="fully-convolutional-nps"></span><h2>Fully Convolutional NPs<a class="headerlink" href="#module-neuralprocesses.architectures.fullconvgnp" title="Permalink to this headline">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="neuralprocesses.architectures.fullconvgnp.construct_fullconvgnp">
+<span class="sig-prename descclassname"><span class="pre">neuralprocesses.architectures.fullconvgnp.</span></span><span class="sig-name descname"><span class="pre">construct_fullconvgnp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim_x=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_y=1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_yc=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_yt=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">points_per_unit=64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">margin=0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_arch='unet'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_channels=(64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">64)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_kernels=5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_strides=2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_activations=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_resize_convs=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unet_resize_conv_interp_method='nearest'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_receptive_field=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_layers=6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conv_channels=64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel_factor=2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_lv=0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">encoder_scales=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">decoder_scale=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">divide_by_density=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon=0.0001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transform=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nps=&lt;module</span> <span class="pre">'neuralprocesses'</span> <span class="pre">from</span> <span class="pre">'/home/runner/work/neuralprocesses/neuralprocesses/neuralprocesses/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/architectures/fullconvgnp.html#construct_fullconvgnp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.architectures.fullconvgnp.construct_fullconvgnp" title="Permalink to this definition">#</a></dt>
+<dd><p>A Fully Convolutional Gaussian Neural Process.</p>
+<p>Sets the attribute <cite>receptive_field</cite> to the receptive field of the model.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dim_x</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the inputs. Defaults to 1.</p></li>
+<li><p><strong>dim_y</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the outputs. Defaults to 1.</p></li>
+<li><p><strong>dim_yc</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Dimensionality of the outputs of the
+context set. You should set this if the dimensionality of the outputs
+of the context set is not equal to the dimensionality of the outputs
+of the target set. You should also set this if you want to use multiple
+context sets. In that case, set this equal to a tuple of integers
+indicating the respective output dimensionalities.</p></li>
+<li><p><strong>dim_yt</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the outputs of the target set. You
+should set this if the dimensionality of the outputs of the target set is
+not equal to the dimensionality of the outputs of the context set.</p></li>
+<li><p><strong>points_per_unit</strong> (<em>float</em><em>, </em><em>optional</em>) – Density of the internal discretisation.
+Defaults to 64.</p></li>
+<li><p><strong>margin</strong> (<em>float</em><em>, </em><em>optional</em>) – Margin of the internal discretisation. Defaults to
+0.1.</p></li>
+<li><p><strong>conv_arch</strong> (<em>str</em><em>, </em><em>optional</em>) – Convolutional architecture to use. Must be one of
+<cite>“unet[-res][-sep]”</cite> or <cite>“conv[-res][-sep]”</cite>. Defaults to <cite>“unet”</cite>.</p></li>
+<li><p><strong>unet_channels</strong> (<em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Channels of every layer of the UNet.
+Defaults to six layers each with 64 channels.</p></li>
+<li><p><strong>unet_kernels</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Sizes of the kernels in the UNet.
+Defaults to 5.</p></li>
+<li><p><strong>unet_strides</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Strides in the UNet. Defaults to 2.</p></li>
+<li><p><strong>unet_activations</strong> (<em>object</em><em> or </em><em>tuple</em><em>[</em><em>object</em><em>]</em><em>, </em><em>optional</em>) – Activation functions
+used by the UNet.</p></li>
+<li><p><strong>unet_resize_convs</strong> (<em>bool</em><em>, </em><em>optional</em>) – Use resize convolutions rather than
+transposed convolutions in the UNet. Defaults to <cite>False</cite>.</p></li>
+<li><p><strong>unet_resize_conv_interp_method</strong> (<em>str</em><em>, </em><em>optional</em>) – Interpolation method for the
+resize convolutions in the UNet. Can be set to <cite>“bilinear”</cite>. Defaults
+to “nearest”.</p></li>
+<li><p><strong>conv_receptive_field</strong> (<em>float</em><em>, </em><em>optional</em>) – Receptive field of the standard
+architecture. Must be specified if <cite>conv_arch</cite> is set to <cite>“conv”</cite>.</p></li>
+<li><p><strong>conv_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – Layers of the standard architecture. Defaults to 8.</p></li>
+<li><p><strong>conv_channels</strong> (<em>int</em><em>, </em><em>optional</em>) – Channels of the standard architecture. Defaults to
+64.</p></li>
+<li><p><strong>kernel_factor</strong> (<em>int</em><em>, </em><em>optional</em>) – Factor to reduce the number of channel of the
+kernel CNN architecture and the kernel points per unit by. Set to 1 to
+put the architecture for the kernel on equal footing with the architecture
+for the mean. Defaults to 2.</p></li>
+<li><p><strong>dim_lv</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the latent variable. Defaults to 0.</p></li>
+<li><p><strong>encoder_scales</strong> (<em>float</em><em> or </em><em>tuple</em><em>[</em><em>float</em><em>]</em><em>, </em><em>optional</em>) – Initial value for the length
+scales of the set convolutions for the context sets embeddings. Defaults
+to <cite>1 / points_per_unit</cite>.</p></li>
+<li><p><strong>decoder_scale</strong> (<em>float</em><em>, </em><em>optional</em>) – Initial value for the length scale of the
+set convolution in the decoder. Defaults to <cite>1 / points_per_unit</cite>.</p></li>
+<li><p><strong>divide_by_density</strong> (<em>bool</em><em>, </em><em>optional</em>) – Divide by the density channel. Defaults
+to <cite>True</cite>.</p></li>
+<li><p><strong>epsilon</strong> (<em>float</em><em>, </em><em>optional</em>) – Epsilon added by the set convolutions before
+dividing by the density channel. Defaults to <cite>1e-4</cite>.</p></li>
+<li><p><strong>transform</strong> (<em>str</em><em> or </em><em>tuple</em><em>[</em><em>float</em><em>, </em><em>float</em><em>]</em>) – Bijection applied to the
+output of the model. This can help deal with positive of bounded data.
+Must be either <cite>“positive”</cite>, <cite>“exp”</cite>, <cite>“softplus”</cite>, or
+<cite>“softplus_of_square”</cite> for positive data or <cite>(lower, upper)</cite> for data in
+this open interval.</p></li>
+<li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>FullConvGNP model.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><code class="xref py py-class docutils literal notranslate"><span class="pre">model.Model</span></code></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-neuralprocesses.architectures.climate">
+<span id="specific-models-for-climate-experiments"></span><h2>Specific Models for Climate Experiments<a class="headerlink" href="#module-neuralprocesses.architectures.climate" title="Permalink to this headline">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="neuralprocesses.architectures.climate.construct_climate_convgnp_mlp">
+<span class="sig-prename descclassname"><span class="pre">neuralprocesses.architectures.climate.</span></span><span class="sig-name descname"><span class="pre">construct_climate_convgnp_mlp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">width_lr=128</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_deg=0.75</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">likelihood='het'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nps=&lt;module</span> <span class="pre">'neuralprocesses'</span> <span class="pre">from</span> <span class="pre">'/home/runner/work/neuralprocesses/neuralprocesses/neuralprocesses/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/architectures/climate.html#construct_climate_convgnp_mlp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.architectures.climate.construct_climate_convgnp_mlp" title="Permalink to this definition">#</a></dt>
+<dd><p>Construct a ConvGNP MLP model for climate downscaling.</p>
+<p class="rubric">References</p>
+<ol class="upperalpha simple">
+<li><dl class="simple">
+<dt>Vaughan, W. Tebbutt, J. S. Hosking, R. E. Turner. (2022). <a href="#id1"><span class="problematic" id="id2">``</span></a>Convolutional</dt><dd><p>Conditional Neural Processes for Local Climate Downscaling,’’ in
+Geoscientific Model Development 15(1), pages 251–268. URL:
+<a class="reference external" href="https://gmd.copernicus.org/articles/15/251/2022/">https://gmd.copernicus.org/articles/15/251/2022/</a></p>
+</dd>
+</dl>
+</li>
+</ol>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>width_lr</strong> (<em>int</em><em>, </em><em>optional</em>) – Width of the low-resolution residual network. Defaults
+to 128.</p></li>
+<li><p><strong>lr_deg</strong> (<em>float</em><em>, </em><em>optional</em>) – Resolution of the low-resolution grid. Defaults to
+0.75.</p></li>
+<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”.
+Defaults to `”lowrank”</cite>.</p></li>
+<li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="neuralprocesses.architectures.climate.construct_climate_convgnp_multires">
+<span class="sig-prename descclassname"><span class="pre">neuralprocesses.architectures.climate.</span></span><span class="sig-name descname"><span class="pre">construct_climate_convgnp_multires</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">width_lr=128</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_mr=64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_hr=64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width_bridge=64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr_deg=0.75</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mr_deg=0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hr_deg=0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mlp=False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">likelihood='het'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype=None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nps=&lt;module</span> <span class="pre">'neuralprocesses'</span> <span class="pre">from</span> <span class="pre">'/home/runner/work/neuralprocesses/neuralprocesses/neuralprocesses/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/architectures/climate.html#construct_climate_convgnp_multires"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.architectures.climate.construct_climate_convgnp_multires" title="Permalink to this definition">#</a></dt>
+<dd><p>Construct a multi-resolution ConvGNP model for climate downscaling and fusion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>width_lr</strong> (<em>int</em><em>, </em><em>optional</em>) – Width of the low-resolution residual network. Defaults
+to 128.</p></li>
+<li><p><strong>width_mr</strong> (<em>int</em><em>, </em><em>optional</em>) – Width of the medium-resolution UNet. Defaults to 64.</p></li>
+<li><p><strong>width_hr</strong> (<em>int</em><em>, </em><em>optional</em>) – Width of the high-resolution UNet. Defaults to 64.</p></li>
+<li><p><strong>width_bridge</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of channels to pass between the
+resolutions. Defaults to 64.</p></li>
+<li><p><strong>lr_deg</strong> (<em>float</em><em>, </em><em>optional</em>) – Resolution of the low-resolution grid. Defaults to
+0.75.</p></li>
+<li><p><strong>mr_deg</strong> (<em>float</em><em>, </em><em>optional</em>) – Resolution of the medium-resolution grid. Defaults to
+0.1.</p></li>
+<li><p><strong>hr_deg</strong> (<em>float</em><em>, </em><em>optional</em>) – Resolution of the high-resolution grid. Defaults to
+0.01.</p></li>
+<li><p><strong>mlp</strong> (<em>bool</em><em>, </em><em>optional</em>) – Use an extra MLP at the end. Defaults to <cite>False</cite>.</p></li>
+<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”.
+Defaults to `”lowrank”</cite>.</p></li>
+<li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "python"
+        },
+        kernelOptions: {
+            kernelName: "python3",
+            path: "./."
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'python3'</script>
+
+              </div>
+              
+            </main>
+            <footer class="footer-article noprint">
+                
+    <!-- Previous / next buttons -->
+<div class='prev-next-area'>
+    <a class='left-prev' id="prev-link" href="basic_usage.html" title="previous page">
+        <i class="fas fa-angle-left"></i>
+        <div class="prev-next-info">
+            <p class="prev-next-subtitle">previous</p>
+            <p class="prev-next-title">Basic Usage</p>
+        </div>
+    </a>
+    <a class='right-next' id="next-link" href="advanced_usage.html" title="next page">
+    <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Advanced Usage</p>
+    </div>
+    <i class="fas fa-angle-right"></i>
+    </a>
+</div>
+            </footer>
+        </div>
+    </div>
+    <div class="footer-content row">
+        <footer class="col footer"><p>
+  
+    By Wessel Bruinsma<br/>
+  
+      &copy; Copyright 2022.<br/>
+</p>
+        </footer>
+    </div>
+    
+</div>
+
+
+      </div>
+    </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script src="_static/scripts/pydata-sphinx-theme.js?digest=1999514e3f237ded88cf"></script>
+
+
+  </body>
+</html>

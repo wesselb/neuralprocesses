@@ -112,8 +112,28 @@ const thebe_selector_output = ".output, .cell_output"
         </ul>
         <ul class="nav bd-sidenav">
  <li class="toctree-l1">
-  <a class="reference internal" href="../../../api.html">
-   Application Programming Interface
+  <a class="reference internal" href="../../../basic_usage.html">
+   Basic Usage
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../architectures.html">
+   List of Predefined Architectures
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../advanced_usage.html">
+   Advanced Usage
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../build_your_own_model.html">
+   Build Your Own Model
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../coders.html">
+   List of Coders
   </a>
  </li>
 </ul>
@@ -264,7 +284,7 @@ title="Open an issue"
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Linear&quot;</span><span class="p">,</span> <span class="s2">&quot;MLP&quot;</span><span class="p">,</span> <span class="s2">&quot;UNet&quot;</span><span class="p">,</span> <span class="s2">&quot;ConvNet&quot;</span><span class="p">,</span> <span class="s2">&quot;Conv&quot;</span><span class="p">,</span> <span class="s2">&quot;ResidualBlock&quot;</span><span class="p">]</span>
 
 
-<div class="viewcode-block" id="Linear"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.nn.Linear">[docs]</a><span class="nd">@register_module</span>
+<div class="viewcode-block" id="Linear"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.nn.Linear">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">Linear</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;A linear layer over channels.</span>
 
@@ -281,7 +301,7 @@ title="Open an issue"
         <span class="bp">self</span><span class="o">.</span><span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="MLP"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.nn.MLP">[docs]</a><span class="nd">@register_module</span>
+<div class="viewcode-block" id="MLP"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.nn.MLP">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">MLP</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;MLP.</span>
 
@@ -362,7 +382,7 @@ title="Open an issue"
     <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span>
 
 
-<div class="viewcode-block" id="UNet"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.nn.UNet">[docs]</a><span class="nd">@register_module</span>
+<div class="viewcode-block" id="UNet"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.nn.UNet">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">UNet</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;UNet.</span>
 
@@ -632,7 +652,7 @@ title="Open an issue"
         <span class="k">return</span> <span class="n">uncompress</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_linear</span><span class="p">(</span><span class="n">h</span><span class="p">))</span></div>
 
 
-<div class="viewcode-block" id="ConvNet"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.nn.ConvNet">[docs]</a><span class="nd">@register_module</span>
+<div class="viewcode-block" id="ConvNet"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.nn.ConvNet">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">ConvNet</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;A regular convolutional neural network.</span>
 
@@ -715,7 +735,7 @@ title="Open an issue"
         <span class="k">return</span> <span class="n">uncompress</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv_net</span><span class="p">(</span><span class="n">x</span><span class="p">))</span></div>
 
 
-<div class="viewcode-block" id="Conv"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.nn.Conv">[docs]</a><span class="nd">@register_module</span>
+<div class="viewcode-block" id="Conv"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.nn.Conv">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">Conv</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;A flexible standard convolutional block.</span>
 
@@ -954,7 +974,7 @@ title="Open an issue"
         <span class="k">return</span> <span class="n">uncompress</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">net</span><span class="p">(</span><span class="n">x</span><span class="p">))</span></div>
 
 
-<div class="viewcode-block" id="ResidualBlock"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.nn.ResidualBlock">[docs]</a><span class="nd">@register_module</span>
+<div class="viewcode-block" id="ResidualBlock"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.nn.ResidualBlock">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">ResidualBlock</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Block of a residual network.</span>
 

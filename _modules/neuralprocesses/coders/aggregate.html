@@ -112,8 +112,28 @@ const thebe_selector_output = ".output, .cell_output"
         </ul>
         <ul class="nav bd-sidenav">
  <li class="toctree-l1">
-  <a class="reference internal" href="../../../api.html">
-   Application Programming Interface
+  <a class="reference internal" href="../../../basic_usage.html">
+   Basic Usage
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../architectures.html">
+   List of Predefined Architectures
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../advanced_usage.html">
+   Advanced Usage
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../build_your_own_model.html">
+   Build Your Own Model
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="../../../coders.html">
+   List of Coders
   </a>
  </li>
 </ul>
@@ -274,7 +294,7 @@ title="Open an issue"
 <span class="p">]</span>
 
 
-<div class="viewcode-block" id="RepeatForAggregateInputs"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.aggregate.RepeatForAggregateInputs">[docs]</a><span class="nd">@register_composite_coder</span>
+<div class="viewcode-block" id="RepeatForAggregateInputs"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.aggregate.RepeatForAggregateInputs">[docs]</a><span class="nd">@register_composite_coder</span>
 <span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">RepeatForAggregateInputs</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;If the coder `coder` encounters an aggregate of target inputs, perform the</span>
@@ -404,7 +424,7 @@ title="Open an issue"
     <span class="k">return</span> <span class="n">AggregateInput</span><span class="p">(</span><span class="o">*</span><span class="n">xzs</span><span class="p">),</span> <span class="n">Aggregate</span><span class="p">(</span><span class="o">*</span><span class="n">zs</span><span class="p">),</span> <span class="n">h</span>
 
 
-<div class="viewcode-block" id="SelectFromChannels"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.aggregate.SelectFromChannels">[docs]</a><span class="nd">@register_module</span>
+<div class="viewcode-block" id="SelectFromChannels"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.aggregate.SelectFromChannels">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">SelectFromChannels</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Select an output channel within a :class:`.RepeatForAggregateInputs`.</span>
 
@@ -448,7 +468,7 @@ title="Open an issue"
     <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span>
 
 
-<div class="viewcode-block" id="RepeatForAggregateInputPairs"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs">[docs]</a><span class="nd">@register_composite_coder</span>
+<div class="viewcode-block" id="RepeatForAggregateInputPairs"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs">[docs]</a><span class="nd">@register_composite_coder</span>
 <span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">RepeatForAggregateInputPairs</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;If the coder `coder` encounters an aggregate of target inputs, perform the</span>
@@ -507,7 +527,7 @@ title="Open an issue"
     <span class="k">return</span> <span class="n">xi</span><span class="p">[:</span><span class="n">ni</span><span class="p">]</span> <span class="o">+</span> <span class="n">xj</span><span class="p">[</span><span class="n">nj</span><span class="p">:]</span>
 
 
-<div class="viewcode-block" id="SelectFromDenseCovarianceChannels"><a class="viewcode-back" href="../../../api.html#neuralprocesses.coders.aggregate.SelectFromDenseCovarianceChannels">[docs]</a><span class="nd">@register_module</span>
+<div class="viewcode-block" id="SelectFromDenseCovarianceChannels"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.aggregate.SelectFromDenseCovarianceChannels">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">SelectFromDenseCovarianceChannels</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Select a pair of output channels from a dense covariance within a</span>
 <span class="sd">    :class:`RepeatForAggregateInputPairs`.&quot;&quot;&quot;</span></div>

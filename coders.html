@@ -6,7 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-    <title>Application Programming Interface &#8212; NeuralProcesses</title>
+    <title>List of Coders &#8212; NeuralProcesses</title>
     
   <!-- Loaded before other Sphinx assets -->
   <link href="_static/styles/theme.css?digest=1999514e3f237ded88cf" rel="stylesheet">
@@ -52,7 +52,7 @@ const thebe_selector_output = ".output, .cell_output"
     <script async="async" src="_static/sphinx-thebe.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="NeuralProcesses" href="intro.html" />
+    <link rel="prev" title="Build Your Own Model" href="build_your_own_model.html" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="docsearch:language" content="None">
     
@@ -113,9 +113,29 @@ const thebe_selector_output = ".output, .cell_output"
             </li>
         </ul>
         <ul class="current nav bd-sidenav">
+ <li class="toctree-l1">
+  <a class="reference internal" href="basic_usage.html">
+   Basic Usage
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="architectures.html">
+   List of Predefined Architectures
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="advanced_usage.html">
+   Advanced Usage
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="build_your_own_model.html">
+   Build Your Own Model
+  </a>
+ </li>
  <li class="toctree-l1 current active">
   <a class="current reference internal" href="#">
-   Application Programming Interface
+   List of Coders
   </a>
  </li>
 </ul>
@@ -208,7 +228,7 @@ title="Source repository"
       </li>
       
       <li>
-        <a href="https://github.com/wesselb/NeuralProcesses/issues/new?title=Issue%20on%20page%20%2Fapi.html&body=Your%20issue%20content%20here."
+        <a href="https://github.com/wesselb/NeuralProcesses/issues/new?title=Issue%20on%20page%20%2Fcoders.html&body=Your%20issue%20content%20here."
    class="headerbtn"
    data-toggle="tooltip"
 data-placement="left"
@@ -236,7 +256,7 @@ title="Open an issue"
   <div class="menu-dropdown__content">
     <ul>
       <li>
-        <a href="_sources/api.rst"
+        <a href="_sources/coders.rst"
    class="headerbtn"
    data-toggle="tooltip"
 data-placement="left"
@@ -296,8 +316,38 @@ title="Print to PDF"
     <nav id="bd-toc-nav" aria-label="Page">
         <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.deepset">
+   Deep Sets
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.attention">
+   Attention
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.functional">
+   Convolutional Deep Sets
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.nn">
+   Neural Networks
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#module-neuralprocesses.coders.aggregate">
-   Coders
+   Aggregations
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.augment">
+   Auxiliary Variables
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.copy">
+   Utility
   </a>
  </li>
 </ul>
@@ -309,7 +359,7 @@ title="Print to PDF"
         <div class="col pl-md-3 pl-lg-5 content-container">
             <!-- Table of contents that is only displayed when printing the page -->
             <div id="jb-print-docs-body" class="onlyprint">
-                <h1>Application Programming Interface</h1>
+                <h1>List of Coders</h1>
                 <!-- Table of contents -->
                 <div id="print-main-content">
                     <div id="jb-print-toc">
@@ -320,8 +370,38 @@ title="Print to PDF"
                         <nav aria-label="Page">
                             <ul class="visible nav section-nav flex-column">
  <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.deepset">
+   Deep Sets
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.attention">
+   Attention
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.functional">
+   Convolutional Deep Sets
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.nn">
+   Neural Networks
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
   <a class="reference internal nav-link" href="#module-neuralprocesses.coders.aggregate">
-   Coders
+   Aggregations
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.augment">
+   Auxiliary Variables
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#module-neuralprocesses.coders.copy">
+   Utility
   </a>
  </li>
 </ul>
@@ -334,63 +414,56 @@ title="Print to PDF"
                 
               <div>
                 
-  <section id="application-programming-interface">
-<h1>Application Programming Interface<a class="headerlink" href="#application-programming-interface" title="Permalink to this headline">#</a></h1>
-<section id="module-neuralprocesses.coders.aggregate">
-<span id="coders"></span><h2>Coders<a class="headerlink" href="#module-neuralprocesses.coders.aggregate" title="Permalink to this headline">#</a></h2>
+  <section id="list-of-coders">
+<h1>List of Coders<a class="headerlink" href="#list-of-coders" title="Permalink to this headline">#</a></h1>
+<section id="module-neuralprocesses.coders.deepset">
+<span id="deep-sets"></span><h2>Deep Sets<a class="headerlink" href="#module-neuralprocesses.coders.deepset" title="Permalink to this headline">#</a></h2>
 <dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.aggregate.</span></span><span class="sig-name descname"><span class="pre">RepeatForAggregateInputPairs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/aggregate.html#RepeatForAggregateInputPairs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs" title="Permalink to this definition">#</a></dt>
-<dd><p>If the coder <cite>coder</cite> encounters an aggregate of target inputs, perform the
-coding operation for every pair of elements in the aggregate with the keyword
-arguments <cite>select_channel_i</cite> and <cite>select_channel_j</cite> set to the indices of the
-particular outputs selected in the pair of elements of the aggregate of inputs.</p>
+<dt class="sig sig-object py" id="neuralprocesses.coders.deepset.DeepSet">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.deepset.</span></span><span class="sig-name descname"><span class="pre">DeepSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">agg=&lt;function</span> <span class="pre">DeepSet.&lt;lambda&gt;&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/deepset.html#DeepSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.deepset.DeepSet" title="Permalink to this definition">#</a></dt>
+<dd><p>Deep set.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>coder</strong> (<em>coder</em>) – Coder.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>phi</strong> (<em>object</em>) – Pre-aggregation function.</p></li>
+<li><p><strong>agg</strong> (<em>object</em><em>, </em><em>optional</em>) – Aggregation function. Defaults to summing.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neuralprocesses.coders.deepset.DeepSet.phi">
+<span class="sig-name descname"><span class="pre">phi</span></span><a class="headerlink" href="#neuralprocesses.coders.deepset.DeepSet.phi" title="Permalink to this definition">#</a></dt>
+<dd><p>Pre-aggregation function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>object</p>
 </dd>
 </dl>
 </dd></dl>
 
-<dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.aggregate.RepeatForAggregateInputs">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.aggregate.</span></span><span class="sig-name descname"><span class="pre">RepeatForAggregateInputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/aggregate.html#RepeatForAggregateInputs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.aggregate.RepeatForAggregateInputs" title="Permalink to this definition">#</a></dt>
-<dd><p>If the coder <cite>coder</cite> encounters an aggregate of target inputs, perform the
-coding operation for every element in the aggregate with the keyword argument
-<cite>select_channel</cite> set to the index of the particular output selected in the element
-of the aggregate of inputs.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neuralprocesses.coders.deepset.DeepSet.agg">
+<span class="sig-name descname"><span class="pre">agg</span></span><a class="headerlink" href="#neuralprocesses.coders.deepset.DeepSet.agg" title="Permalink to this definition">#</a></dt>
+<dd><p>Aggregation function.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>coder</strong> (<em>coder</em>) – Coder.</p>
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>object</p>
 </dd>
 </dl>
 </dd></dl>
 
-<dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.aggregate.SelectFromChannels">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.aggregate.</span></span><span class="sig-name descname"><span class="pre">SelectFromChannels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">sizes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/aggregate.html#SelectFromChannels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.aggregate.SelectFromChannels" title="Permalink to this definition">#</a></dt>
-<dd><p>Select an output channel within a <a class="reference internal" href="#neuralprocesses.coders.aggregate.RepeatForAggregateInputs" title="neuralprocesses.coders.aggregate.RepeatForAggregateInputs"><code class="xref py py-class docutils literal notranslate"><span class="pre">RepeatForAggregateInputs</span></code></a>.</p>
-<p>The channels dimension is supposed to be a concatenation of multiple blocks of
-channels, where selecting the <cite>i`th output is performed by selecting the `i`th
-element of every block. The elements of `sizes</cite> specify the lengths of the blocks.</p>
-<p>If an element of <cite>sizes</cite> is a tuple, then it is assumed that the channels of that
-block must be further reshaped into that tuple. The selection will then happen on
-the _last_ unpacked dimension.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>*sizes</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em>) – Specification of the channel blocks.</p>
-</dd>
-</dl>
 </dd></dl>
 
-<dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.aggregate.SelectFromDenseCovarianceChannels">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.aggregate.</span></span><span class="sig-name descname"><span class="pre">SelectFromDenseCovarianceChannels</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/aggregate.html#SelectFromDenseCovarianceChannels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.aggregate.SelectFromDenseCovarianceChannels" title="Permalink to this definition">#</a></dt>
-<dd><p>Select a pair of output channels from a dense covariance within a
-<a class="reference internal" href="#neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs" title="neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs"><code class="xref py py-class docutils literal notranslate"><span class="pre">RepeatForAggregateInputPairs</span></code></a>.</p>
+<span class="target" id="module-neuralprocesses.coders.inputs"></span><dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.inputs.InputsCoder">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.inputs.</span></span><span class="sig-name descname"><span class="pre">InputsCoder</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/inputs.html#InputsCoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.inputs.InputsCoder" title="Permalink to this definition">#</a></dt>
+<dd><p>Encode with the target inputs.</p>
 </dd></dl>
 
-<span class="target" id="module-neuralprocesses.coders.attention"></span><dl class="py class">
+</section>
+<section id="module-neuralprocesses.coders.attention">
+<span id="attention"></span><h2>Attention<a class="headerlink" href="#module-neuralprocesses.coders.attention" title="Permalink to this headline">#</a></h2>
+<dl class="py class">
 <dt class="sig sig-object py" id="neuralprocesses.coders.attention.Attention">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.attention.</span></span><span class="sig-name descname"><span class="pre">Attention</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim_x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim_embedding</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_heads</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_enc_layers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_self</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/attention.html#Attention"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.attention.Attention" title="Permalink to this definition">#</a></dt>
 <dd><p>Attention module.</p>
@@ -624,85 +697,10 @@ the _last_ unpacked dimension.</p>
 
 </dd></dl>
 
-<span class="target" id="module-neuralprocesses.coders.augment"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.augment.Augment">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.augment.</span></span><span class="sig-name descname"><span class="pre">Augment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/augment.html#Augment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.augment.Augment" title="Permalink to this definition">#</a></dt>
-<dd><p>Concatenate the augmentation of the input to the encoding, and remove any
-augmentation of target inputs.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>coder</strong> (<em>coder</em>) – Coder to run after the augmentation.</p>
-</dd>
-</dl>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="neuralprocesses.coders.augment.Augment.coder">
-<span class="sig-name descname"><span class="pre">coder</span></span><a class="headerlink" href="#neuralprocesses.coders.augment.Augment.coder" title="Permalink to this definition">#</a></dt>
-<dd><p>Coder to run after the augmentation.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>coder</p>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<span class="target" id="module-neuralprocesses.coders.copy"></span><span class="target" id="module-neuralprocesses.coders.deepset"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.deepset.DeepSet">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.deepset.</span></span><span class="sig-name descname"><span class="pre">DeepSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phi</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">agg=&lt;function</span> <span class="pre">DeepSet.&lt;lambda&gt;&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/deepset.html#DeepSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.deepset.DeepSet" title="Permalink to this definition">#</a></dt>
-<dd><p>Deep set.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>phi</strong> (<em>object</em>) – Pre-aggregation function.</p></li>
-<li><p><strong>agg</strong> (<em>object</em><em>, </em><em>optional</em>) – Aggregation function. Defaults to summing.</p></li>
-</ul>
-</dd>
-</dl>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="neuralprocesses.coders.deepset.DeepSet.phi">
-<span class="sig-name descname"><span class="pre">phi</span></span><a class="headerlink" href="#neuralprocesses.coders.deepset.DeepSet.phi" title="Permalink to this definition">#</a></dt>
-<dd><p>Pre-aggregation function.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>object</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="neuralprocesses.coders.deepset.DeepSet.agg">
-<span class="sig-name descname"><span class="pre">agg</span></span><a class="headerlink" href="#neuralprocesses.coders.deepset.DeepSet.agg" title="Permalink to this definition">#</a></dt>
-<dd><p>Aggregation function.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>object</p>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<span class="target" id="module-neuralprocesses.coders.densecov"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.densecov.DenseCovariancePSDTransform">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.densecov.</span></span><span class="sig-name descname"><span class="pre">DenseCovariancePSDTransform</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/densecov.html#DenseCovariancePSDTransform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.densecov.DenseCovariancePSDTransform" title="Permalink to this definition">#</a></dt>
-<dd><p>Multiply a dense covariance encoding by itself transposed to ensure that it is
-PSD.</p>
-</dd></dl>
-
+</section>
+<section id="module-neuralprocesses.coders.functional">
+<span id="convolutional-deep-sets"></span><h2>Convolutional Deep Sets<a class="headerlink" href="#module-neuralprocesses.coders.functional" title="Permalink to this headline">#</a></h2>
 <dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.densecov.FromDenseCovariance">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.densecov.</span></span><span class="sig-name descname"><span class="pre">FromDenseCovariance</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/densecov.html#FromDenseCovariance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.densecov.FromDenseCovariance" title="Permalink to this definition">#</a></dt>
-<dd><p>Shape a dense covariance encoding into a regular encoding.</p>
-</dd></dl>
-
-<dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.densecov.ToDenseCovariance">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.densecov.</span></span><span class="sig-name descname"><span class="pre">ToDenseCovariance</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/densecov.html#ToDenseCovariance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.densecov.ToDenseCovariance" title="Permalink to this definition">#</a></dt>
-<dd><p>Shape a regular encoding into a dense covariance encoding.</p>
-</dd></dl>
-
-<span class="target" id="module-neuralprocesses.coders.functional"></span><dl class="py class">
 <dt class="sig sig-object py" id="neuralprocesses.coders.functional.FunctionalCoder">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.functional.</span></span><span class="sig-name descname"><span class="pre">FunctionalCoder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">disc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coder</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target=&lt;function</span> <span class="pre">FunctionalCoder.&lt;lambda&gt;&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/functional.html#FunctionalCoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.functional.FunctionalCoder" title="Permalink to this definition">#</a></dt>
 <dd><p>A coder that codes to a discretisation for a functional representation.</p>
@@ -754,58 +752,70 @@ span the discretisation over.</p>
 
 </dd></dl>
 
-<span class="target" id="module-neuralprocesses.coders.fuse"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.fuse.Fuse">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.fuse.</span></span><span class="sig-name descname"><span class="pre">Fuse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">set_conv</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/fuse.html#Fuse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.fuse.Fuse" title="Permalink to this definition">#</a></dt>
-<dd><p>In a parallel of two things, interpolate the first to the inputs of the second,
-and concatenate the result to the second.</p>
+<span class="target" id="module-neuralprocesses.coders.setconv.setconv"></span><dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.setconv.SetConv">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.setconv.</span></span><span class="sig-name descname"><span class="pre">SetConv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scale</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">learnable</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/setconv.html#SetConv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.setconv.SetConv" title="Permalink to this definition">#</a></dt>
+<dd><p>A set convolution.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>set_conv</strong> (<em>coder</em>) – Set conv that should perform the interpolation.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>scale</strong> (<em>float</em>) – Initial value for the length scale.</p></li>
+<li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
+<li><p><strong>learnable</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether the SetConv length scale is learnable.</p></li>
+</ul>
 </dd>
 </dl>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="neuralprocesses.coders.fuse.Fuse.set_conv">
-<span class="sig-name descname"><span class="pre">set_conv</span></span><a class="headerlink" href="#neuralprocesses.coders.fuse.Fuse.set_conv" title="Permalink to this definition">#</a></dt>
-<dd><p>Set conv that should perform the interpolation.</p>
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.setconv.SetConv.log_scale">
+<span class="sig-name descname"><span class="pre">log_scale</span></span><a class="headerlink" href="#neuralprocesses.coders.setconv.setconv.SetConv.log_scale" title="Permalink to this definition">#</a></dt>
+<dd><p>Logarithm of the length scale.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>coder</p>
+<dd class="field-odd"><p>scalar</p>
 </dd>
 </dl>
 </dd></dl>
 
 </dd></dl>
 
-<span class="target" id="module-neuralprocesses.coders.inputs"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.inputs.InputsCoder">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.inputs.</span></span><span class="sig-name descname"><span class="pre">InputsCoder</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/inputs.html#InputsCoder"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.inputs.InputsCoder" title="Permalink to this definition">#</a></dt>
-<dd><p>Encode with the target inputs.</p>
-</dd></dl>
-
-<span class="target" id="module-neuralprocesses.coders.mapdiag"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.mapdiag.MapDiagonal">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.mapdiag.</span></span><span class="sig-name descname"><span class="pre">MapDiagonal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/mapdiag.html#MapDiagonal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.mapdiag.MapDiagonal" title="Permalink to this definition">#</a></dt>
-<dd><p>Map to the diagonal of the squared space.</p>
+<span class="target" id="module-neuralprocesses.coders.setconv.density"></span><dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.DivideByFirstChannel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.density.</span></span><span class="sig-name descname"><span class="pre">DivideByFirstChannel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/density.html#DivideByFirstChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.density.DivideByFirstChannel" title="Permalink to this definition">#</a></dt>
+<dd><p>Divide by the first channel.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>coder</strong> (<em>coder</em>) – Coder to apply the mapped values to.</p>
+<dd class="field-odd"><p><strong>epsilon</strong> (<em>float</em>) – Value to add to the channel before dividing.</p>
 </dd>
 </dl>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="neuralprocesses.coders.mapdiag.MapDiagonal.coder">
-<span class="sig-name descname"><span class="pre">coder</span></span><a class="headerlink" href="#neuralprocesses.coders.mapdiag.MapDiagonal.coder" title="Permalink to this definition">#</a></dt>
-<dd><p>Coder to apply the mapped values to.</p>
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.DivideByFirstChannel.epsilon">
+<span class="sig-name descname"><span class="pre">epsilon</span></span><a class="headerlink" href="#neuralprocesses.coders.setconv.density.DivideByFirstChannel.epsilon" title="Permalink to this definition">#</a></dt>
+<dd><p>Value to add to the channel before dividing.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>coder</p>
+<dd class="field-odd"><p>float</p>
 </dd>
 </dl>
 </dd></dl>
 
 </dd></dl>
 
-<span class="target" id="module-neuralprocesses.coders.nn"></span><dl class="py class">
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.PrependDensityChannel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.density.</span></span><span class="sig-name descname"><span class="pre">PrependDensityChannel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/density.html#PrependDensityChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.density.PrependDensityChannel" title="Permalink to this definition">#</a></dt>
+<dd><p>Prepend a density channel to the current encoding.</p>
+</dd></dl>
+
+<span class="target" id="module-neuralprocesses.coders.setconv.identity"></span><dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.identity.PrependIdentityChannel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.identity.</span></span><span class="sig-name descname"><span class="pre">PrependIdentityChannel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/identity.html#PrependIdentityChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.identity.PrependIdentityChannel" title="Permalink to this definition">#</a></dt>
+<dd><p>Prepend a density channel to the current encoding.</p>
+</dd></dl>
+
+</section>
+<section id="module-neuralprocesses.coders.nn">
+<span id="neural-networks"></span><h2>Neural Networks<a class="headerlink" href="#module-neuralprocesses.coders.nn" title="Permalink to this headline">#</a></h2>
+<dl class="py class">
 <dt class="sig sig-object py" id="neuralprocesses.coders.nn.Conv">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.nn.</span></span><span class="sig-name descname"><span class="pre">Conv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">in_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">out_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Union</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="p"><span class="pre">...</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stride</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">transposed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">separable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">residual</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/nn.html#Conv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.nn.Conv" title="Permalink to this definition">#</a></dt>
 <dd><p>A flexible standard convolutional block.</p>
@@ -1162,66 +1172,90 @@ resize convolutions. Can be set to “bilinear”. Defaults to “nearest”.</p
 
 </dd></dl>
 
-<span class="target" id="module-neuralprocesses.coders.setconv.density"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.DivideByFirstChannel">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.density.</span></span><span class="sig-name descname"><span class="pre">DivideByFirstChannel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/density.html#DivideByFirstChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.density.DivideByFirstChannel" title="Permalink to this definition">#</a></dt>
-<dd><p>Divide by the first channel.</p>
+</section>
+<section id="module-neuralprocesses.coders.aggregate">
+<span id="aggregations"></span><h2>Aggregations<a class="headerlink" href="#module-neuralprocesses.coders.aggregate" title="Permalink to this headline">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.aggregate.</span></span><span class="sig-name descname"><span class="pre">RepeatForAggregateInputPairs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/aggregate.html#RepeatForAggregateInputPairs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs" title="Permalink to this definition">#</a></dt>
+<dd><p>If the coder <cite>coder</cite> encounters an aggregate of target inputs, perform the
+coding operation for every pair of elements in the aggregate with the keyword
+arguments <cite>select_channel_i</cite> and <cite>select_channel_j</cite> set to the indices of the
+particular outputs selected in the pair of elements of the aggregate of inputs.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>epsilon</strong> (<em>float</em>) – Value to add to the channel before dividing.</p>
+<dd class="field-odd"><p><strong>coder</strong> (<em>coder</em>) – Coder.</p>
 </dd>
 </dl>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.DivideByFirstChannel.epsilon">
-<span class="sig-name descname"><span class="pre">epsilon</span></span><a class="headerlink" href="#neuralprocesses.coders.setconv.density.DivideByFirstChannel.epsilon" title="Permalink to this definition">#</a></dt>
-<dd><p>Value to add to the channel before dividing.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>float</p>
-</dd>
-</dl>
-</dd></dl>
-
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.PrependDensityChannel">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.density.</span></span><span class="sig-name descname"><span class="pre">PrependDensityChannel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/density.html#PrependDensityChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.density.PrependDensityChannel" title="Permalink to this definition">#</a></dt>
-<dd><p>Prepend a density channel to the current encoding.</p>
-</dd></dl>
-
-<span class="target" id="module-neuralprocesses.coders.setconv.identity"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.identity.PrependIdentityChannel">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.identity.</span></span><span class="sig-name descname"><span class="pre">PrependIdentityChannel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/identity.html#PrependIdentityChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.identity.PrependIdentityChannel" title="Permalink to this definition">#</a></dt>
-<dd><p>Prepend a density channel to the current encoding.</p>
-</dd></dl>
-
-<span class="target" id="module-neuralprocesses.coders.setconv.setconv"></span><dl class="py class">
-<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.setconv.SetConv">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.setconv.</span></span><span class="sig-name descname"><span class="pre">SetConv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scale</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">learnable</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/setconv.html#SetConv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.setconv.SetConv" title="Permalink to this definition">#</a></dt>
-<dd><p>A set convolution.</p>
+<dt class="sig sig-object py" id="neuralprocesses.coders.aggregate.RepeatForAggregateInputs">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.aggregate.</span></span><span class="sig-name descname"><span class="pre">RepeatForAggregateInputs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/aggregate.html#RepeatForAggregateInputs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.aggregate.RepeatForAggregateInputs" title="Permalink to this definition">#</a></dt>
+<dd><p>If the coder <cite>coder</cite> encounters an aggregate of target inputs, perform the
+coding operation for every element in the aggregate with the keyword argument
+<cite>select_channel</cite> set to the index of the particular output selected in the element
+of the aggregate of inputs.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>scale</strong> (<em>float</em>) – Initial value for the length scale.</p></li>
-<li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
-<li><p><strong>learnable</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether the SetConv length scale is learnable.</p></li>
-</ul>
+<dd class="field-odd"><p><strong>coder</strong> (<em>coder</em>) – Coder.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.aggregate.SelectFromChannels">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.aggregate.</span></span><span class="sig-name descname"><span class="pre">SelectFromChannels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">size0</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">sizes</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/aggregate.html#SelectFromChannels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.aggregate.SelectFromChannels" title="Permalink to this definition">#</a></dt>
+<dd><p>Select an output channel within a <a class="reference internal" href="#neuralprocesses.coders.aggregate.RepeatForAggregateInputs" title="neuralprocesses.coders.aggregate.RepeatForAggregateInputs"><code class="xref py py-class docutils literal notranslate"><span class="pre">RepeatForAggregateInputs</span></code></a>.</p>
+<p>The channels dimension is supposed to be a concatenation of multiple blocks of
+channels, where selecting the <cite>i`th output is performed by selecting the `i`th
+element of every block. The elements of `sizes</cite> specify the lengths of the blocks.</p>
+<p>If an element of <cite>sizes</cite> is a tuple, then it is assumed that the channels of that
+block must be further reshaped into that tuple. The selection will then happen on
+the _last_ unpacked dimension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>*sizes</strong> (<em>int</em><em> or </em><em>tuple</em><em>[</em><em>int</em><em>]</em>) – Specification of the channel blocks.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.aggregate.SelectFromDenseCovarianceChannels">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.aggregate.</span></span><span class="sig-name descname"><span class="pre">SelectFromDenseCovarianceChannels</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/aggregate.html#SelectFromDenseCovarianceChannels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.aggregate.SelectFromDenseCovarianceChannels" title="Permalink to this definition">#</a></dt>
+<dd><p>Select a pair of output channels from a dense covariance within a
+<a class="reference internal" href="#neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs" title="neuralprocesses.coders.aggregate.RepeatForAggregateInputPairs"><code class="xref py py-class docutils literal notranslate"><span class="pre">RepeatForAggregateInputPairs</span></code></a>.</p>
+</dd></dl>
+
+</section>
+<section id="module-neuralprocesses.coders.augment">
+<span id="auxiliary-variables"></span><h2>Auxiliary Variables<a class="headerlink" href="#module-neuralprocesses.coders.augment" title="Permalink to this headline">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.augment.Augment">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.augment.</span></span><span class="sig-name descname"><span class="pre">Augment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/augment.html#Augment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.augment.Augment" title="Permalink to this definition">#</a></dt>
+<dd><p>Concatenate the augmentation of the input to the encoding, and remove any
+augmentation of target inputs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>coder</strong> (<em>coder</em>) – Coder to run after the augmentation.</p>
 </dd>
 </dl>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.setconv.SetConv.log_scale">
-<span class="sig-name descname"><span class="pre">log_scale</span></span><a class="headerlink" href="#neuralprocesses.coders.setconv.setconv.SetConv.log_scale" title="Permalink to this definition">#</a></dt>
-<dd><p>Logarithm of the length scale.</p>
+<dt class="sig sig-object py" id="neuralprocesses.coders.augment.Augment.coder">
+<span class="sig-name descname"><span class="pre">coder</span></span><a class="headerlink" href="#neuralprocesses.coders.augment.Augment.coder" title="Permalink to this definition">#</a></dt>
+<dd><p>Coder to run after the augmentation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type</dt>
-<dd class="field-odd"><p>scalar</p>
+<dd class="field-odd"><p>coder</p>
 </dd>
 </dl>
 </dd></dl>
 
 </dd></dl>
 
+</section>
+<section id="module-neuralprocesses.coders.copy">
+<span id="utility"></span><h2>Utility<a class="headerlink" href="#module-neuralprocesses.coders.copy" title="Permalink to this headline">#</a></h2>
 <span class="target" id="module-neuralprocesses.coders.shaping"></span><dl class="py class">
 <dt class="sig sig-object py" id="neuralprocesses.coders.shaping.Identity">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.shaping.</span></span><span class="sig-name descname"><span class="pre">Identity</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/shaping.html#Identity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.shaping.Identity" title="Permalink to this definition">#</a></dt>
@@ -1286,6 +1320,70 @@ resize convolutions. Can be set to “bilinear”. Defaults to “nearest”.</p
 
 </dd></dl>
 
+<span class="target" id="module-neuralprocesses.coders.fuse"></span><dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.fuse.Fuse">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.fuse.</span></span><span class="sig-name descname"><span class="pre">Fuse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">set_conv</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/fuse.html#Fuse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.fuse.Fuse" title="Permalink to this definition">#</a></dt>
+<dd><p>In a parallel of two things, interpolate the first to the inputs of the second,
+and concatenate the result to the second.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>set_conv</strong> (<em>coder</em>) – Set conv that should perform the interpolation.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neuralprocesses.coders.fuse.Fuse.set_conv">
+<span class="sig-name descname"><span class="pre">set_conv</span></span><a class="headerlink" href="#neuralprocesses.coders.fuse.Fuse.set_conv" title="Permalink to this definition">#</a></dt>
+<dd><p>Set conv that should perform the interpolation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>coder</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-neuralprocesses.coders.mapdiag"></span><dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.mapdiag.MapDiagonal">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.mapdiag.</span></span><span class="sig-name descname"><span class="pre">MapDiagonal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/mapdiag.html#MapDiagonal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.mapdiag.MapDiagonal" title="Permalink to this definition">#</a></dt>
+<dd><p>Map to the diagonal of the squared space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>coder</strong> (<em>coder</em>) – Coder to apply the mapped values to.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neuralprocesses.coders.mapdiag.MapDiagonal.coder">
+<span class="sig-name descname"><span class="pre">coder</span></span><a class="headerlink" href="#neuralprocesses.coders.mapdiag.MapDiagonal.coder" title="Permalink to this definition">#</a></dt>
+<dd><p>Coder to apply the mapped values to.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>coder</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-neuralprocesses.coders.densecov"></span><dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.densecov.DenseCovariancePSDTransform">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.densecov.</span></span><span class="sig-name descname"><span class="pre">DenseCovariancePSDTransform</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/densecov.html#DenseCovariancePSDTransform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.densecov.DenseCovariancePSDTransform" title="Permalink to this definition">#</a></dt>
+<dd><p>Multiply a dense covariance encoding by itself transposed to ensure that it is
+PSD.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.densecov.FromDenseCovariance">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.densecov.</span></span><span class="sig-name descname"><span class="pre">FromDenseCovariance</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/densecov.html#FromDenseCovariance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.densecov.FromDenseCovariance" title="Permalink to this definition">#</a></dt>
+<dd><p>Shape a dense covariance encoding into a regular encoding.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.densecov.ToDenseCovariance">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.densecov.</span></span><span class="sig-name descname"><span class="pre">ToDenseCovariance</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/densecov.html#ToDenseCovariance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.densecov.ToDenseCovariance" title="Permalink to this definition">#</a></dt>
+<dd><p>Shape a regular encoding into a dense covariance encoding.</p>
+</dd></dl>
+
 </section>
 </section>
 
@@ -1316,11 +1414,11 @@ resize convolutions. Can be set to “bilinear”. Defaults to “nearest”.</p
                 
     <!-- Previous / next buttons -->
 <div class='prev-next-area'>
-    <a class='left-prev' id="prev-link" href="intro.html" title="previous page">
+    <a class='left-prev' id="prev-link" href="build_your_own_model.html" title="previous page">
         <i class="fas fa-angle-left"></i>
         <div class="prev-next-info">
             <p class="prev-next-subtitle">previous</p>
-            <p class="prev-next-title">NeuralProcesses</p>
+            <p class="prev-next-title">Build Your Own Model</p>
         </div>
     </a>
 </div>
