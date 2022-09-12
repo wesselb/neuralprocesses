@@ -58,10 +58,10 @@ broadcast_coder_over_parallel(PrependDensityChannel)
 @_dispatch
 def code(coder: PrependDensityChannel, xz, z: Masked, x, **kw_args):
     mask = z.mask
-    # Set the missing values to zero. Zeros in the data channel do not affect the
-    # encoding.
-    z = z.y * mask
-    return code(coder, xz, z, x, **kw_args)
+    d = data_dims(xz)
+    # Set the missing values to zero by multiplying with the mask. Zeros in the data
+    # channel do not affect the encoding.
+    return xz, B.concat(z.mask, z.y * z.mask, axis=-d - 1)
 
 
 @register_module
