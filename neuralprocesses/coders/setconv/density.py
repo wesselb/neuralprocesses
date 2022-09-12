@@ -48,7 +48,6 @@ def code(coder: PrependDensityChannel, xz, z: B.Numeric, x, **kw_args):
         else:
             # Produce just one density channel.
             c = 1
-        print(c, coder.multi, d, B.shape(z, -d - 1), B.shape(z))
         density_channel = B.ones(B.dtype(z), *batch(z, d + 1), c, *B.shape(z)[-d:])
     return xz, B.concat(density_channel, z, axis=-d - 1)
 
