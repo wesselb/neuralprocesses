@@ -57,12 +57,11 @@ broadcast_coder_over_parallel(PrependDensityChannel)
 
 @_dispatch
 def code(coder: PrependDensityChannel, xz, z: Masked, x, **kw_args):
-    # Apply mask to density channel _and_ the data channels. Since the mask has
-    # only one channel, we can simply pointwise multiply and broadcasting should
-    # do the rest for us.
     mask = z.mask
-    xz, z = code(coder, xz, z.y, x, **kw_args)
-    return xz, mask * z
+    # Set the missing values to zero. Zeros in the data channel do not affect the
+    # encoding.
+    z = z.y * mask
+    return code(coder, xz, z, x, **kw_args)
 
 
 @register_module
