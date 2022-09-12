@@ -270,7 +270,7 @@ title="Open an issue"
               <div>
                 
   <h1>Source code for neuralprocesses.coders.setconv.density</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span> <span class="nn">lab</span> <span class="k">as</span> <span class="nn">B</span>
 
@@ -282,20 +282,46 @@ title="Open an issue"
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;PrependDensityChannel&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;PrependMultiDensityChannel&quot;</span><span class="p">,</span>
     <span class="s2">&quot;DivideByFirstChannel&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;DivideByFirstHalf&quot;</span><span class="p">,</span>
 <span class="p">]</span>
 
 
 <div class="viewcode-block" id="PrependDensityChannel"><a class="viewcode-back" href="../../../../coders.html#neuralprocesses.coders.setconv.density.PrependDensityChannel">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">PrependDensityChannel</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Prepend a density channel to the current encoding.&quot;&quot;&quot;</span></div>
+    <span class="sd">&quot;&quot;&quot;Prepend a density channel to the current encoding.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        multi (bool, optional): Produce a separate density channel for every channel.</span>
+<span class="sd">            If `False`, produce just one density channel for all channels. Defaults</span>
+<span class="sd">            to `False`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">multi</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">multi</span> <span class="o">=</span> <span class="n">multi</span></div>
+
+
+<div class="viewcode-block" id="PrependMultiDensityChannel"><a class="viewcode-back" href="../../../../coders.html#neuralprocesses.coders.setconv.density.PrependMultiDensityChannel">[docs]</a><span class="nd">@register_module</span>
+<span class="k">class</span> <span class="nc">PrependMultiDensityChannel</span><span class="p">(</span><span class="n">PrependDensityChannel</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Prepend a separate density channel for every channel to the current encoding.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">PrependDensityChannel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">multi</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
 
 
 <span class="nd">@_dispatch</span>
 <span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">coder</span><span class="p">:</span> <span class="n">PrependDensityChannel</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">B</span><span class="o">.</span><span class="n">Numeric</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
     <span class="n">d</span> <span class="o">=</span> <span class="n">data_dims</span><span class="p">(</span><span class="n">xz</span><span class="p">)</span>
     <span class="k">with</span> <span class="n">B</span><span class="o">.</span><span class="n">on_device</span><span class="p">(</span><span class="n">z</span><span class="p">):</span>
-        <span class="n">density_channel</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">B</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">z</span><span class="p">),</span> <span class="o">*</span><span class="n">batch</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">d</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">z</span><span class="p">)[</span><span class="o">-</span><span class="n">d</span><span class="p">:])</span>
+        <span class="k">if</span> <span class="n">coder</span><span class="o">.</span><span class="n">multi</span><span class="p">:</span>
+            <span class="c1"># Produce separate density channels.</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="o">-</span><span class="n">d</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Produce just one density channel.</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">coder</span><span class="o">.</span><span class="n">multi</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="o">-</span><span class="n">d</span> <span class="o">-</span> <span class="mi">1</span><span class="p">),</span> <span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">z</span><span class="p">))</span>
+        <span class="n">density_channel</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">B</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">z</span><span class="p">),</span> <span class="o">*</span><span class="n">batch</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="n">d</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">c</span><span class="p">,</span> <span class="o">*</span><span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">z</span><span class="p">)[</span><span class="o">-</span><span class="n">d</span><span class="p">:])</span>
     <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">B</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">density_channel</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="n">d</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
 
 
@@ -309,11 +335,30 @@ title="Open an issue"
     <span class="c1"># do the rest for us.</span>
     <span class="n">mask</span> <span class="o">=</span> <span class="n">z</span><span class="o">.</span><span class="n">mask</span>
     <span class="n">xz</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">code</span><span class="p">(</span><span class="n">coder</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="p">(</span><span class="n">mask</span> <span class="o">*</span> <span class="n">z</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">mask</span> <span class="o">*</span> <span class="n">z</span>
+
+
+<span class="nd">@register_module</span>
+<span class="k">class</span> <span class="nc">DivideByChannels</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Divide by the first `n` channels.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        spec (int or str): Channels to divide by.</span>
+<span class="sd">        epsilon (float): Value to add to the channel before dividing.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        spec (int or str): Channels to divide by.</span>
+<span class="sd">        epsilon (float): Value to add to the channel before dividing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@_dispatch</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">spec</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">epsilon</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spec</span> <span class="o">=</span> <span class="n">spec</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">epsilon</span> <span class="o">=</span> <span class="n">epsilon</span>
 
 
 <div class="viewcode-block" id="DivideByFirstChannel"><a class="viewcode-back" href="../../../../coders.html#neuralprocesses.coders.setconv.density.DivideByFirstChannel">[docs]</a><span class="nd">@register_module</span>
-<span class="k">class</span> <span class="nc">DivideByFirstChannel</span><span class="p">:</span>
+<span class="k">class</span> <span class="nc">DivideByFirstChannel</span><span class="p">(</span><span class="n">DivideByChannels</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Divide by the first channel.</span>
 
 <span class="sd">    Args:</span>
@@ -325,12 +370,28 @@ title="Open an issue"
 
     <span class="nd">@_dispatch</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-8</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">epsilon</span> <span class="o">=</span> <span class="n">epsilon</span></div>
+        <span class="n">DivideByChannels</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DivideByFirstHalf"><a class="viewcode-back" href="../../../../coders.html#neuralprocesses.coders.setconv.density.DivideByFirstHalf">[docs]</a><span class="nd">@register_module</span>
+<span class="k">class</span> <span class="nc">DivideByFirstHalf</span><span class="p">(</span><span class="n">DivideByChannels</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Divide by the first half of channels.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        epsilon (float): Value to add to the channels before dividing.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        epsilon (float): Value to add to the channels before dividing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@_dispatch</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-8</span><span class="p">):</span>
+        <span class="n">DivideByChannels</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;half&quot;</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">)</span></div>
 
 
 <span class="nd">@_dispatch</span>
 <span class="k">def</span> <span class="nf">code</span><span class="p">(</span>
-    <span class="n">coder</span><span class="p">:</span> <span class="n">DivideByFirstChannel</span><span class="p">,</span>
+    <span class="n">coder</span><span class="p">:</span> <span class="n">DivideByChannels</span><span class="p">,</span>
     <span class="n">xz</span><span class="p">,</span>
     <span class="n">z</span><span class="p">:</span> <span class="n">B</span><span class="o">.</span><span class="n">Numeric</span><span class="p">,</span>
     <span class="n">x</span><span class="p">,</span>
@@ -339,19 +400,25 @@ title="Open an issue"
 <span class="p">):</span>
     <span class="n">epsilon</span> <span class="o">=</span> <span class="n">epsilon</span> <span class="ow">or</span> <span class="n">coder</span><span class="o">.</span><span class="n">epsilon</span>
     <span class="n">d</span> <span class="o">=</span> <span class="n">data_dims</span><span class="p">(</span><span class="n">xz</span><span class="p">)</span>
-    <span class="n">slice_to_one</span> <span class="o">=</span> <span class="p">(</span><span class="bp">Ellipsis</span><span class="p">,</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span> <span class="o">+</span> <span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">),)</span> <span class="o">*</span> <span class="n">d</span>
-    <span class="n">slice_from_one</span> <span class="o">=</span> <span class="p">(</span><span class="bp">Ellipsis</span><span class="p">,</span> <span class="nb">slice</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span> <span class="o">+</span> <span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">),)</span> <span class="o">*</span> <span class="n">d</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">coder</span><span class="o">.</span><span class="n">spec</span><span class="p">,</span> <span class="n">B</span><span class="o">.</span><span class="n">Int</span><span class="p">):</span>
+        <span class="n">num_divide</span> <span class="o">=</span> <span class="n">coder</span><span class="o">.</span><span class="n">spec</span>
+    <span class="k">elif</span> <span class="n">coder</span><span class="o">.</span><span class="n">spec</span> <span class="o">==</span> <span class="s2">&quot;half&quot;</span><span class="p">:</span>
+        <span class="n">num_divide</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">z</span><span class="p">,</span> <span class="o">-</span><span class="n">d</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown specification `</span><span class="si">{</span><span class="n">coder</span><span class="o">.</span><span class="n">spec</span><span class="si">}</span><span class="s2">`.&quot;</span><span class="p">)</span>
+    <span class="n">slice1</span> <span class="o">=</span> <span class="p">(</span><span class="bp">Ellipsis</span><span class="p">,</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">num_divide</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span> <span class="o">+</span> <span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">),)</span> <span class="o">*</span> <span class="n">d</span>
+    <span class="n">slice2</span> <span class="o">=</span> <span class="p">(</span><span class="bp">Ellipsis</span><span class="p">,</span> <span class="nb">slice</span><span class="p">(</span><span class="n">num_divide</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">))</span> <span class="o">+</span> <span class="p">(</span><span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">),)</span> <span class="o">*</span> <span class="n">d</span>
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">xz</span><span class="p">,</span>
         <span class="n">B</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
-            <span class="n">z</span><span class="p">[</span><span class="n">slice_to_one</span><span class="p">],</span>
-            <span class="n">z</span><span class="p">[</span><span class="n">slice_from_one</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">z</span><span class="p">[</span><span class="n">slice_to_one</span><span class="p">]</span> <span class="o">+</span> <span class="n">epsilon</span><span class="p">),</span>
+            <span class="n">z</span><span class="p">[</span><span class="n">slice1</span><span class="p">],</span>
+            <span class="n">z</span><span class="p">[</span><span class="n">slice2</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">z</span><span class="p">[</span><span class="n">slice1</span><span class="p">]</span> <span class="o">+</span> <span class="n">epsilon</span><span class="p">),</span>
             <span class="n">axis</span><span class="o">=-</span><span class="n">d</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
         <span class="p">),</span>
     <span class="p">)</span>
 
 
-<span class="n">broadcast_coder_over_parallel</span><span class="p">(</span><span class="n">DivideByFirstChannel</span><span class="p">)</span>
+<span class="n">broadcast_coder_over_parallel</span><span class="p">(</span><span class="n">DivideByChannels</span><span class="p">)</span>
 </pre></div>
 
               </div>

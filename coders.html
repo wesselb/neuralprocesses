@@ -801,9 +801,44 @@ span the discretisation over.</p>
 </dd></dl>
 
 <dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.DivideByFirstHalf">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.density.</span></span><span class="sig-name descname"><span class="pre">DivideByFirstHalf</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/density.html#DivideByFirstHalf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.density.DivideByFirstHalf" title="Permalink to this definition">#</a></dt>
+<dd><p>Divide by the first half of channels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>epsilon</strong> (<em>float</em>) – Value to add to the channels before dividing.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.DivideByFirstHalf.epsilon">
+<span class="sig-name descname"><span class="pre">epsilon</span></span><a class="headerlink" href="#neuralprocesses.coders.setconv.density.DivideByFirstHalf.epsilon" title="Permalink to this definition">#</a></dt>
+<dd><p>Value to add to the channels before dividing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.PrependDensityChannel">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.density.</span></span><span class="sig-name descname"><span class="pre">PrependDensityChannel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/density.html#PrependDensityChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.density.PrependDensityChannel" title="Permalink to this definition">#</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.density.</span></span><span class="sig-name descname"><span class="pre">PrependDensityChannel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">multi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/density.html#PrependDensityChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.density.PrependDensityChannel" title="Permalink to this definition">#</a></dt>
 <dd><p>Prepend a density channel to the current encoding.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>multi</strong> (<em>bool</em><em>, </em><em>optional</em>) – Produce a separate density channel for every channel.
+If <cite>False</cite>, produce just one density channel for all channels. Defaults
+to <cite>False</cite>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.setconv.density.PrependMultiDensityChannel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.setconv.density.</span></span><span class="sig-name descname"><span class="pre">PrependMultiDensityChannel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/setconv/density.html#PrependMultiDensityChannel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.setconv.density.PrependMultiDensityChannel" title="Permalink to this definition">#</a></dt>
+<dd><p>Prepend a separate density channel for every channel to the current encoding.</p>
 </dd></dl>
 
 <span class="target" id="module-neuralprocesses.coders.setconv.identity"></span><dl class="py class">
