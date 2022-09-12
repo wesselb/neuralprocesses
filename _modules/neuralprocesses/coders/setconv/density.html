@@ -329,12 +329,11 @@ title="Open an issue"
 
 <span class="nd">@_dispatch</span>
 <span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">coder</span><span class="p">:</span> <span class="n">PrependDensityChannel</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">Masked</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
-    <span class="c1"># Apply mask to density channel _and_ the data channels. Since the mask has</span>
-    <span class="c1"># only one channel, we can simply pointwise multiply and broadcasting should</span>
-    <span class="c1"># do the rest for us.</span>
     <span class="n">mask</span> <span class="o">=</span> <span class="n">z</span><span class="o">.</span><span class="n">mask</span>
-    <span class="n">xz</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">code</span><span class="p">(</span><span class="n">coder</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">mask</span> <span class="o">*</span> <span class="n">z</span>
+    <span class="c1"># Set the missing values to zero. Zeros in the data channel do not affect the</span>
+    <span class="c1"># encoding.</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="n">z</span><span class="o">.</span><span class="n">y</span> <span class="o">*</span> <span class="n">mask</span>
+    <span class="k">return</span> <span class="n">code</span><span class="p">(</span><span class="n">coder</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">)</span>
 
 
 <span class="nd">@register_module</span>
