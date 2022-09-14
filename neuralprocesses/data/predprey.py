@@ -11,6 +11,11 @@ from ..dist.uniform import UniformDiscrete, UniformContinuous
 __all__ = ["PredPreyGenerator", "PredPreyRealGenerator"]
 
 
+# Determine the true scale of the hare-lynx data set. The simulator will be tuned to
+# this.
+_true_scale = np.mean(np.array(load()))
+
+
 def _predprey_step(state, x_y, t, dt, *, alpha, beta, delta, gamma, sigma):
     x = x_y[..., 0]
     y = x_y[..., 1]
@@ -83,6 +88,9 @@ def _predprey_simulate(state, dtype, t0, t1, dt, t_target, *, batch_size=16):
     t, traj = zip(*traj)
     t = B.to_active_device(B.cast(dtype, B.stack(*t)))
     traj = B.stack(*traj, axis=-1)
+
+    # Fix the scale of the trajectory.
+    traj = traj / B.mean(traj, axis=(1, 2), squeeze=False) * _true_scale
 
     # Undo the sorting.
     t = B.take(t, inv_perm)
