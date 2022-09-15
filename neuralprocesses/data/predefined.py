@@ -22,6 +22,8 @@ def construct_predefined_gens(
     x_range_target=(-2, 2),
     pred_logpdf=True,
     pred_logpdf_diag=True,
+    max_ctx=None,
+    max_trg=None,
     device="cpu",
 ):
     """Construct a number of predefined data generators.
@@ -71,8 +73,8 @@ def construct_predefined_gens(
             seed=seed,
             noise=0.05,
             kernel=kernel,
-            num_context=UniformDiscrete(0, 30 * dim_x),
-            num_target=UniformDiscrete(50 * dim_x, 50 * dim_x),
+            num_context=UniformDiscrete(0, max_ctx if max_ctx else 30 * dim_x),
+            num_target=UniformDiscrete(max_trg if max_trg else 50 * dim_x, max_trg if max_trg else 50 * dim_x),
             pred_logpdf=pred_logpdf,
             pred_logpdf_diag=pred_logpdf_diag,
             **config,
@@ -85,8 +87,8 @@ def construct_predefined_gens(
         # The sawtooth is hard already as it is. Do not add noise.
         noise=0,
         dist_freq=UniformContinuous(2 / factor, 4 / factor),
-        num_context=UniformDiscrete(0, 75 * dim_x),
-        num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+        num_context=UniformDiscrete(0, max_ctx if max_ctx else 75 * dim_x),
+        num_target=UniformDiscrete(max_trg if max_trg else 100 * dim_x, max_trg if max_trg else 100 * dim_x),
         **config,
     )
     # Be sure to use different seeds in the mixture components. We also use the high
@@ -98,8 +100,8 @@ def construct_predefined_gens(
                 seed=seed + i,
                 noise=0.05,
                 kernel=kernel,
-                num_context=UniformDiscrete(0, 75 * dim_x),
-                num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+                num_context=UniformDiscrete(0, max_ctx if max_ctx else 75 * dim_x),
+                num_target=UniformDiscrete(max_trg if max_trg else 100 * dim_x, max_trg if max_trg else 100 * dim_x),
                 pred_logpdf=pred_logpdf,
                 pred_logpdf_diag=pred_logpdf_diag,
                 **config,
@@ -113,8 +115,8 @@ def construct_predefined_gens(
             # The sawtooth is hard already as it is. Do not add noise.
             noise=0,
             dist_freq=UniformContinuous(2 / factor, 4 / factor),
-            num_context=UniformDiscrete(0, 75 * dim_x),
-            num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+            num_context=UniformDiscrete(0, max_ctx if max_ctx else 75 * dim_x),
+            num_target=UniformDiscrete(max_trg if max_trg else 100 * dim_x, max_trg if max_trg else 100 * dim_x),
             **config,
         ),
         seed=seed,
@@ -126,8 +128,8 @@ def construct_predefined_gens(
             seed=seed + len(kernels.items()) + i + 1,
             noise=0.05,
             kernel=kernels[kernel],
-            num_context=UniformDiscrete(0, 30 * dim_x),
-            num_target=UniformDiscrete(50 * dim_x, 50 * dim_x),
+            num_context=UniformDiscrete(0, max_ctx if max_ctx else 30 * dim_x),
+            num_target=UniformDiscrete(max_trg if max_trg else 50 * dim_x, max_trg if max_trg else 50 * dim_x),
             pred_logpdf=False,
             pred_logpdf_diag=False,
             mean_diff=mean_diff,

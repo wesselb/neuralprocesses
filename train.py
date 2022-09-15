@@ -4,6 +4,7 @@ import sys
 import time
 import warnings
 from functools import partial
+from time import time
 
 import experiment as exp
 import lab as B
@@ -19,10 +20,13 @@ __all__ = ["main"]
 warnings.filterwarnings("ignore", category=ToDenseWarning)
 
 
-def train(state, model, opt, objective, gen, *, fix_noise):
+def train(state, model, opt, objective, gen, total_time, *, fix_noise):
     """Train for an epoch."""
     vals = []
     for batch in gen.epoch():
+        
+        start = time()
+        
         state, obj = objective(
             state,
             model,
@@ -38,9 +42,12 @@ def train(state, model, opt, objective, gen, *, fix_noise):
         val.backward()
         opt.step()
 
+        end = time()
+        total_time = total_time + (end - start)
+        
     vals = B.concat(*vals)
     out.kv("Loglik (T)", exp.with_err(vals, and_lower=True))
-    return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
+    return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), total_time
 
 
 def eval(state, model, objective, gen):
@@ -72,7 +79,7 @@ def eval(state, model, objective, gen):
         if kls_diag:
             out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag), and_upper=True))
 
-        return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
+        return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), (B.mean(vals), B.std(vals) / B.sqrt(len(vals)))
 
 
 def main(**kw_args):
@@ -139,6 +146,8 @@ def main(**kw_args):
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--evaluate-fast", action="store_true")
+    parser.add_argument("--timing-run", action="store_true")
+    parser.add_argument("--timing-eval-every", type=int, default=10)
     parser.add_argument("--evaluate-num-plots", type=int, default=0)
     parser.add_argument(
         "--evaluate-objective",
@@ -264,8 +273,8 @@ def main(**kw_args):
     gen_train, gen_cv, gens_eval = exp.data[args.data]["setup"](
         args,
         config,
-        num_tasks_train=2**6 if args.train_fast else 2**14,
-        num_tasks_cv=2**6 if args.train_fast else 2**12,
+        num_tasks_train=2**6 if args.train_fast else 2**12, # 2**14,
+        num_tasks_cv=2**6 if args.train_fast else 2**9, # 2**12,
         num_tasks_eval=2**6 if args.evaluate_fast else 2**12,
         device=device,
     )
@@ -563,20 +572,20 @@ def main(**kw_args):
         if not args.ar or args.also_ar:
             # Make some plots.
             gen = gen_cv()
-            for i in range(args.evaluate_num_plots):
-                exp.visualise(
-                    model,
-                    gen,
-                    path=wd.file(f"evaluate-{i + 1:03d}.pdf"),
-                    config=config,
-                )
+            # for i in range(args.evaluate_num_plots):
+            #     exp.visualise(
+            #         model,
+            #         gen,
+            #         path=wd.file(f"evaluate-{i + 1:03d}.pdf"),
+            #         config=config,
+            #     )
 
             # For every objective and evaluation generator, do the evaluation.
             for objecive_name, objective_eval in objectives_eval:
                 with out.Section(objecive_name):
                     for gen_name, gen in gens_eval():
                         with out.Section(gen_name.capitalize()):
-                            state, _ = eval(state, model, objective_eval, gen)
+                            state, _, _ = eval(state, model, objective_eval, gen)
 
         # Always run AR evaluation for the conditional models.
         if not args.no_ar and (
@@ -584,14 +593,14 @@ def main(**kw_args):
         ):
             # Make some plots.
             gen = gen_cv()
-            for i in range(args.evaluate_num_plots):
-                exp.visualise(
-                    model,
-                    gen,
-                    path=wd.file(f"evaluate-ar-{i + 1:03d}.pdf"),
-                    config=config,
-                    predict=nps.ar_predict,
-                )
+            # for i in range(args.evaluate_num_plots):
+            #     exp.visualise(
+            #         model,
+            #         gen,
+            #         path=wd.file(f"evaluate-ar-{i + 1:03d}.pdf"),
+            #         config=config,
+            #         predict=nps.ar_predict,
+            #     )
 
             with out.Section("AR"):
                 for name, gen in gens_eval():
@@ -628,6 +637,7 @@ def main(**kw_args):
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
         B.epsilon = config["epsilon_start"]
+        total_time = 0.
 
         for i in range(start, args.epochs):
             with out.Section(f"Epoch {i + 1}"):
@@ -646,56 +656,85 @@ def main(**kw_args):
                         wd.file(f"model-epoch-{i+1}.torch"),
                     )
 
-
-                # Perform an epoch.
                 if config["fix_noise"] and i < config["fix_noise_epochs"]:
                     fix_noise = 1e-4
                 else:
                     fix_noise = None
-                state, _ = train(
+
+#                # The epoch is done. Now evaluate.
+#                state, val, (mean_loglik, stderr_loglik) = eval(state, model, objective_cv, gen_cv())
+#
+#                # Save current model.
+#                torch.save(
+#                    {
+#                        "weights": model.state_dict(),
+#                        "objective": val,
+#                        "epoch": i + 1,
+#                    },
+#                    wd.file(f"model-last.torch"),
+#                )
+#
+#                # Check if the model is the new best. If so, save it.
+#                if val > best_eval_lik:
+#                    out.out("New best model!")
+#                    best_eval_lik = val
+#                    torch.save(
+#                        {
+#                            "weights": model.state_dict(),
+#                            "objective": val,
+#                            "epoch": i + 1,
+#                        },
+#                        wd.file(f"model-best.torch"),
+#                    )
+                    
+                if args.timing_run and i % args.timing_eval_every == 0:
+
+                    state, val, (mean_loglik, stderr_loglik) = eval(state, model, objective_cv, gen_cv())
+                    
+                    if "cnp" in args.model:
+                        state, _, (mean_ar_loglik, stderr_ar_loglik) = eval(
+                            state,
+                            model,
+                            partial(
+                                nps.ar_loglik,
+                                order="random",
+                                normalise=not args.unnormalised,
+                            ),
+                            gen_cv(),
+                        )
+                        
+                    else:
+                        mean_ar_loglik = "NA"
+                        stderr_ar_loglik = "NA"
+
+                    with open(wd.file("timing.txt"), "a") as file:
+                        file.write(
+                                f"Epoch: {i-1} | Training time (sec): {total_time:.6f} | "
+                                f"Loglik: {mean_loglik} +/-  {stderr_loglik} | "
+                                f"AR Loglik: {mean_ar_loglik} +/-  {stderr_ar_loglik}\n"
+                        )
+
+                    out.out(f"Total training time: {total_time/60:.1f} min.")
+
+                # Visualise a few predictions by the model.
+                gen = gen_cv()
+                # for j in range(5):
+                #     exp.visualise(
+                #         model,
+                #         gen,
+                #         path=wd.file(f"train-epoch-{i + 1:03d}-{j + 1}.pdf"),
+                #         config=config,
+                #     )
+
+                state, _, total_time = train(
                     state,
                     model,
                     opt,
                     objective,
                     gen_train,
+                    total_time,
                     fix_noise=fix_noise,
                 )
-
-                # The epoch is done. Now evaluate.
-                state, val = eval(state, model, objective_cv, gen_cv())
-
-                # Save current model.
-                torch.save(
-                    {
-                        "weights": model.state_dict(),
-                        "objective": val,
-                        "epoch": i + 1,
-                    },
-                    wd.file(f"model-last.torch"),
-                )
-
-                # Check if the model is the new best. If so, save it.
-                if val > best_eval_lik:
-                    out.out("New best model!")
-                    best_eval_lik = val
-                    torch.save(
-                        {
-                            "weights": model.state_dict(),
-                            "objective": val,
-                            "epoch": i + 1,
-                        },
-                        wd.file(f"model-best.torch"),
-                    )
-
-                # Visualise a few predictions by the model.
-                gen = gen_cv()
-                for j in range(5):
-                    exp.visualise(
-                        model,
-                        gen,
-                        path=wd.file(f"train-epoch-{i + 1:03d}-{j + 1}.pdf"),
-                        config=config,
-                    )
 
 
 if __name__ == "__main__":

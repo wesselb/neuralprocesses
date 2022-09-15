@@ -9,6 +9,7 @@ __all__ = []
 
 
 def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
+    
     config["dim_x"] = args.dim_x
     config["dim_y"] = args.dim_y
 
@@ -59,6 +60,8 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
         pred_logpdf=True,
         pred_logpdf_diag=True,
         device=device,
+        max_ctx=30*args.dim_x,
+        max_trg=100,
         mean_diff=config["mean_diff"],
     )[name]
 
