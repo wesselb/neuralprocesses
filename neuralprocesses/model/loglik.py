@@ -89,7 +89,7 @@ def loglik(
 
     if normalise:
         # Normalise by the number of targets.
-        logpdfs = logpdfs / num_data(xt, yt)
+        logpdfs = logpdfs / B.cast(float64, num_data(xt, yt))
 
     return state, logpdfs
 

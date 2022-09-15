@@ -98,7 +98,7 @@ def elbo(
 
     if normalise:
         # Normalise by the number of targets.
-        elbos = elbos / num_data(xt, yt)
+        elbos = elbos / B.cast(float64, num_data(xt, yt))
 
     return state, elbos
 

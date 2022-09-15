@@ -249,23 +249,25 @@ def test_forward(nps, model_sample):
     check_prediction(nps, pred, yt)
 
 
+@pytest.mark.parametrize("normalise", [False, True])
 @pytest.mark.flaky(reruns=3)
-def test_elbo(nps, model_sample):
+def test_elbo(nps, model_sample, normalise):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-    elbos = nps.elbo(model, xc, yc, xt, yt, num_samples=2)
+    elbos = nps.elbo(model, xc, yc, xt, yt, num_samples=2, normalise=normalise)
     assert B.rank(elbos) == 1
     assert np.isfinite(B.to_numpy(B.sum(elbos)))
     assert B.dtype(elbos) == nps.dtype64
 
 
+@pytest.mark.parametrize("normalise", [False, True])
 @pytest.mark.flaky(reruns=3)
-def test_loglik(nps, model_sample):
+def test_loglik(nps, model_sample, normalise):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
-    logpdfs = nps.loglik(model, xc, yc, xt, yt, num_samples=2)
+    logpdfs = nps.loglik(model, xc, yc, xt, yt, num_samples=2, normalise=normalise)
     assert B.rank(logpdfs) == 1
     assert np.isfinite(B.to_numpy(B.sum(logpdfs)))
     assert B.dtype(logpdfs) == nps.dtype64
