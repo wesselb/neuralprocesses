@@ -135,6 +135,8 @@ def _repeat_concat(dims: B.Int, z1: B.Numeric, z2: B.Numeric):
         z2 = B.expand_dims(z2, axis=0)
     else:
         raise ValueError(f"Cannot concatenate tensors with ranks {rank} and {rank2}.")
+    # The ranks of `z1` and `z2` should now be the same. Take the rank of any.
+    rank = B.rank(z1)
 
     # Broadcast the data dimensions and possible sample dimension. There are `1 + dims`
     # many of them, so perform a loop.
