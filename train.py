@@ -139,7 +139,7 @@ def main(**kw_args):
     parser.add_argument("--evaluate", action="store_true")
     parser.add_argument("--evaluate-last", action="store_true")
     parser.add_argument("--evaluate-fast", action="store_true")
-    parser.add_argument("--evaluate-num-plots", type=int, default=0)
+    parser.add_argument("--evaluate-num-plots", type=int, default=5)
     parser.add_argument(
         "--evaluate-objective",
         choices=["loglik", "elbo"],
@@ -153,6 +153,12 @@ def main(**kw_args):
     parser.add_argument("--also-ar", action="store_true")
     parser.add_argument("--no-ar", action="store_true")
     parser.add_argument("--experiment-setting", type=str, nargs="*")
+    parser.add_argument(
+        "--eeg-mode",
+        type=str,
+        choices=["random", "interpolation", "forecasting", "reconstruction"]
+    )
+    
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -201,13 +207,16 @@ def main(**kw_args):
         # The default is training.
         suffix = "_train"
 
+    data_dir = args.data if args.mean_diff is None else f"{args.data}-{args.mean_diff}"
+    data_dir = data_dir if args.eeg_mode is None else f"{args.data}-{args.eeg_mode}"
+    
     # Setup script.
     if not observe:
         out.report_time = True
     wd = WorkingDirectory(
         *args.root,
         *(args.subdir or ()),
-        args.data if args.mean_diff is None else f"{args.data}-{args.mean_diff}",
+        data_dir,
         *((f"x{args.dim_x}_y{args.dim_y}",) if hasattr(args, "dim_x") else ()),
         args.model,
         *((args.arch,) if hasattr(args, "arch") else ()),
@@ -258,6 +267,7 @@ def main(**kw_args):
         # doesn't make sense to set it to a value higher of the last hidden layer of
         # the CNN architecture. We therefore set it to 64.
         "num_basis_functions": 64,
+        "eeg_mode": args.eeg_mode,
     }
 
     # Setup data generators for training and for evaluation.

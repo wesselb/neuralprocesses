@@ -7,8 +7,8 @@ __all__ = []
 
 
 def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
-    config["default"]["rate"] = 2e-4
-    config["default"]["epochs"] = 200
+    config["default"]["rate"] = 5e-5 # 2e-4
+    config["default"]["epochs"] = 1000 # 200
     config["dim_x"] = 1
     config["dim_y"] = 7
 
@@ -22,6 +22,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
     config["margin"] = 0.1
     config["conv_receptive_field"] = 1.0
     config["unet_strides"] = (1,) + (2,) * 5
+    
     # Increase the capacity of the ConvCNP, ConvGNP, and ConvNP to account for the many
     # outputs. The FullConvGNP is already large enough...
     if args.model in {"convcnp", "convgnp"}:
@@ -41,7 +42,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
         seed=0,
         batch_size=args.batch_size,
         num_tasks=num_tasks_train,
-        mode="random",
+        mode=config["eeg_mode"], # "random",
         subset="train",
         device=device,
     )
@@ -52,7 +53,7 @@ def setup(args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device
             seed=20,
             batch_size=args.batch_size,
             num_tasks=num_tasks_cv,
-            mode="random",
+            mode=config["eeg_mode"], # "random",
             subset="cv",
             device=device,
         )
