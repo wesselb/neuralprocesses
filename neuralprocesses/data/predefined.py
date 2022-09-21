@@ -17,9 +17,9 @@ def construct_predefined_gens(
     num_tasks=2**14,
     dim_x=1,
     dim_y=1,
-    mean_diff=0.0,
     x_range_context=(-2, 2),
     x_range_target=(-2, 2),
+    mean_diff=0.0,
     pred_logpdf=True,
     pred_logpdf_diag=True,
     device="cpu",
@@ -38,6 +38,8 @@ def construct_predefined_gens(
             context points. Defaults to `(-2, 2)`.
         x_range_target (tuple[float, float], optional): Range of the inputs of the
             target points. Defaults to `(-2, 2)`.
+        mean_diff (float, optional): Difference in means in the samples of
+            :class:`neuralprocesses.data.mixgp.MixtureGPGenerator`.
         pred_logpdf (bool, optional): Also compute the logpdf of the target set given
             the context set under the true GP. Defaults to `True`.
         pred_logpdf_diag (bool, optional): Also compute the logpdf of the target set
@@ -79,18 +81,21 @@ def construct_predefined_gens(
         )
         for name, kernel in kernels.items()
     }
+    # Previously, the maximum number of context points was `75 * dim_x`. However, if
+    # `dim_x == 1`, then this is too high. We therefore change that case, and keep all
+    # other cases the same.
+    max_context = 30 if dim_x == 1 else 2 * dim_x
     gens["sawtooth"] = SawtoothGenerator(
         dtype,
         seed=seed,
         # The sawtooth is hard already as it is. Do not add noise.
         noise=0,
         dist_freq=UniformContinuous(2 / factor, 4 / factor),
-        num_context=UniformDiscrete(0, 75 * dim_x),
+        num_context=UniformDiscrete(0, max_context),
         num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
         **config,
     )
-    # Be sure to use different seeds in the mixture components. We also use the high
-    # number of context and target points in all components.
+    # Be sure to use different seeds in the mixture components.
     gens["mixture"] = MixtureGenerator(
         *(
             GPGenerator(
@@ -98,7 +103,7 @@ def construct_predefined_gens(
                 seed=seed + i,
                 noise=0.05,
                 kernel=kernel,
-                num_context=UniformDiscrete(0, 75 * dim_x),
+                num_context=UniformDiscrete(0, max_context),
                 num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
                 pred_logpdf=pred_logpdf,
                 pred_logpdf_diag=pred_logpdf_diag,
@@ -113,7 +118,7 @@ def construct_predefined_gens(
             # The sawtooth is hard already as it is. Do not add noise.
             noise=0,
             dist_freq=UniformContinuous(2 / factor, 4 / factor),
-            num_context=UniformDiscrete(0, 75 * dim_x),
+            num_context=UniformDiscrete(0, max_context),
             num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
             **config,
         ),
