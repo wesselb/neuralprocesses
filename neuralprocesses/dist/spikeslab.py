@@ -245,3 +245,9 @@ def _spikeslab_concat(spikes, slab):
 @_dispatch
 def _spikeslab_concat(spikes, slab: Aggregate):
     return Aggregate(*(_spikeslab_concat(spikes, si) for si in slab))
+
+
+@B.dtype.dispatch
+def dtype(d: SpikesSlab):
+    # TODO: Fix this!
+    return B.dtype(d.logpdfs)
