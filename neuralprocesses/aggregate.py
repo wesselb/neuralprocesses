@@ -78,13 +78,19 @@ def _map_f(name, num_args):
         raise ValueError(f"Invalid number of arguments {num_args}.")
 
 
+_map_f("shape", 1)
+_map_f("expand_dims", 1)
+_map_f("exp", 1)
+_map_f("one", 1)
+_map_f("zero", 1)
 _map_f("mean", 1)
+_map_f("sum", 1)
+_map_f("logsumexp", 1)
 
 _map_f("add", 2)
 _map_f("subtract", 2)
 _map_f("multiply", 2)
 _map_f("divide", 2)
-
 
 _map_f("stack", "*")
 _map_f("concat", "*")

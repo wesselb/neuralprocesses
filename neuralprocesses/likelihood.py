@@ -112,14 +112,12 @@ def code(
 
 
 @_dispatch
-def _code_het(
+def _het(
     coder: HeterogeneousGaussianLikelihood,
     xz: AggregateInput,
     z: Aggregate,
 ):
-    means, noises, shapes = zip(
-        *[_code_het(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
-    )
+    means, noises, shapes = zip(*[_het(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)])
 
     # Concatenate into one big Gaussian.
     mean = B.concat(*means, axis=-1)
@@ -130,7 +128,7 @@ def _code_het(
 
 
 @_dispatch
-def _code_het(coder: HeterogeneousGaussianLikelihood, xz, z: B.Numeric):
+def _het(coder: HeterogeneousGaussianLikelihood, xz, z: B.Numeric):
     d = data_dims(xz)
     dim_y = B.shape(z, -d - 1) // 2
 
@@ -393,7 +391,7 @@ def code(
     dtype_lik=None,
     **kw_args,
 ):
-    alpha, beta, logp0, logp1, logps, shape = _code_spikesbeta(coder, xz, z)
+    alpha, beta, logp0, logp1, logps, d = _spikesbeta(coder, xz, z)
 
     # Cast parameters to the right data type.
     if dtype_lik:
@@ -408,52 +406,45 @@ def code(
         dtype = dtype_lik or B.dtype(z)
         spikes = B.stack(B.one(dtype), B.zero(dtype))
 
-    print(logp0.shape, logp1.shape, logps.shape)
     return xz, SpikesSlab(
         spikes,
         Beta(alpha, beta),
         B.stack(logp0, logp1, logps, axis=-1),
+        d,
         epsilon=coder.epsilon,
         slab_safe_value=0.5,
     )
 
 
 @_dispatch
-def _code_spikesbeta(
+def _spikesbeta(
     coder: SpikesBetaLikelihood,
     xz: AggregateInput,
     z: Aggregate,
 ):
-    alphas, betas, logp0s, logp1s, logpss, shapes = zip(
-        *[_code_spikesbeta(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
+    alphas, betas, logp0s, logp1s, logpss, ds = zip(
+        *[_spikesbeta(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
     )
 
     # Concatenate into one big distribution.
-    alpha = B.concat(*alphas, axis=-1)
-    beta = B.concat(*betas, axis=-1)
-    logp0 = B.concat(*logp0s, axis=-1)
-    logp1 = B.concat(*logp1s, axis=-1)
-    logps = B.concat(*logpss, axis=-1)
-    shape = Aggregate(*shapes)
+    alpha = Aggregate(*alphas)
+    beta = Aggregate(*betas)
+    logp0 = Aggregate(*logp0s)
+    logp1 = Aggregate(*logp1s)
+    logps = Aggregate(*logpss)
+    d = Aggregate(*ds)
 
-    return alpha, beta, logp0, logp1, logps, shape
+    return alpha, beta, logp0, logp1, logps, d
 
 
 @_dispatch
-def _code_spikesbeta(coder: SpikesBetaLikelihood, xz, z: B.Numeric):
+def _spikesbeta(coder: SpikesBetaLikelihood, xz, z: B.Numeric):
     d = data_dims(xz)
     dim_y = B.shape(z, -d - 1) // 5
 
     z_alpha, z_beta, z_logp0, z_logp1, z_logps = split(
         z, (dim_y, dim_y, dim_y, dim_y, dim_y), -d - 1
     )
-
-    # Vectorise the data. Record the shape!
-    z_alpha, shape = _vectorise(z_alpha, d + 1)
-    z_beta, _ = _vectorise(z_beta, d + 1)
-    z_logp0, _ = _vectorise(z_logp0, d + 1)
-    z_logp1, _ = _vectorise(z_logp1, d + 1)
-    z_logps, _ = _vectorise(z_logps, d + 1)
 
     # Transform into parameters.
     alpha = B.sigmoid(z_alpha)
@@ -462,4 +453,4 @@ def _code_spikesbeta(coder: SpikesBetaLikelihood, xz, z: B.Numeric):
     logp1 = z_logp1
     logps = z_logps
 
-    return alpha, beta, logp0, logp1, logps, shape
+    return alpha, beta, logp0, logp1, logps, d
