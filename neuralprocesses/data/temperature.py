@@ -305,6 +305,8 @@ class TemperatureGenerator(DataGenerator):
         target_elev (bool): Append the elevation at the target inputs as auxiliary
             information.
         passes (int): How many times to cycle through the data in an epoch.
+        data (:class:`neuralprocesses.data.temperature._TemperatureData`):
+            The raw data.
         device (str): Device.
     """
 
@@ -353,6 +355,8 @@ class TemperatureGenerator(DataGenerator):
             context_elev_hr=context_elev_hr,
             target_elev_interpolate=target_elev_interpolate,
         )
+        # Expose the raw data to the user.
+        self.data = data
 
         if subset == "train":
             mask = data.train_mask
