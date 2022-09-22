@@ -250,4 +250,4 @@ def _spikeslab_concat(spikes, slab: Aggregate):
 @B.dtype.dispatch
 def dtype(d: SpikesSlab):
     # TODO: Fix this!
-    return B.dtype(d.logpdfs)
+    return B.dtype(d.logprobs)
