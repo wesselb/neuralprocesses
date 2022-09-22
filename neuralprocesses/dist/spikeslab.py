@@ -197,7 +197,11 @@ class SpikesSlab(AbstractDistribution):
 
 @B.shape_batch.dispatch
 def shape_batch(d: SpikesSlab):
-    shape = B.shape_broadcast(d.slab, d.logprobs[..., 0])
+    if isinstance(d.logprobs, Aggregate):
+        logprobs = Aggregate(*(x[..., 0] for x in d.logprobs))
+    else:
+        logprobs = d.logprobs
+    shape = B.shape_broadcast(d.slab, logprobs)
     if isinstance(shape, Aggregate):
         shape = broadcast(*shape)
     return shape

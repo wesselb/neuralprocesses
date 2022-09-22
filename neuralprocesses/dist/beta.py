@@ -110,8 +110,8 @@ def dtype(d: Beta):
     return B.dtype(d.alpha, d.beta)
 
 
-@B.shape_batch.dispatch
-def shape_batch(d: Beta):
+@B.shape.dispatch
+def shape(d: Beta):
     shape = B.shape_broadcast(d.alpha, d.beta)
     if isinstance(shape, Aggregate):
         shape = broadcast(*shape)
