@@ -47,6 +47,10 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
             ),
             nps.DenseGaussianLikelihood(),
         )
+    elif spec == "spikes-beta":
+        num_channels = (2 + 3) * dim_y  # Alpha, beta, and three log-probabilities
+        selector = nps.SelectFromChannels(dim_y, dim_y, dim_y, dim_y, dim_y)
+        lik = nps.SpikesBetaLikelihood()
 
     else:
         raise ValueError(f'Incorrect likelihood specification "{spec}".')

@@ -7,7 +7,7 @@ from lab.util import resolve_axis
 from . import _dispatch
 from .aggregate import AggregateInput, Aggregate
 from .datadims import data_dims
-from .dist import MultiOutputNormal, Dirac
+from .dist import MultiOutputNormal, Dirac, SpikesSlab, Beta
 from .parallel import Parallel
 from .util import register_module, split, split_dimension
 
@@ -89,7 +89,7 @@ class HeterogeneousGaussianLikelihood(AbstractLikelihood):
         return repr(self)
 
     def __repr__(self):
-        return "HeterogeneousGaussianLikelihood()"
+        return f"HeterogeneousGaussianLikelihood(epsilon={self.epsilon!r})"
 
 
 @_dispatch
@@ -169,7 +169,9 @@ class LowRankGaussianLikelihood(AbstractLikelihood):
         return repr(self)
 
     def __repr__(self):
-        return f"LowRankGaussianLikelihood(rank={self.rank})"
+        return (
+            f"LowRankGaussianLikelihood(rank={self.rank!r}, epsilon={self.epsilon!r})"
+        )
 
 
 @_dispatch
@@ -261,7 +263,7 @@ class DenseGaussianLikelihood(AbstractLikelihood):
         return repr(self)
 
     def __repr__(self):
-        return "DenseGaussianLikelihood()"
+        return r"DenseGaussianLikelihood(epsilon={self.epsilon!r})"
 
 
 @_dispatch
@@ -357,3 +359,107 @@ def _dense_var(coder: DenseGaussianLikelihood, xz, z: B.Numeric):
     z, _ = _vectorise(z, d + 1)
 
     return z
+
+
+@register_module
+class SpikesBetaLikelihood(AbstractLikelihood):
+    """Gaussian likelihood with heterogeneous noise.
+
+    Args:
+        epsilon (float, optional): Tolerance for equality checking. Defaults to `1e-6`.
+
+    Args:
+        epsilon (float): Tolerance for equality checking.
+    """
+
+    @_dispatch
+    def __init__(self, epsilon: float = 1e-6):
+        self.epsilon = epsilon
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return f"SpikesBetaLikelihood(epsilon={self.epsilon!r})"
+
+
+@_dispatch
+def code(
+    coder: SpikesBetaLikelihood,
+    xz,
+    z,
+    x,
+    *,
+    dtype_lik=None,
+    **kw_args,
+):
+    alpha, beta, logp0, logp1, logps, shape = _code_spikesbeta(coder, xz, z)
+
+    # Cast parameters to the right data type.
+    if dtype_lik:
+        alpha = B.cast(dtype_lik, alpha)
+        beta = B.cast(dtype_lik, beta)
+        logp0 = B.cast(dtype_lik, logp0)
+        logp1 = B.cast(dtype_lik, logp1)
+        logps = B.cast(dtype_lik, logps)
+
+    # Create the spikes vector.
+    with B.on_device(z):
+        dtype = dtype_lik or B.dtype(z)
+        spikes = B.stack(B.one(dtype), B.zero(dtype))
+
+    print(logp0.shape, logp1.shape, logps.shape)
+    return xz, SpikesSlab(
+        spikes,
+        Beta(alpha, beta),
+        B.stack(logp0, logp1, logps, axis=-1),
+        epsilon=coder.epsilon,
+        slab_safe_value=0.5,
+    )
+
+
+@_dispatch
+def _code_spikesbeta(
+    coder: SpikesBetaLikelihood,
+    xz: AggregateInput,
+    z: Aggregate,
+):
+    alphas, betas, logp0s, logp1s, logpss, shapes = zip(
+        *[_code_spikesbeta(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
+    )
+
+    # Concatenate into one big distribution.
+    alpha = B.concat(*alphas, axis=-1)
+    beta = B.concat(*betas, axis=-1)
+    logp0 = B.concat(*logp0s, axis=-1)
+    logp1 = B.concat(*logp1s, axis=-1)
+    logps = B.concat(*logpss, axis=-1)
+    shape = Aggregate(*shapes)
+
+    return alpha, beta, logp0, logp1, logps, shape
+
+
+@_dispatch
+def _code_spikesbeta(coder: SpikesBetaLikelihood, xz, z: B.Numeric):
+    d = data_dims(xz)
+    dim_y = B.shape(z, -d - 1) // 5
+
+    z_alpha, z_beta, z_logp0, z_logp1, z_logps = split(
+        z, (dim_y, dim_y, dim_y, dim_y, dim_y), -d - 1
+    )
+
+    # Vectorise the data. Record the shape!
+    z_alpha, shape = _vectorise(z_alpha, d + 1)
+    z_beta, _ = _vectorise(z_beta, d + 1)
+    z_logp0, _ = _vectorise(z_logp0, d + 1)
+    z_logp1, _ = _vectorise(z_logp1, d + 1)
+    z_logps, _ = _vectorise(z_logps, d + 1)
+
+    # Transform into parameters.
+    alpha = B.sigmoid(z_alpha)
+    beta = B.sigmoid(z_beta)
+    logp0 = z_logp0
+    logp1 = z_logp1
+    logps = z_logps
+
+    return alpha, beta, logp0, logp1, logps, shape
