@@ -204,6 +204,16 @@ def shape(d: SpikesSlab):
     return B.shape_broadcast(d.slab, d.logprobs[..., 0])
 
 
+@B.shape_batch.dispatch
+def shape_batch(d: SpikesSlab):
+    return B.shape_batch_broadcast(d.slab, d.logprobs[..., 0])
+
+
+@B.shape_matrix.dispatch
+def shape_matrix(d: SpikesSlab):
+    return B.shape_matrix_broadcast(d.slab, d.logprobs[..., 0])
+
+
 @_dispatch
 def _sum_sample_dims(x: B.Numeric, d: B.Int):
     for _ in range(d):

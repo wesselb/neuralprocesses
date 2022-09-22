@@ -112,3 +112,13 @@ def dtype(d: Beta):
 @B.shape.dispatch
 def shape(d: Beta):
     return B.shape_broadcast(d.alpha, d.beta)
+
+
+@B.shape_batch.dispatch
+def shape(d: Beta):
+    return B.shape_batch_broadcast(d.alpha, d.beta)
+
+
+@B.shape_matrix.dispatch
+def shape(d: Beta):
+    return B.shape_matrix_broadcast(d.alpha, d.beta)
