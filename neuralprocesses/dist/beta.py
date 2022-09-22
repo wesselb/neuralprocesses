@@ -1,4 +1,5 @@
 import lab as B
+from matrix.shape import broadcast
 
 from .dist import AbstractDistribution
 from .. import _dispatch
@@ -109,16 +110,9 @@ def dtype(d: Beta):
     return B.dtype(d.alpha, d.beta)
 
 
-@B.shape.dispatch
-def shape(d: Beta):
-    return B.shape_broadcast(d.alpha, d.beta)
-
-
 @B.shape_batch.dispatch
-def shape(d: Beta):
-    return B.shape_batch_broadcast(d.alpha, d.beta)
-
-
-@B.shape_matrix.dispatch
-def shape(d: Beta):
-    return B.shape_matrix_broadcast(d.alpha, d.beta)
+def shape_batch(d: Beta):
+    shape = B.shape_broadcast(d.alpha, d.beta)
+    if isinstance(shape, Aggregate):
+        shape = broadcast(*shape)
+    return shape

@@ -1,9 +1,10 @@
 import lab as B
+from matrix.shape import broadcast
 from wbml.util import indented_kv
 
 from .dist import AbstractDistribution
-from ..aggregate import Aggregate
 from .. import _dispatch
+from ..aggregate import Aggregate
 
 __all__ = ["SpikesSlab"]
 
@@ -194,24 +195,12 @@ class SpikesSlab(AbstractDistribution):
         return state, sample_spikes + slab_indicator * sample_slab
 
 
-@B.dtype.dispatch
-def dtype(d: SpikesSlab):
-    return B.dtype(d.spikes, d.slab, d.logprobs)
-
-
-@B.shape.dispatch
-def shape(d: SpikesSlab):
-    return B.shape_broadcast(d.slab, d.logprobs[..., 0])
-
-
 @B.shape_batch.dispatch
 def shape_batch(d: SpikesSlab):
-    return B.shape_batch_broadcast(d.slab, d.logprobs[..., 0])
-
-
-@B.shape_matrix.dispatch
-def shape_matrix(d: SpikesSlab):
-    return B.shape_matrix_broadcast(d.slab, d.logprobs[..., 0])
+    shape = B.shape_broadcast(d.slab, d.logprobs[..., 0])
+    if isinstance(shape, Aggregate):
+        shape = broadcast(*shape)
+    return shape
 
 
 @_dispatch
