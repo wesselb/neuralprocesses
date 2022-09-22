@@ -73,6 +73,10 @@ class SpikesSlab(AbstractDistribution):
         )
 
     @property
+    def noiseless(self):
+        return self
+
+    @property
     def mean(self):
         return self.m1
 
