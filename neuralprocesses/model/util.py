@@ -5,7 +5,7 @@ from plum import Union
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
 from ..dist import (
-    AbstractMultiOutputDistribution,
+    AbstractDistribution,
     MultiOutputNormal,
     TransformedMultiOutputDistribution,
 )
@@ -17,7 +17,7 @@ __all__ = ["sample", "fix_noise", "compress_contexts", "tile_for_sampling"]
 @_dispatch
 def sample(
     state: B.RandomState,
-    x: AbstractMultiOutputDistribution,
+    x: AbstractDistribution,
     num: Union[B.Int, None] = None,
 ):
     """Sample an encoding:
@@ -48,12 +48,12 @@ def fix_noise(d, value: None):
     """Fix the noise of a prediction.
 
     Args:
-        d (:class:`neuralprocesses.dist.dist.AbstractMultiOutputDistribution`):
+        d (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
             Prediction.
         value (float or None): Value to fix it to.
 
     Returns:
-        :class:`neuralprocesses.dist.dist.AbstractMultiOutputDistribution`: Prediction
+        :class:`neuralprocesses.dist.dist.AbstractDistribution`: Prediction
             with noise fixed.
     """
     return d

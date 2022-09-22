@@ -6,7 +6,7 @@ from .util import sample, fix_noise as fix_noise_in_pred, compress_contexts
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
 from ..coding import code, code_track, recode_stochastic
-from ..dist import AbstractMultiOutputDistribution
+from ..dist import AbstractDistribution
 from ..numdata import num_data
 from ..parallel import Parallel
 
@@ -117,7 +117,7 @@ def elbo(model: Model, *args, **kw_args):
 
 
 @_dispatch
-def _kl(q: AbstractMultiOutputDistribution, p: AbstractMultiOutputDistribution):
+def _kl(q: AbstractDistribution, p: AbstractDistribution):
     return q.kl(p)
 
 

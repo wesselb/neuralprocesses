@@ -2,7 +2,7 @@ import matrix  # noqa
 from plum import ptype, Signature
 
 from . import _dispatch
-from .dist import Dirac, AbstractMultiOutputDistribution
+from .dist import Dirac, AbstractDistribution
 from .parallel import Parallel
 from .util import is_composite_coder
 
@@ -146,6 +146,6 @@ def _choose(new: Dirac, old: Dirac):
 
 
 @_dispatch
-def _choose(new: AbstractMultiOutputDistribution, old: AbstractMultiOutputDistribution):
+def _choose(new: AbstractDistribution, old: AbstractDistribution):
     # Do recode other distributions.
     return new

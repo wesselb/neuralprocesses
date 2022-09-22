@@ -5,7 +5,7 @@ from plum import parametric, Union
 from stheno import Normal
 from wbml.util import indented_kv
 
-from .dist import AbstractMultiOutputDistribution
+from .dist import AbstractDistribution
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..util import batch, split
@@ -52,7 +52,7 @@ def _monormal_unvectorise(x: B.Numeric, shape: Aggregate, **kw_args):
 
 
 @parametric
-class MultiOutputNormal(AbstractMultiOutputDistribution):
+class MultiOutputNormal(AbstractDistribution):
     """A normal distribution for multiple outputs. Use one of the class methods to
     construct the object.
 

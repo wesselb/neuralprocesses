@@ -1,7 +1,7 @@
 import lab as B
 from wbml.util import indented_kv
 
-from .dist import AbstractMultiOutputDistribution
+from .dist import AbstractDistribution
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..util import batch
@@ -9,18 +9,18 @@ from ..util import batch
 __all__ = ["Dirac"]
 
 
-class Dirac(AbstractMultiOutputDistribution):
+class Dirac(AbstractDistribution):
     """A Dirac delta.
 
     Also accepts aggregated of its arguments.
 
     Args:
-        x (tensor): Position of the Dirac delta of shape `(*b, c, *n)`.
-        d (int): Dimensionality of the data, i.e. `len(n)`.
+        x (tensor): Position of the Dirac delta.
+        d (int): Dimensionality of the data.
 
     Attributes:
-        x (tensor): Position of the Dirac delta of shape `(*b, c, *n)`.
-        d (int): Dimensionality of the data, i.e. `len(n)`.
+        x (tensor): Position of the Dirac delta.
+        d (int): Dimensionality of the data.
     """
 
     def __init__(self, x, d):
