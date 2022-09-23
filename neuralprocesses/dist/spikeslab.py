@@ -92,11 +92,11 @@ class SpikesSlab(AbstractDistribution):
         return logprob_cat + logpdf_slab
 
     @_dispatch
-    def logpdf_cat(self, logprobs: Aggregate, d: B.Int, x: Aggregate):
+    def logpdf_cat(self, logprobs: Aggregate, d: Aggregate, x: Aggregate):
         li, ii = zip(
             *(self.logpdf_cat(li, di, xi) for li, di, xi in zip(logprobs, d, x))
         )
-        return Aggregate(*li), Aggregate(*ii)
+        return sum(li, 0), Aggregate(*ii)
 
     @_dispatch
     def logpdf_cat(self, logprobs: B.Numeric, d: B.Int, x: B.Numeric):
