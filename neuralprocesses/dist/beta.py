@@ -1,9 +1,10 @@
 import lab as B
 from matrix.shape import broadcast
 
-from .dist import AbstractDistribution
+from .dist import AbstractDistribution, shape_batch
 from .. import _dispatch
 from ..aggregate import Aggregate
+from ..mask import Masked
 
 __all__ = ["Beta"]
 
@@ -14,15 +15,18 @@ class Beta(AbstractDistribution):
     Args:
         alpha (tensor): Shape parameter `alpha`.
         beta (tensor): Shape parameter `beta`.
+        d (int): Dimensionality of the sample.
 
     Attributes:
         alpha (tensor): Shape parameter `alpha`.
         beta (tensor): Shape parameter `beta`.
+        d (int): Dimensionality of the sample.
     """
 
-    def __init__(self, alpha, beta):
+    def __init__(self, alpha, beta, d):
         self.alpha = alpha
         self.beta = beta
+        self.d = d
 
     @property
     def mean(self):
@@ -32,19 +36,11 @@ class Beta(AbstractDistribution):
     def var(self):
         sum = B.add(self.alpha, self.beta)
         with B.on_device(sum):
-            return B.divide(
-                B.multiply(self.alpha, self.beta),
-                B.multiply(B.multiply(sum, sum), B.add(sum, B.one(sum))),
-            )
-
-    @property
-    def m1(self):
-        return self.mean
-
-    @property
-    def m2(self):
-        mean = self.mean
-        return B.add(self.var, B.multiply(mean, mean))
+            one = B.one(sum)
+        return B.divide(
+            B.multiply(self.alpha, self.beta),
+            B.multiply(B.multiply(sum, sum), B.add(sum, one)),
+        )
 
     @_dispatch
     def sample(
@@ -83,20 +79,38 @@ class Beta(AbstractDistribution):
 
     @_dispatch
     def logpdf(self, x):
-        # TODO: This behaviour is wrong! Refactor!
-        return self.logpdf(self.alpha, self.beta, x)
+        return self.logpdf(self.alpha, self.beta, self.d, x)
 
     @_dispatch
-    def logpdf(self, alpha: Aggregate, beta: Aggregate, x: Aggregate):
-        return Aggregate(
-            *(self.logpdf(ai, bi, xi) for ai, bi, xi in zip(alpha, beta, x))
+    def logpdf(self, alpha: Aggregate, beta: Aggregate, d: Aggregate, x: Aggregate):
+        return sum(
+            [self.logpdf(ai, bi, di, xi) for ai, bi, di, xi in zip(alpha, beta, d, x)],
+            0,
         )
 
     @_dispatch
-    def logpdf(self, alpha: B.Numeric, beta: B.Numeric, x: B.Numeric):
-        return (
-            (alpha - 1) * B.log(x) + (beta - 1) * B.log(1 - x) - B.logbeta(alpha, beta)
-        )
+    def logpdf(self, alpha: B.Numeric, beta: B.Numeric, d: B.Int, x: Masked):
+        x, mask = x.y, x.mask
+        with B.on_device(alpha):
+            safe = B.to_active_device(B.cast(B.dtype(alpha), 0.5))
+        # Make inputs safe.
+        x = mask * x + (1 - mask) * safe
+        # Run with safe inputs, and filter out the right logpdfs.
+        return self.logpdf(alpha, beta, d, x, mask=mask)
+
+    @_dispatch
+    def logpdf(
+        self,
+        alpha: B.Numeric,
+        beta: B.Numeric,
+        d: B.Int,
+        x: B.Numeric,
+        *,
+        mask=1,
+    ):
+        logz = B.logbeta(alpha, beta)
+        logpdf = (alpha - 1) * B.log(x) + (beta - 1) * B.log(1 - x) - logz
+        return B.sum(mask * logpdf, axis=tuple(range(B.rank(logpdf)))[-d:])
 
     def __str__(self):
         return f"Beta({self.alpha}, {self.beta})"
@@ -106,13 +120,22 @@ class Beta(AbstractDistribution):
 
 
 @B.dtype.dispatch
-def dtype(d: Beta):
-    return B.dtype(d.alpha, d.beta)
+def dtype(dist: Beta):
+    return B.dtype(dist.alpha, dist.beta)
 
 
-@B.shape.dispatch
-def shape(d: Beta):
-    shape = B.shape_broadcast(d.alpha, d.beta)
-    if isinstance(shape, Aggregate):
-        shape = broadcast(*shape)
-    return shape
+@shape_batch.dispatch
+def shape_batch(dist: Beta):
+    return shape_batch(dist, dist.alpha, dist.beta, dist.d)
+
+
+@shape_batch.dispatch
+def shape_batch(dist: Beta, alpha: B.Numeric, beta: B.Numeric, d: B.Int):
+    return B.shape_broadcast(alpha, beta)[:-d]
+
+
+@shape_batch.dispatch
+def shape_batch(dist: Beta, alpha: Aggregate, beta: Aggregate, d: Aggregate):
+    return broadcast(
+        *(shape_batch(dist, ai, bi, di) for ai, bi, di in zip(alpha, beta, d))
+    )

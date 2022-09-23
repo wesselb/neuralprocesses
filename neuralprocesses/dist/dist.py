@@ -1,9 +1,10 @@
+import abc
+
 import lab as B
 
 from .. import _dispatch
-import abc
 
-__all__ = ["AbstractDistribution", "AbstractMultiOutputDistribution"]
+__all__ = ["AbstractDistribution", "AbstractMultiOutputDistribution", "shape_batch"]
 
 
 class AbstractDistribution(metaclass=abc.ABCMeta):
@@ -59,13 +60,27 @@ class AbstractDistribution(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError(f"Log-pdf of {self} cannot be computed.")
 
+    @property
     def mean(self):
         """tensor: Mean."""
-        raise NotImplementedError(f"Mean of {self} cannot be computed.")
+        return self.m1
 
+    @property
     def var(self):
         """tensor: Marginal variance."""
-        raise NotImplementedError(f"Variance of {self} cannot be computed.")
+        m1 = self.m1
+        return B.subtract(self.m2, B.multiply(m1, m1))
+
+    @property
+    def m1(self):
+        """tensor: First moment."""
+        return self.mean
+
+    @property
+    def m2(self):
+        """tensor: Second moment."""
+        mean = self.mean
+        return B.add(self.var, B.multiply(mean, mean))
 
     def kl(self, other):
         """Compute the KL-divergence with respect to another distribution.
@@ -91,3 +106,23 @@ class AbstractDistribution(metaclass=abc.ABCMeta):
 
 # Support this for backwards compatibility.
 AbstractMultiOutputDistribution = AbstractDistribution
+
+
+@_dispatch
+def shape_batch(dist: AbstractDistribution):
+    """Determine the batch shape of a distribution.
+
+    Args:
+        dist (:class:`.AbstractDistribution`): Distribution.
+        *dims (int, optional): Dimensions to get.
+
+    Returns:
+        shape or int: Batch shape of the prediction of `dist`.
+    """
+    raise NotImplementedError(f"Cannot determine the batch shape of {dist}.")
+
+
+@_dispatch
+def shape_batch(dist, *dims: B.Int):
+    dist_shape_batch = shape_batch(dist)
+    return B.squeeze(tuple(dist_shape_batch[d] for d in dims))

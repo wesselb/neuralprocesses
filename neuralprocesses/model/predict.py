@@ -3,6 +3,7 @@ import numpy as np
 
 from .model import Model
 from .. import _dispatch
+from ..dist import shape_batch
 
 __all__ = ["predict"]
 
@@ -60,7 +61,7 @@ def predict(
         # If the number of samples is equal to one but `num_samples > 1`, then the
         # encoding was a `Dirac`, so we can stop batching. In this case, we can
         # efficiently compute everything that we need and exit.
-        if this_num_samples > 1 and B.shape_batch(pred, 0) == 1:
+        if this_num_samples > 1 and shape_batch(pred, 0) == 1:
             state, ft = pred.noiseless.sample(state, num_samples)
             state, yt = pred.sample(state, num_samples)
             return (

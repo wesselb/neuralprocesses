@@ -3,7 +3,7 @@ from functools import partial
 import lab as B
 from wbml.util import indented_kv
 
-from .dist import AbstractDistribution
+from .dist import AbstractDistribution, shape_batch
 from .normal import _map_sample_output
 from .. import _dispatch
 from ..aggregate import Aggregate
@@ -241,9 +241,9 @@ def cast(dtype: B.DType, dist: TransformedMultiOutputDistribution):
     return TransformedMultiOutputDistribution(B.cast(dtype, dist.dist), dist.transform)
 
 
-@B.dispatch
+@shape_batch.dispatch
 def shape_batch(dist: TransformedMultiOutputDistribution):
-    return B.shape_batch(dist.dist)
+    return shape_batch(dist.dist)
 
 
 @_dispatch

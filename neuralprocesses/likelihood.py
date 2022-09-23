@@ -408,7 +408,7 @@ def code(
 
     return xz, SpikesSlab(
         spikes,
-        Beta(alpha, beta),
+        Beta(alpha, beta, d),
         B.stack(logp0, logp1, logps, axis=-1),
         d,
         epsilon=coder.epsilon,
@@ -453,4 +453,4 @@ def _spikesbeta(coder: SpikesBetaLikelihood, xz, z: B.Numeric):
     logp1 = z_logp1
     logps = z_logps
 
-    return alpha, beta, logp0, logp1, logps, d
+    return alpha, beta, logp0, logp1, logps, d + 1

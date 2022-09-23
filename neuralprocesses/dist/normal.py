@@ -5,7 +5,7 @@ from plum import parametric, Union
 from stheno import Normal
 from wbml.util import indented_kv
 
-from .dist import AbstractDistribution
+from .dist import AbstractDistribution, shape_batch
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..util import batch, split
@@ -237,7 +237,7 @@ def cast(dtype: B.DType, dist: MultiOutputNormal):
     )
 
 
-@B.dispatch
+@shape_batch.dispatch
 def shape_batch(dist: MultiOutputNormal):
     return B.shape_batch_broadcast(dist._mean, dist._var, dist._noise)
 

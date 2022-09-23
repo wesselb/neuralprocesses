@@ -79,8 +79,6 @@ def _map_f(name, num_args):
         raise ValueError(f"Invalid number of arguments {num_args}.")
 
 
-_map_f("shape", 1)
-_map_f("shape_broadcast", 1)
 _map_f("expand_dims", 1)
 _map_f("exp", 1)
 _map_f("one", 1)

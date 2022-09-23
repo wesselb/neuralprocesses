@@ -2,9 +2,10 @@ import lab as B
 from matrix.shape import broadcast
 from wbml.util import indented_kv
 
-from .dist import AbstractDistribution
+from .dist import AbstractDistribution, shape_batch
 from .. import _dispatch
 from ..aggregate import Aggregate
+from ..mask import Masked
 
 __all__ = ["SpikesSlab"]
 
@@ -74,47 +75,38 @@ class SpikesSlab(AbstractDistribution):
 
     @property
     def noiseless(self):
+        # TODO: What to do here?
         return self
 
     @property
-    def mean(self):
-        return self.m1
-
-    @property
-    def var(self):
-        m1 = self.m1
-        return B.subtract(self.m2, B.multiply(m1, m1))
-
-    @property
     def m1(self):
-        m1_sp = self.spikes
-        m1_sl = self.slab.m1
-        m1 = _spikeslab_concat(m1_sp, m1_sl)
+        m1_spikes = self.spikes
+        m1_slab = self.slab.m1
+        m1 = _spikeslab_concat(m1_spikes, m1_slab)
         return B.sum(B.multiply(B.exp(self.logprobs), m1), axis=-1)
 
     @property
     def m2(self):
-        m2_sp = self.spikes * self.spikes
-        m2_sl = self.slab.m2
-        m2 = _spikeslab_concat(m2_sp, m2_sl)
+        m2_spikes = self.spikes * self.spikes
+        m2_slab = self.slab.m2
+        m2 = _spikeslab_concat(m2_spikes, m2_slab)
         return B.sum(B.multiply(B.exp(self.logprobs), m2), axis=-1)
 
     @_dispatch
     def logpdf(self, x):
-        logprob_cat, ind_slab = self.logpdf_cat(self.logprobs, x)
-        x = self.logpdf_adjust_inputs(ind_slab, x)
-        logpdf_slab = self.slab.logpdf(x)
-        logpdf = B.add(logprob_cat, B.multiply(ind_slab, logpdf_slab))
-        logpdf = _sum_sample_dims(logpdf, self.d)
-        return _sum_aggregate(logpdf)
+        logprob_cat, ind_slab = self.logpdf_cat(self.logprobs, self.d, x)
+        logpdf_slab = self.slab.logpdf(_mask(x, ind_slab))
+        return logprob_cat + logpdf_slab
 
     @_dispatch
-    def logpdf_cat(self, logprobs: Aggregate, x: Aggregate):
-        li, ii = zip(*(self.logpdf_cat(li, xi) for li, xi in zip(logprobs, x)))
+    def logpdf_cat(self, logprobs: Aggregate, d: B.Int, x: Aggregate):
+        li, ii = zip(
+            *(self.logpdf_cat(li, di, xi) for li, di, xi in zip(logprobs, d, x))
+        )
         return Aggregate(*li), Aggregate(*ii)
 
     @_dispatch
-    def logpdf_cat(self, logprobs: B.Numeric, x: B.Numeric):
+    def logpdf_cat(self, logprobs: B.Numeric, d: B.Int, x: B.Numeric):
         # Construct indicators which filter out the spikes.
         ind_spikes = B.cast(
             B.dtype(x),
@@ -131,19 +123,9 @@ class SpikesSlab(AbstractDistribution):
         # Compute the log-probability of the categorical random variable.
         full_indicator = B.concat(ind_spikes, ind_slab[..., None], axis=-1)
         logprob_cat = B.sum(full_indicator * logprobs, axis=-1)
-        return logprob_cat, ind_slab
-
-    @_dispatch
-    def logpdf_adjust_inputs(self, ind_slab: Aggregate, x: Aggregate):
-        return Aggregate(
-            *(self.logpdf_adjust_inputs(ii, xi) for ii, xi in zip(ind_slab, x))
-        )
-
-    @_dispatch
-    def logpdf_adjust_inputs(self, ind_slab: B.Numeric, x: B.Numeric):
-        with B.on_device(x):
-            safe = B.to_active_device(B.cast(B.dtype(x), self.slab_safe_value))
-            return ind_slab * x + safe * (B.one(x) - ind_slab)
+        # Sum over the sample dimensions.
+        dims = tuple(range(B.rank(logprob_cat)))[-d:]
+        return B.sum(logprob_cat, axis=dims), ind_slab
 
     @_dispatch
     def sample(self, state: B.RandomState, dtype: B.DType, *shape):
@@ -199,38 +181,25 @@ class SpikesSlab(AbstractDistribution):
         return state, sample_spikes + slab_indicator * sample_slab
 
 
-@B.shape_batch.dispatch
-def shape_batch(d: SpikesSlab):
-    if isinstance(d.logprobs, Aggregate):
-        logprobs = Aggregate(*(x[..., 0] for x in d.logprobs))
-    else:
-        logprobs = d.logprobs
-    shape = B.shape_broadcast(d.slab, logprobs)
-    if isinstance(shape, Aggregate):
-        shape = broadcast(*shape)
-    return shape
+@B.dtype.dispatch
+def dtype(d: SpikesSlab):
+    return B.dtype(d.spikes, d.spikes, d.logprobs)
 
 
-@_dispatch
-def _sum_sample_dims(x: B.Numeric, d: B.Int):
-    for _ in range(d):
-        x = B.sum(x, axis=-1)
-    return x
+@shape_batch.dispatch
+def shape_batch(dist: SpikesSlab):
+    return broadcast(shape_batch(dist.slab), shape_batch(dist, dist.logprobs, dist.d))
 
 
-@_dispatch
-def _sum_sample_dims(x: Aggregate, d: Aggregate):
-    return Aggregate(*(_sum_sample_dims(xi, di) for xi, di in zip(x, d)))
+@shape_batch.dispatch
+def shape_batch(dist: SpikesSlab, logprobs: B.Numeric, d: B.Int):
+    # `logprobs` has one extra dimension!
+    return B.shape(logprobs)[: -(d + 1)]
 
 
-@_dispatch
-def _sum_aggregate(x):
-    return x
-
-
-@_dispatch
-def _sum_aggregate(x: Aggregate):
-    return sum(x, 0)
+@shape_batch.dispatch
+def shape_batch(dist: SpikesSlab, logprobs: Aggregate, d: Aggregate):
+    return broadcast(*(shape_batch(dist, li, di) for li, di in zip(logprobs, d)))
 
 
 @_dispatch
@@ -247,7 +216,11 @@ def _spikeslab_concat(spikes, slab: Aggregate):
     return Aggregate(*(_spikeslab_concat(spikes, si) for si in slab))
 
 
-@B.dtype.dispatch
-def dtype(d: SpikesSlab):
-    # TODO: Fix this!
-    return B.dtype(d.logprobs)
+@_dispatch
+def _mask(x, mask):
+    return Masked(x, mask)
+
+
+@_dispatch
+def _mask(x: Aggregate, mask: Aggregate):
+    return Aggregate(*(_mask(xi, mi) for xi, mi in zip(x, mask)))
