@@ -156,9 +156,9 @@ def main(**kw_args):
     parser.add_argument(
         "--eeg-mode",
         type=str,
-        choices=["random", "interpolation", "forecasting", "reconstruction"]
+        choices=["random", "interpolation", "forecasting", "reconstruction"],
     )
-    
+    parser.add_argument("--patch", type=str)
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -174,6 +174,37 @@ def main(**kw_args):
         )
     else:
         args = parser.parse_args()
+
+    def patch_model(d):
+        """Patch a loaded model.
+
+        Args:
+            d (dict): Output of :func:`torch.load`.
+
+        Returns:
+            dict: `d`, but patched.
+        """
+        if args.patch:
+            with out.Section("Patching loaded model"):
+                # Loop over patches.
+                for patch in args.patch.strip().split(";"):
+                    base_from, base_to = patch.split(":")
+
+                    # Try to apply the patch.
+                    applied_patch = False
+                    for k in list(d["weights"].keys()):
+                        if k.startswith(base_from):
+                            applied_patch = True
+                            tail = k[len(base_from) :]
+                            d["weights"][base_to + tail] = d["weights"][k]
+                            del d["weights"][k]
+
+                    # Report whether the patch was applied.
+                    if applied_patch:
+                        out.out(f'Applied patch "{patch}".')
+                    else:
+                        out.out(f'Did not apply patch "{patch}".')
+        return d
 
     # Remove the architecture argument if a model doesn't use it.
     if args.model not in {
@@ -209,7 +240,7 @@ def main(**kw_args):
 
     data_dir = args.data if args.mean_diff is None else f"{args.data}-{args.mean_diff}"
     data_dir = data_dir if args.eeg_mode is None else f"{args.data}-{args.eeg_mode}"
-    
+
     # Setup script.
     if not observe:
         out.report_time = True
@@ -289,7 +320,7 @@ def main(**kw_args):
     # Check if a run has completed.
     if args.check_completed:
         if os.path.exists(wd.file("model-last.torch")):
-            d = torch.load(wd.file("model-last.torch"), map_location="cpu")
+            d = patch_model(torch.load(wd.file("model-last.torch"), map_location="cpu"))
             if d["epoch"] >= args.epochs - 1:
                 out.out("Completed!")
                 sys.exit(0)
@@ -568,7 +599,9 @@ def main(**kw_args):
             name = "model-last.torch"
         else:
             name = "model-best.torch"
-        model.load_state_dict(torch.load(wd.file(name), map_location=device)["weights"])
+        model.load_state_dict(
+            patch_model(torch.load(wd.file(name), map_location=device))["weights"]
+        )
 
         if not args.ar or args.also_ar:
             # Make some plots.
@@ -625,8 +658,12 @@ def main(**kw_args):
         start = 0
         if args.resume_at_epoch:
             start = args.resume_at_epoch - 1
-            d_last = torch.load(wd.file("model-last.torch"), map_location=device)
-            d_best = torch.load(wd.file("model-best.torch"), map_location=device)
+            d_last = patch_model(
+                torch.load(wd.file("model-last.torch"), map_location=device)
+            )
+            d_best = patch_model(
+                torch.load(wd.file("model-best.torch"), map_location=device)
+            )
             model.load_state_dict(d_last["weights"])
             best_eval_lik = d_best["objective"]
         else:

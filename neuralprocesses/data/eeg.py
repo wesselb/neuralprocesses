@@ -190,7 +190,7 @@ class EEGGenerator(DataGenerator):
         state, perm = B.randperm(state, np.int64, len(_eeg_all_subjects))
         all_subjects = np.array(_eeg_all_subjects)[perm]
 
-        # Split into training, cross-validation, and validation data.
+        # Split into training, cross-validation, and evaluation data.
         if subset == "train":
             subjects = all_subjects[20:]
         elif subset == "cv":
