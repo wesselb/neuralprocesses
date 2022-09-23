@@ -84,7 +84,7 @@ def construct_predefined_gens(
     # Previously, the maximum number of context points was `75 * dim_x`. However, if
     # `dim_x == 1`, then this is too high. We therefore change that case, and keep all
     # other cases the same.
-    max_context = 30 if dim_x == 1 else 2 * dim_x
+    max_context = 30 * dim_x
     gens["sawtooth"] = SawtoothGenerator(
         dtype,
         seed=seed,
