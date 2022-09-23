@@ -165,7 +165,7 @@ class EEGGenerator(DataGenerator):
         seed=0,
         num_tasks=2**14,
         batch_size=16,
-        num_target=UniformDiscrete(50, 200),
+        num_target=UniformDiscrete(50, 256), # UniformDiscrete(50, 200),
         forecast_start=UniformContinuous(0.5, 0.75),
         subset="train",
         mode="random",
