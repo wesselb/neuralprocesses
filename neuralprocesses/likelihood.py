@@ -102,7 +102,7 @@ def code(
     dtype_lik=None,
     **kw_args,
 ):
-    mean, noise, shape = _code_het(coder, xz, z)
+    mean, noise, shape = _het(coder, xz, z)
 
     # Cast parameters to the right data type.
     if dtype_lik:
@@ -412,7 +412,6 @@ def code(
         B.stack(logp0, logp1, logps, axis=-1),
         d,
         epsilon=coder.epsilon,
-        slab_safe_value=0.5,
     )
 
 

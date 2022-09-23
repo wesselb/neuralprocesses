@@ -53,7 +53,6 @@ class SpikesSlab(AbstractDistribution):
             f"<SpikesSlab:"
             f" spikes={self.spikes!r},"
             f" epsilon={self.epsilon!r},"
-            f" slab_safe_value={self.slab_safe_value!r}\n"
             + indented_kv("slab", repr(self.slab), suffix="\n")
             + indented_kv("logprobs", repr(self.logprobs), suffix=">")
         )
@@ -63,7 +62,6 @@ class SpikesSlab(AbstractDistribution):
             f"<SpikeSlab:"
             f" spikes={self.spikes},"
             f" epsilon={self.epsilon},"
-            f" slab_safe_value={self.slab_safe_value}\n"
             + indented_kv("slab", str(self.slab), suffix="\n")
             + indented_kv("logprobs", str(self.logprobs), suffix=">")
         )
