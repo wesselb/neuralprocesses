@@ -19,8 +19,6 @@ class SpikesSlab(AbstractDistribution):
         logprobs (tensor): Log-probabilities for the spikes and the slab with the
             log-probability for the slab last.
         epsilon (float, optional): Tolerance for equality checking. Defaults to `1e-6`.
-        slab_safe_value (float, optional): Safe value to to evaluate the slab at.
-            Defaults to `0.5`.
 
     Attributes:
         spikes (vector): Spikes.
@@ -28,7 +26,6 @@ class SpikesSlab(AbstractDistribution):
         logprobs (tensor): Log-probabilities for the spikes and the slab with the
             log-probability for the slab last.
         epsilon (float): Tolerance for equality checking.
-        slab_safe_value (float): Safe value to to evaluate the slab at.
     """
 
     @_dispatch
@@ -40,7 +37,6 @@ class SpikesSlab(AbstractDistribution):
         d,
         *,
         epsilon: float = 1e-6,
-        slab_safe_value: float = 0.5,
     ):
         self.spikes = spikes
         self.slab = slab
@@ -51,7 +47,6 @@ class SpikesSlab(AbstractDistribution):
         )
         self.d = d
         self.epsilon = epsilon
-        self.slab_safe_value = slab_safe_value
 
     def __repr__(self):
         return (  # Comment to preserve formatting.
