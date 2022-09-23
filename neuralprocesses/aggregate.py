@@ -1,6 +1,5 @@
 import lab as B
 from plum import Tuple
-import matrix
 
 from . import _dispatch
 
