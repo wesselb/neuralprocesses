@@ -8,6 +8,7 @@ from ..dist import (
     AbstractDistribution,
     MultiOutputNormal,
     TransformedMultiOutputDistribution,
+    SpikesSlab,
 )
 from ..parallel import Parallel
 
@@ -76,6 +77,11 @@ def fix_noise(d: TransformedMultiOutputDistribution, value: float):
         fix_noise(d.dist, value),
         d.transform,
     )
+
+
+@_dispatch
+def fix_noise(d: SpikesSlab, value: float):
+    return d
 
 
 @_dispatch
