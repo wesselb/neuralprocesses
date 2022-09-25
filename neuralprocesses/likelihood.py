@@ -446,8 +446,8 @@ def _spikesbeta(coder: SpikesBetaLikelihood, xz, z: B.Numeric):
     )
 
     # Transform into parameters.
-    alpha = B.softplus(z_alpha)
-    beta = B.softplus(z_beta)
+    alpha = 1e-3 + B.softplus(z_alpha)
+    beta = 1e-3 + B.softplus(z_beta)
     logp0 = z_logp0
     logp1 = z_logp1
     logps = z_logps
