@@ -6,6 +6,7 @@ from .dist import AbstractDistribution, shape_batch
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..mask import Masked
+from .dirac import Dirac
 
 __all__ = ["SpikesSlab"]
 
@@ -68,8 +69,7 @@ class SpikesSlab(AbstractDistribution):
 
     @property
     def noiseless(self):
-        # TODO: What to do here?
-        return self
+        return Dirac(self.mean, self.d)
 
     @property
     def m1(self):
