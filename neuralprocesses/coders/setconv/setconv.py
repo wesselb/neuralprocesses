@@ -8,7 +8,9 @@ from ...augment import AugmentedInput
 from ...parallel import broadcast_coder_over_parallel
 from ...util import register_module
 
-__all__ = ["SetConv"]
+from stheno import EQ
+
+__all__ = ["SetConv", "DPSetConv"]
 
 
 @register_module
@@ -76,7 +78,8 @@ def compute_weights(coder, x1, x2):
 @_dispatch
 @_batch_targets
 def code(coder: SetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
-    return x, B.matmul(z, compute_weights(coder, xz, x))
+    z = B.matmul(z, compute_weights(coder, xz, x))
+    return x, z
 
 
 _setconv_cache_num_tup = {}
@@ -166,3 +169,58 @@ broadcast_coder_over_parallel(SetConv)
 def code(coder: SetConv, xz, z, x: AugmentedInput, **kw_args):
     xz, z = code(coder, xz, z, x.x, **kw_args)
     return AugmentedInput(xz, x.augmentation), z
+
+
+@register_module
+class DPSetConv:
+    """A set convolution with a DP mechanism.
+
+    Args:
+        scale (float): Initial value for the length scale.
+        dtype (dtype, optional): Data type.
+        learnable (bool, optional): Whether the SetConv length scale is learnable.
+
+    Attributes:
+        log_scale (scalar): Logarithm of the length scale.
+
+    """
+
+    def __init__(
+            self,
+            scale,
+            y_bound,
+            kernel_bound,
+            epsilon,
+            delta,
+            dtype=None,
+            learnable=True,
+        ):
+        
+        self.log_scale = self.nn.Parameter(
+            B.log(scale), dtype=dtype, learnable=learnable
+        )
+        
+    def sample_noise(self, xz, z, x):
+        
+        _x = B.transpose(x, [0, 2, 1])
+        
+        kernel = EQ().stretch(B.exp(self.log_scale))
+        
+        k = lambda tensor: kernel(tensor, tensor) + \
+            1e-6 * B.eye(tensor.dtype, tensor.shape[-1])[None, :, :]
+        
+        noise = [B.sample(k(_x.double()))[:, None, :, 0] for i in range(z.shape[1])]
+        noise = B.cast(z.dtype, B.concat(*noise, axis=1))
+        
+        return noise
+
+        
+
+@_dispatch
+@_batch_targets
+def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
+    z = B.matmul(z, compute_weights(coder, xz, x)) + coder.sample_noise(xz, z, x)
+    return x, z
+
+
+_setconv_cache_num_tup = {}
