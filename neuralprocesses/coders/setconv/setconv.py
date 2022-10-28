@@ -7,6 +7,7 @@ from ... import _dispatch
 from ...augment import AugmentedInput
 from ...parallel import broadcast_coder_over_parallel
 from ...util import register_module
+import privacy_accounting as pa
 
 from stheno import EQ
 
@@ -16,15 +17,12 @@ __all__ = ["SetConv", "DPSetConv"]
 @register_module
 class SetConv:
     """A set convolution.
-
     Args:
         scale (float): Initial value for the length scale.
         dtype (dtype, optional): Data type.
         learnable (bool, optional): Whether the SetConv length scale is learnable.
-
     Attributes:
         log_scale (scalar): Logarithm of the length scale.
-
     """
 
     def __init__(self, scale, dtype=None, learnable=True):
@@ -78,8 +76,7 @@ def compute_weights(coder, x1, x2):
 @_dispatch
 @_batch_targets
 def code(coder: SetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
-    z = B.matmul(z, compute_weights(coder, xz, x))
-    return x, z
+    return x, B.matmul(z, compute_weights(coder, xz, x))
 
 
 _setconv_cache_num_tup = {}
@@ -200,6 +197,28 @@ class DPSetConv:
             B.log(scale), dtype=dtype, learnable=learnable
         )
         
+        self.scale = scale
+        self.y_bound = y_bound
+        self.kernel_bound = kernel_bound
+        self.epsilon = epsilon
+        self.delta = delta
+      
+    @property
+    def density_sensitivity_squared(self):
+        return 2 * self.kernel_bound
+    
+    @property
+    def value_sensitivity_squared(self):
+        return 4 * self.y_bound**2 * self.kernel_bound
+    
+    @property
+    def density_sigma(self):
+        return pa.sigma(self.epsilon, self.delta, self.density_sensitivity_squared)
+    
+    @property
+    def value_sigma(self):
+        return pa.sigma(self.epsilon, self.delta, self.value_sensitivity_squared)
+        
     def sample_noise(self, xz, z, x):
         
         _x = B.transpose(x, [0, 2, 1])
@@ -212,10 +231,13 @@ class DPSetConv:
         noise = [B.sample(k(_x.double()))[:, None, :, 0] for i in range(z.shape[1])]
         noise = B.cast(z.dtype, B.concat(*noise, axis=1))
         
+        num_channels = noise.shape[1]
+        noise[:, :num_channels//2, :] = self.density_sigma * noise[:, :num_channels//2, :]
+        noise[:, num_channels//2:, :] = self.value_sigma * noise[:, num_channels//2:, :]
+    
         return noise
 
         
-
 @_dispatch
 @_batch_targets
 def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
