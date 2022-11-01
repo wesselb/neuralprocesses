@@ -7,7 +7,8 @@ from ... import _dispatch
 from ...augment import AugmentedInput
 from ...parallel import broadcast_coder_over_parallel
 from ...util import register_module
-import privacy_accounting as pa
+
+from . import privacy_accounting as pa
 
 from stheno import EQ
 
@@ -202,6 +203,18 @@ class DPSetConv:
         self.kernel_bound = kernel_bound
         self.epsilon = epsilon
         self.delta = delta
+        
+        self.density_sigma = pa.sigma(
+            self.epsilon,
+            self.delta,
+            self.density_sensitivity_squared,
+        )
+        
+        self.value_sigma = pa.sigma(
+            self.epsilon,
+            self.delta,
+            self.density_sensitivity_squared,
+        )
       
     @property
     def density_sensitivity_squared(self):
@@ -210,14 +223,6 @@ class DPSetConv:
     @property
     def value_sensitivity_squared(self):
         return 4 * self.y_bound**2 * self.kernel_bound
-    
-    @property
-    def density_sigma(self):
-        return pa.sigma(self.epsilon, self.delta, self.density_sensitivity_squared)
-    
-    @property
-    def value_sigma(self):
-        return pa.sigma(self.epsilon, self.delta, self.value_sensitivity_squared)
         
     def sample_noise(self, xz, z, x):
         
@@ -236,12 +241,37 @@ class DPSetConv:
         noise[:, num_channels//2:, :] = self.value_sigma * noise[:, num_channels//2:, :]
     
         return noise
+    
+    def clip_density_and_data_channels(self, tensor):
+        
+        num_channels = tensor.shape[1]
+        ones = B.ones(tensor.dtype, *(tensor[:, :num_channels//2, :].shape))
+        
+        tensor = B.concat(
+            B.minimum(
+                tensor[:, :num_channels//2, :],
+                self.kernel_bound * ones,
+            ),
+            B.minimum(
+                tensor[:, num_channels//2:, :],
+                self.y_bound * ones,
+            ),
+            axis=1,
+        )
+        
+        return tensor
 
         
 @_dispatch
 @_batch_targets
 def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
-    z = B.matmul(z, compute_weights(coder, xz, x)) + coder.sample_noise(xz, z, x)
+    
+    density_data_channels = coder.clip_density_and_data_channels(
+        B.matmul(z, compute_weights(coder, xz, x))
+    )
+    
+    z = density_data_channels + coder.sample_noise(xz, z, x)
+    
     return x, z
 
 

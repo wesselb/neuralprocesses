@@ -66,13 +66,16 @@ def eval(state, model, objective, gen):
 
         # Report numbers.
         vals = B.concat(*vals)
-        out.kv("Loglik (V)", exp.with_err(vals, and_lower=True))
+        metrics = {"loglik_val": exp.with_err(vals, and_lower=True)}
+        out.kv("Loglik (V)", metrics["loglik_val"])
         if kls:
-            out.kv("KL (full)", exp.with_err(B.concat(*kls), and_upper=True))
+            metrics["kl_full"] = exp.with_err(B.concat(*kls), and_upper=True)
+            out.kv("KL (full)", metrics["kl_full"])
         if kls_diag:
-            out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag), and_upper=True))
+            metrics["kl_diag"] = exp.with_err(B.concat(*kls_diag), and_upper=True)
+            out.kv("KL (diag)", metrics["kl_diag"])
 
-        return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
+        return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), metrics
 
 
 def main(**kw_args):
@@ -107,6 +110,7 @@ def main(**kw_args):
             "convgnp-mlp",
             "convcnp-multires",
             "convgnp-multires",
+            "dpconvcnp",
         ],
         default="convcnp",
     )
@@ -159,6 +163,10 @@ def main(**kw_args):
         choices=["random", "interpolation", "forecasting", "reconstruction"],
     )
     parser.add_argument("--patch", type=str)
+    parser.add_argument("--dp-epsilon", type=float, default=None)
+    parser.add_argument("--dp-delta", type=float, default=None)
+    parser.add_argument("--dp-y-bound", type=float, default=None)
+    parser.add_argument("--dp-kernel-bound", type=float, default=None)
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -212,6 +220,7 @@ def main(**kw_args):
         "convgnp",
         "convnp",
         "fullconvgnp",
+        "dpconvcnp",
     }:
         del args.arch
 
@@ -241,6 +250,16 @@ def main(**kw_args):
     data_dir = args.data if args.mean_diff is None else f"{args.data}-{args.mean_diff}"
     data_dir = data_dir if args.eeg_mode is None else f"{args.data}-{args.eeg_mode}"
 
+    if args.model == "dpconvcnp":
+        model_name = f"dpconvcnp_" + \
+                     f"{args.dp_epsilon:.4f}_" + \
+                     f"{args.dp_delta:.4f}_" + \
+                     f"{args.dp_y_bound:.4f}_" + \
+                     f"{args.dp_kernel_bound:.4f}"
+                        
+    else:
+        model_name = args.model
+    
     # Setup script.
     if not observe:
         out.report_time = True
@@ -249,7 +268,7 @@ def main(**kw_args):
         *(args.subdir or ()),
         data_dir,
         *((f"x{args.dim_x}_y{args.dim_y}",) if hasattr(args, "dim_x") else ()),
-        args.model,
+        model_name,
         *((args.arch,) if hasattr(args, "arch") else ()),
         args.objective,
         log=f"log{suffix}.txt",
@@ -493,6 +512,29 @@ def main(**kw_args):
                 encoder_scales=config["encoder_scales"],
                 transform=config["transform"],
             )
+        elif args.model == "dpconvcnp":
+            model = nps.construct_convgnp(
+                points_per_unit=config["points_per_unit"],
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                likelihood="het",
+                conv_arch=args.arch,
+                unet_channels=config["unet_channels"],
+                unet_strides=config["unet_strides"],
+                conv_channels=config["conv_channels"],
+                conv_layers=config["num_layers"],
+                conv_receptive_field=config["conv_receptive_field"],
+                margin=config["margin"],
+                encoder_scales=config["encoder_scales"],
+                transform=config["transform"],
+                divide_by_density=False,
+                use_dp=True,
+                dp_epsilon=args.dp_epsilon,
+                dp_delta=args.dp_delta,
+                dp_y_bound=args.dp_y_bound,
+                dp_kernel_bound=args.dp_kernel_bound,
+            )
         else:
             raise ValueError(f'Invalid model "{args.model}".')
 
@@ -619,7 +661,7 @@ def main(**kw_args):
                 with out.Section(objecive_name):
                     for gen_name, gen in gens_eval():
                         with out.Section(gen_name.capitalize()):
-                            state, _ = eval(state, model, objective_eval, gen)
+                            state, _, metrics = eval(state, model, objective_eval, gen)
 
         # Always run AR evaluation for the conditional models.
         if not args.no_ar and (
@@ -639,7 +681,7 @@ def main(**kw_args):
             with out.Section("AR"):
                 for name, gen in gens_eval():
                     with out.Section(name.capitalize()):
-                        state, _ = eval(
+                        state, _, metrics = eval(
                             state,
                             model,
                             partial(
@@ -708,7 +750,7 @@ def main(**kw_args):
                 )
 
                 # The epoch is done. Now evaluate.
-                state, val = eval(state, model, objective_cv, gen_cv())
+                state, val, metrics = eval(state, model, objective_cv, gen_cv())
 
                 # Save current model.
                 torch.save(
@@ -732,6 +774,11 @@ def main(**kw_args):
                         },
                         wd.file(f"model-best.torch"),
                     )
+                    
+                    for metric_name, metric_value in metrics.items():
+                        file = open(f"{wd.file(metric_name)}.txt", "w")
+                        file.write(metric_value)
+                        file.close()
 
                 # Visualise a few predictions by the model.
                 gen = gen_cv()

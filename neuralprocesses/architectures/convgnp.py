@@ -42,6 +42,11 @@ def _convgnp_construct_encoder_setconvs(
     dim_yc,
     disc,
     dtype=None,
+    use_dp=False,
+    dp_epsilon=None,
+    dp_delta=None,
+    dp_kernel_bound=None,
+    dp_y_bound=None,
     init_factor=1,
     encoder_scales_learnable=True,
 ):
@@ -53,13 +58,31 @@ def _convgnp_construct_encoder_setconvs(
     # Ensure that there is one for every context set.
     if not isinstance(encoder_scales, (tuple, list)):
         encoder_scales = (encoder_scales,) * len(dim_yc)
-    # Construct set convs.
-    return nps.Parallel(
-        *(
-            nps.SetConv(s, dtype=dtype, learnable=encoder_scales_learnable)
-            for s in encoder_scales
+        
+    if use_dp:
+        # Construct DP set convs.
+        return nps.Parallel(
+            *(
+                nps.DPSetConv(
+                    s,
+                    epsilon=dp_epsilon,
+                    delta=dp_delta,
+                    kernel_bound=dp_kernel_bound,
+                    y_bound=dp_y_bound,
+                    dtype=dtype,
+                    learnable=encoder_scales_learnable)
+                for s in encoder_scales
+            )
         )
-    )
+        
+    else:
+        # Construct set convs.
+        return nps.Parallel(
+            *(
+                nps.SetConv(s, dtype=dtype, learnable=encoder_scales_learnable)
+                for s in encoder_scales
+            )
+        )
 
 
 def _convgnp_construct_decoder_setconv(
@@ -117,6 +140,11 @@ def construct_convgnp(
     transform=None,
     dtype=None,
     nps=nps,
+    use_dp=False,
+    dp_epsilon=None,
+    dp_delta=None,
+    dp_kernel_bound=None,
+    dp_y_bound=None,
 ):
     """A Convolutional Gaussian Neural Process.
 
@@ -342,6 +370,24 @@ def construct_convgnp(
         margin=margin,
         dim=dim_x,
     )
+    
+    dp_params = [dp_epsilon, dp_delta, dp_kernel_bound, dp_y_bound]
+    
+    if use_dp:
+        
+        if any([param is None for param in dp_params]):
+            raise ValueError(
+                f"If use_dp=True, dp_epsilon, dp_delta, dp_kernel_bound and dp_y_bound "
+                f"should not be None, found {dp_epsilon} {dp_delta} {dp_kernel_bound} "
+                f"and {dp_y_bound} respectively."
+            )
+            
+        if divide_by_density:
+            raise ValueError(
+                f"If use_dp=True, divide_by_density should be False, "
+                f"found {divide_by_density}."
+            )
+            
 
     # Construct model.
     model = nps.Model(
@@ -355,6 +401,11 @@ def construct_convgnp(
                     dim_yc,
                     disc,
                     dtype,
+                    use_dp,
+                    dp_epsilon=dp_epsilon,
+                    dp_delta=dp_delta,
+                    dp_kernel_bound=dp_kernel_bound,
+                    dp_y_bound=dp_y_bound,
                     encoder_scales_learnable=encoder_scales_learnable,
                 ),
                 _convgnp_optional_division_by_density(nps, divide_by_density, epsilon),
