@@ -12,6 +12,7 @@ __all__ = ["construct_predefined_gens"]
 
 def construct_predefined_gens(
     dtype,
+    num_target,
     seed=0,
     batch_size=16,
     num_tasks=2**14,
@@ -84,17 +85,18 @@ def construct_predefined_gens(
     # Previously, the maximum number of context points was `75 * dim_x`. However, if
     # `dim_x == 1`, then this is too high. We therefore change that case, and keep all
     # other cases the same.
-    max_context = 100 if dim_x == 1 else 100 * dim_x
+    max_context = 100 * dim_x # 100 if dim_x == 1 else 100 * dim_x
     gens["sawtooth"] = SawtoothGenerator(
         dtype,
         seed=seed,
         # The sawtooth is hard already as it is. Do not add noise.
         noise=0,
         dist_freq=UniformContinuous(2 / factor, 4 / factor),
-        num_context=UniformDiscrete(20, max_context),
-        num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+        num_context=UniformDiscrete(0, 0), # UniformDiscrete(20, max_context),
+        num_target=UniformDiscrete(num_target, num_target), #UniformDiscrete(100 * dim_x, 100 * dim_x),
         **config,
     )
+
     # Be sure to use different seeds in the mixture components.
     gens["mixture"] = MixtureGenerator(
         *(
@@ -118,8 +120,8 @@ def construct_predefined_gens(
             # The sawtooth is hard already as it is. Do not add noise.
             noise=0,
             dist_freq=UniformContinuous(2 / factor, 4 / factor),
-            num_context=UniformDiscrete(20, max_context),
-            num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+            num_context=UniformDiscrete(0, 0), # UniformDiscrete(20, max_context),
+            num_target=UniformDiscrete(num_target, num_target), #UniformDiscrete(100 * dim_x, 100 * dim_x),
             **config,
         ),
         seed=seed,

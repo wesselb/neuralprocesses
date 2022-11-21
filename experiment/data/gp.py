@@ -8,7 +8,7 @@ from .util import register_data
 __all__ = []
 
 
-def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, device):
+def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, num_target, device):
     config["dim_x"] = args.dim_x
     config["dim_y"] = args.dim_y
 
@@ -38,6 +38,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
 
     gen_train = nps.construct_predefined_gens(
         torch.float32,
+        num_target=num_target,
         seed=10,
         batch_size=args.batch_size,
         num_tasks=num_tasks_train,
@@ -51,6 +52,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
 
     gen_cv = lambda: nps.construct_predefined_gens(
         torch.float32,
+        num_target=num_target,
         seed=20,  # Use a different seed!
         batch_size=args.batch_size,
         num_tasks=num_tasks_cv,
@@ -65,9 +67,11 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
     def gens_eval():
         return [
             (
+                short_name,
                 eval_name,
                 nps.construct_predefined_gens(
                     torch.float32,
+                    num_target=num_target,
                     seed=30,  # Use yet another seed!
                     batch_size=args.batch_size,
                     num_tasks=num_tasks_eval,
@@ -81,10 +85,10 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
                     mean_diff=config["mean_diff"],
                 )[args.data],
             )
-            for eval_name, x_range_context, x_range_target in [
-                ("interpolation in training range", (-2, 2), (-2, 2)),
-                ("interpolation beyond training range", (2, 6), (2, 6)),
-                ("extrapolation beyond training range", (-2, 2), (2, 6)),
+            for short_name, eval_name, x_range_context, x_range_target in [
+                ("inter-id", "interpolation in training range", (-2, 2), (-2, 2)),
+                #("inter-ood", "interpolation beyond training range", (2, 6), (2, 6)),
+                #("extra", "extrapolation beyond training range", (-2, 2), (2, 6)),
             ]
         ]
 
