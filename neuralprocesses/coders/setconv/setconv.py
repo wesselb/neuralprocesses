@@ -187,42 +187,36 @@ class DPSetConv:
             self,
             scale,
             y_bound,
-            kernel_bound,
             epsilon,
             delta,
             dtype=None,
             learnable=True,
         ):
         
+        self.epsilon = epsilon
+        self.delta = delta
+        
         self.log_scale = self.nn.Parameter(
             B.log(scale), dtype=dtype, learnable=learnable
         )
         
-        self.scale = scale
-        self.y_bound = y_bound
-        self.kernel_bound = kernel_bound
-        self.epsilon = epsilon
-        self.delta = delta
-        
-        self.density_sigma = pa.sigma(
-            self.epsilon,
-            self.delta,
-            self.density_sensitivity_squared,
+        self.log_y_bound = self.nn.Parameter(
+            B.log(y_bound), dtype=dtype, learnable=learnable
         )
         
-        self.value_sigma = pa.sigma(
-            self.epsilon,
-            self.delta,
-            self.density_sensitivity_squared,
-        )
-      
-    @property
-    def density_sensitivity_squared(self):
-        return 2 * self.kernel_bound
+        self.sens_per_sigma = pa.find_sens_per_sigma(epsilon=epsilon, delta_bound=delta)
     
     @property
-    def value_sensitivity_squared(self):
-        return 4 * self.y_bound**2 * self.kernel_bound
+    def density_sigma(self):
+        return 2.0**0.5 / self.sens_per_sigma
+    
+    @property
+    def value_sigma(self):
+        return 2 * B.exp(self.log_y_bound) / self.sens_per_sigma
+      
+    @property
+    def y_bound(self):
+        return B.exp(self.log_y_bound)
         
     def sample_noise(self, xz, z, x):
         
@@ -237,27 +231,25 @@ class DPSetConv:
         noise = B.cast(z.dtype, B.concat(*noise, axis=1))
         
         num_channels = noise.shape[1]
-        noise[:, :num_channels//2, :] = self.density_sigma * noise[:, :num_channels//2, :]
-        noise[:, num_channels//2:, :] = self.value_sigma * noise[:, num_channels//2:, :]
+        
+        noise_density = self.density_sigma * noise[:, :num_channels//2, :]
+        noise_value = self.value_sigma * noise[:, num_channels//2:, :]
+        
+        noise = B.concat(noise_density, noise_value, axis=1)
     
         return noise
     
-    def clip_density_and_data_channels(self, tensor):
+    def clip_data_channel(self, tensor):
         
         num_channels = tensor.shape[1]
         ones = B.ones(tensor.dtype, *(tensor[:, :num_channels//2, :].shape))
+
+        kernel = tensor[:, :num_channels//2, :]
+
+        clipped_data = B.minimum(tensor[:, num_channels//2:, :], self.y_bound * ones)
+        clipped_data = B.maximum(clipped_data, -self.y_bound * ones)
         
-        tensor = B.concat(
-            B.minimum(
-                tensor[:, :num_channels//2, :],
-                self.kernel_bound * ones,
-            ),
-            B.minimum(
-                tensor[:, num_channels//2:, :],
-                self.y_bound * ones,
-            ),
-            axis=1,
-        )
+        tensor = B.concat(kernel, clipped_data, axis=1)
         
         return tensor
 
@@ -266,8 +258,9 @@ class DPSetConv:
 @_batch_targets
 def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
     
-    density_data_channels = coder.clip_density_and_data_channels(
-        B.matmul(z, compute_weights(coder, xz, x))
+    density_data_channels = B.matmul(
+        coder.clip_data_channel(z),
+        compute_weights(coder, xz, x),
     )
     
     z = density_data_channels + coder.sample_noise(xz, z, x)

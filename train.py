@@ -74,6 +74,11 @@ def eval(state, model, objective, gen):
         if kls_diag:
             metrics["kl_diag"] = exp.with_err(B.concat(*kls_diag), and_upper=True)
             out.kv("KL (diag)", metrics["kl_diag"])
+            
+        out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
+        out.kv("Encoder y_bound     ", model.encoder.coder[1][0].y_bound)
+        out.kv("Density noise scale ", model.encoder.coder[1][0].density_sigma)
+        out.kv("Data noise scale    ", model.encoder.coder[1][0].value_sigma)
 
         return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), metrics
 
@@ -165,8 +170,8 @@ def main(**kw_args):
     parser.add_argument("--patch", type=str)
     parser.add_argument("--dp-epsilon", type=float, default=None)
     parser.add_argument("--dp-delta", type=float, default=None)
-    parser.add_argument("--dp-y-bound", type=float, default=None)
-    parser.add_argument("--dp-kernel-bound", type=float, default=None)
+    parser.add_argument("--dp-y-bound", type=float, default=2.)
+    parser.add_argument("--encoder-scales", type=float, default=None)
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -253,9 +258,7 @@ def main(**kw_args):
     if args.model == "dpconvcnp":
         model_name = f"dpconvcnp_" + \
                      f"{args.dp_epsilon:.4f}_" + \
-                     f"{args.dp_delta:.4f}_" + \
-                     f"{args.dp_y_bound:.4f}_" + \
-                     f"{args.dp_kernel_bound:.4f}"
+                     f"{args.dp_delta:.4f}"
                         
     else:
         model_name = args.model
@@ -310,7 +313,7 @@ def main(**kw_args):
         "unet_channels": (64,) * 6,
         "unet_strides": (1,) + (2,) * 5,
         "conv_channels": 64,
-        "encoder_scales": None,
+        "encoder_scales": None or args.encoder_scales,
         "fullconvgnp_kernel_factor": 2,
         "mean_diff": args.mean_diff,
         # Performance of the ConvGNP is sensitive to this parameter. Moreover, it
@@ -533,7 +536,6 @@ def main(**kw_args):
                 dp_epsilon=args.dp_epsilon,
                 dp_delta=args.dp_delta,
                 dp_y_bound=args.dp_y_bound,
-                dp_kernel_bound=args.dp_kernel_bound,
             )
         else:
             raise ValueError(f'Invalid model "{args.model}".')

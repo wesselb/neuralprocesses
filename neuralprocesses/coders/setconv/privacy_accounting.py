@@ -31,17 +31,3 @@ def find_sens_per_sigma(epsilon, delta_bound, upper_bound=20):
         float: The required sensitivity per noise standard deviation.
     """
     return optim.brentq(lambda sens_per_sigma: delta(epsilon, sens_per_sigma) - delta_bound, 0, upper_bound)
-
-def sigma(epsilon, delta_bound, sensitivity_squared, sensitivity_per_sigma_upper_bound=20):
-    """Find the required noise standard deviation for the Gaussian mechanism with (epsilon, delta)-DP.
-
-    Args:
-        epsilon (float)
-        delta_bound (float)
-        sensitivity_squared (float): Square of the sensitivity of the Gaussian mechanism.
-        sensitivity_per_sigma_upper_bound (float, optional): Guess for an upper bound on sensitivity / sigma. Defaults to 20.
-
-    Returns:
-        float: The required noise standard deviation.
-    """
-    return np.sqrt(sensitivity_squared) / find_sens_per_sigma(epsilon, delta_bound, sensitivity_per_sigma_upper_bound)

@@ -45,7 +45,6 @@ def _convgnp_construct_encoder_setconvs(
     use_dp=False,
     dp_epsilon=None,
     dp_delta=None,
-    dp_kernel_bound=None,
     dp_y_bound=None,
     init_factor=1,
     encoder_scales_learnable=True,
@@ -67,7 +66,6 @@ def _convgnp_construct_encoder_setconvs(
                     s,
                     epsilon=dp_epsilon,
                     delta=dp_delta,
-                    kernel_bound=dp_kernel_bound,
                     y_bound=dp_y_bound,
                     dtype=dtype,
                     learnable=encoder_scales_learnable)
@@ -143,7 +141,6 @@ def construct_convgnp(
     use_dp=False,
     dp_epsilon=None,
     dp_delta=None,
-    dp_kernel_bound=None,
     dp_y_bound=None,
 ):
     """A Convolutional Gaussian Neural Process.
@@ -371,14 +368,14 @@ def construct_convgnp(
         dim=dim_x,
     )
     
-    dp_params = [dp_epsilon, dp_delta, dp_kernel_bound, dp_y_bound]
+    dp_params = [dp_epsilon, dp_delta, dp_y_bound]
     
     if use_dp:
         
         if any([param is None for param in dp_params]):
             raise ValueError(
-                f"If use_dp=True, dp_epsilon, dp_delta, dp_kernel_bound and dp_y_bound "
-                f"should not be None, found {dp_epsilon} {dp_delta} {dp_kernel_bound} "
+                f"If use_dp=True, dp_epsilon, dp_delta, and dp_y_bound "
+                f"should not be None, found {dp_epsilon} {dp_delta} "
                 f"and {dp_y_bound} respectively."
             )
             
@@ -404,7 +401,6 @@ def construct_convgnp(
                     use_dp,
                     dp_epsilon=dp_epsilon,
                     dp_delta=dp_delta,
-                    dp_kernel_bound=dp_kernel_bound,
                     dp_y_bound=dp_y_bound,
                     encoder_scales_learnable=encoder_scales_learnable,
                 ),
