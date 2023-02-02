@@ -21,6 +21,7 @@ warnings.filterwarnings("ignore", category=ToDenseWarning)
 
 def train(state, model, opt, objective, gen, *, fix_noise):
     """Train for an epoch."""
+
     vals = []
     for batch in gen.epoch():
         state, obj = objective(
@@ -29,6 +30,8 @@ def train(state, model, opt, objective, gen, *, fix_noise):
             batch["contexts"],
             batch["xt"],
             batch["yt"],
+            epsilon=batch["epsilon"],
+            delta=batch["delta"],
             fix_noise=fix_noise,
         )
         vals.append(B.to_numpy(obj))
@@ -37,6 +40,7 @@ def train(state, model, opt, objective, gen, *, fix_noise):
         opt.zero_grad(set_to_none=True)
         val.backward()
         opt.step()
+
 
     vals = B.concat(*vals)
     out.kv("Loglik (T)", exp.with_err(vals, and_lower=True))
@@ -48,12 +52,15 @@ def eval(state, model, objective, gen):
     with torch.no_grad():
         vals, kls, kls_diag = [], [], []
         for batch in gen.epoch():
+
             state, obj = objective(
                 state,
                 model,
                 batch["contexts"],
                 batch["xt"],
                 batch["yt"],
+                epsilon=batch["epsilon"],
+                delta=batch["delta"],
             )
 
             # Save numbers.
@@ -77,8 +84,9 @@ def eval(state, model, objective, gen):
             
         out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
         out.kv("Encoder y_bound     ", model.encoder.coder[1][0].y_bound)
-        out.kv("Density noise scale ", model.encoder.coder[1][0].density_sigma)
-        out.kv("Data noise scale    ", model.encoder.coder[1][0].value_sigma)
+        out.kv("Noise fraction      ", torch.mean(model.encoder.coder[1][0].t))
+        out.kv("Density noise scale ", torch.mean(model.encoder.coder[1][0]._density_sigma))
+        out.kv("Data noise scale    ", torch.mean(model.encoder.coder[1][0]._value_sigma))
 
         return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), metrics
 
@@ -168,10 +176,17 @@ def main(**kw_args):
         choices=["random", "interpolation", "forecasting", "reconstruction"],
     )
     parser.add_argument("--patch", type=str)
-    parser.add_argument("--dp-epsilon", type=float, default=None)
-    parser.add_argument("--dp-delta", type=float, default=None)
-    parser.add_argument("--dp-y-bound", type=float, default=2.)
     parser.add_argument("--encoder-scales", type=float, default=None)
+
+    parser.add_argument("--min-log10-scale", type=float, default=np.log10(0.1))
+    parser.add_argument("--max-log10-scale", type=float, default=np.log10(5.0))
+
+    parser.add_argument("--dp-epsilon-min", type=float, default=1.)
+    parser.add_argument("--dp-epsilon-max", type=float, default=9.)
+    parser.add_argument("--dp-log10-delta-min", type=float, default=-3.)
+    parser.add_argument("--dp-log10-delta-max", type=float, default=-3.)
+    parser.add_argument("--dp-y-bound", type=float, default=2.)
+    parser.add_argument("--dp-use-noise-channels", default=False, action="store_true")
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -256,10 +271,15 @@ def main(**kw_args):
     data_dir = data_dir if args.eeg_mode is None else f"{args.data}-{args.eeg_mode}"
 
     if args.model == "dpconvcnp":
-        model_name = f"dpconvcnp_" + \
-                     f"{args.dp_epsilon:.4f}_" + \
-                     f"{args.dp_delta:.4f}"
-                        
+
+        dp_epsilon_range = (args.dp_epsilon_min, args.dp_epsilon_max)
+        dp_log10_delta_range = (args.dp_log10_delta_min, args.dp_log10_delta_max)
+
+        model_name = "dpconvcnp_"
+        model_name = model_name + "1_" if args.dp_use_noise_channels else model_name + "0_"
+        model_name = model_name + f"{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
+        model_name = model_name + f"{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
+
     else:
         model_name = args.model
     
@@ -321,6 +341,11 @@ def main(**kw_args):
         # the CNN architecture. We therefore set it to 64.
         "num_basis_functions": 64,
         "eeg_mode": args.eeg_mode,
+        "use_dp_noise_channels": args.dp_use_noise_channels,
+        "dp_epsilon_range": dp_epsilon_range,
+        "dp_log10_delta_range": dp_log10_delta_range,
+        "min_log10_scale": args.min_log10_scale,
+        "max_log10_scale": args.max_log10_scale,
     }
 
     # Setup data generators for training and for evaluation.
@@ -329,7 +354,7 @@ def main(**kw_args):
         config,
         num_tasks_train=2**6 if args.train_fast else 2**14,
         num_tasks_cv=2**6 if args.train_fast else 2**12,
-        num_tasks_eval=2**6 if args.evaluate_fast else 2**12,
+        num_tasks_eval=2**6 if args.evaluate_fast else 2**14,
         device=device,
     )
 
@@ -516,6 +541,7 @@ def main(**kw_args):
                 transform=config["transform"],
             )
         elif args.model == "dpconvcnp":
+
             model = nps.construct_convgnp(
                 points_per_unit=config["points_per_unit"],
                 dim_x=config["dim_x"],
@@ -533,8 +559,7 @@ def main(**kw_args):
                 transform=config["transform"],
                 divide_by_density=False,
                 use_dp=True,
-                dp_epsilon=args.dp_epsilon,
-                dp_delta=args.dp_delta,
+                use_dp_noise_channels=args.dp_use_noise_channels,
                 dp_y_bound=args.dp_y_bound,
             )
         else:

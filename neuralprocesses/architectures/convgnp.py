@@ -43,9 +43,8 @@ def _convgnp_construct_encoder_setconvs(
     disc,
     dtype=None,
     use_dp=False,
-    dp_epsilon=None,
-    dp_delta=None,
     dp_y_bound=None,
+    use_dp_noise_channels=False,
     init_factor=1,
     encoder_scales_learnable=True,
 ):
@@ -64,9 +63,8 @@ def _convgnp_construct_encoder_setconvs(
             *(
                 nps.DPSetConv(
                     s,
-                    epsilon=dp_epsilon,
-                    delta=dp_delta,
                     y_bound=dp_y_bound,
+                    use_dp_noise_channels=use_dp_noise_channels,
                     dtype=dtype,
                     learnable=encoder_scales_learnable)
                 for s in encoder_scales
@@ -139,8 +137,7 @@ def construct_convgnp(
     dtype=None,
     nps=nps,
     use_dp=False,
-    dp_epsilon=None,
-    dp_delta=None,
+    use_dp_noise_channels=True,
     dp_y_bound=None,
 ):
     """A Convolutional Gaussian Neural Process.
@@ -290,7 +287,7 @@ def construct_convgnp(
         in_channels = dim_lv
         out_channels = conv_out_channels  # These must be equal!
     else:
-        in_channels = conv_in_channels
+        in_channels = 2 * conv_in_channels if use_dp and use_dp_noise_channels else conv_in_channels
         out_channels = conv_out_channels  # These must be equal!
     if "unet" in conv_arch:
         if dim_lv > 0:
@@ -368,22 +365,12 @@ def construct_convgnp(
         dim=dim_x,
     )
     
-    dp_params = [dp_epsilon, dp_delta, dp_y_bound]
-    
-    if use_dp:
-        
-        if any([param is None for param in dp_params]):
-            raise ValueError(
-                f"If use_dp=True, dp_epsilon, dp_delta, and dp_y_bound "
-                f"should not be None, found {dp_epsilon} {dp_delta} "
-                f"and {dp_y_bound} respectively."
-            )
-            
-        if divide_by_density:
-            raise ValueError(
-                f"If use_dp=True, divide_by_density should be False, "
-                f"found {divide_by_density}."
-            )
+    if use_dp and divide_by_density:
+
+        raise ValueError(
+            f"If use_dp=True, divide_by_density should be False, "
+            f"found {divide_by_density}."
+        )
             
 
     # Construct model.
@@ -398,10 +385,9 @@ def construct_convgnp(
                     dim_yc,
                     disc,
                     dtype,
-                    use_dp,
-                    dp_epsilon=dp_epsilon,
-                    dp_delta=dp_delta,
+                    use_dp=use_dp,
                     dp_y_bound=dp_y_bound,
+                    use_dp_noise_channels=use_dp_noise_channels,
                     encoder_scales_learnable=encoder_scales_learnable,
                 ),
                 _convgnp_optional_division_by_density(nps, divide_by_density, epsilon),

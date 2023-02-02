@@ -2,6 +2,7 @@ from functools import wraps
 from string import ascii_lowercase as letters
 
 import lab as B
+import torch
 
 from ... import _dispatch
 from ...augment import AugmentedInput
@@ -187,14 +188,10 @@ class DPSetConv:
             self,
             scale,
             y_bound,
-            epsilon,
-            delta,
+            use_dp_noise_channels,
             dtype=None,
             learnable=True,
         ):
-        
-        self.epsilon = epsilon
-        self.delta = delta
         
         self.log_scale = self.nn.Parameter(
             B.log(scale), dtype=dtype, learnable=learnable
@@ -204,22 +201,52 @@ class DPSetConv:
             B.log(y_bound), dtype=dtype, learnable=learnable
         )
         
-        self.sens_per_sigma = pa.find_sens_per_sigma(epsilon=epsilon, delta_bound=delta)
+        self.logit_t = self.nn.Parameter(
+            0., dtype=dtype, learnable=learnable
+        )
+        
+        self.use_dp_noise_channels = use_dp_noise_channels
     
-    @property
-    def density_sigma(self):
-        return 2.0**0.5 / self.sens_per_sigma
+    def density_sigma(self, sens_per_sigma):
+        return 2 ** 0.5 / (sens_per_sigma * (1 - self.t)**0.5)
     
-    @property
-    def value_sigma(self):
-        return 2 * B.exp(self.log_y_bound) / self.sens_per_sigma
+    def value_sigma(self, sens_per_sigma):
+        return 2. * self.y_bound / (sens_per_sigma * self.t**0.5)
       
+    # Correct: 
+    #     both_sigma = (2 + 4 * y_bound**2)**0.5 / sens_per_sigma
+    #
+    # Also correct: 
+    #
+    #     t in [0, 1]
+    #
+    #     μ = sens_per_sigma ** 2 / 2
+    #     density_sensitivity = 2 ** 0.5
+    #     signal_sensitivity = 2 * y_bound
+    #
+    #     density_sigma = density_sensitivity / (2 (1 - t) μ)**0.5 = density_sens / (sens_per_sigma * (1-t)**0.5)
+    #     value_sigma = signal_sensitivity / (2 t μ)**0.5 = signal_sens / (sens_per_sigma * t**0.5)
+    #
+    #     density_sigma = 2**0.5 * density_sensitivity / sens_per_sigma = 2 / sens_per_sigma
+    #     value_sigma = 2**0.5 * signal_sensitivity / sens_per_sigma = 2 * 2**0.5 * y_bound
+        
+    @property
+    def t(self):
+        return B.sigmoid(self.logit_t)
+    
     @property
     def y_bound(self):
         return B.exp(self.log_y_bound)
         
-    def sample_noise(self, xz, z, x):
+    def sample_noise(self, xz, z, x, epsilon, delta):
         
+        epsilon = epsilon[:, 0]
+        delta = delta[:, 0]
+
+        sens_per_sigma = torch.tensor([
+            pa.find_sens_per_sigma(epsilon=e, delta_bound=d) for e, d in zip(epsilon, delta)
+        ]).to(xz.device)
+
         _x = B.transpose(x, [0, 2, 1])
         
         kernel = EQ().stretch(B.exp(self.log_scale))
@@ -231,13 +258,16 @@ class DPSetConv:
         noise = B.cast(z.dtype, B.concat(*noise, axis=1))
         
         num_channels = noise.shape[1]
+
+        self._density_sigma = self.density_sigma(sens_per_sigma)
+        self._value_sigma = self.value_sigma(sens_per_sigma)
         
-        noise_density = self.density_sigma * noise[:, :num_channels//2, :]
-        noise_value = self.value_sigma * noise[:, num_channels//2:, :]
+        density_noise = self._density_sigma[:, None, None] * noise[:, :num_channels//2, :]
+        value_noise = self._value_sigma[:, None, None] * noise[:, num_channels//2:, :]
         
-        noise = B.concat(noise_density, noise_value, axis=1)
+        noise = B.concat(density_noise, value_noise, axis=1)
     
-        return noise
+        return noise, self._density_sigma, self._value_sigma
     
     def clip_data_channel(self, tensor):
         
@@ -256,15 +286,24 @@ class DPSetConv:
         
 @_dispatch
 @_batch_targets
-def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, **kw_args):
-    
+def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, *, epsilon: B.Numeric, delta: B.Numeric, **kw_args):
+
     density_data_channels = B.matmul(
         coder.clip_data_channel(z),
         compute_weights(coder, xz, x),
     )
+
+    noise, density_sigma, value_sigma = coder.sample_noise(xz, z, x, epsilon, delta)
     
-    z = density_data_channels + coder.sample_noise(xz, z, x)
+    z = density_data_channels + noise
     
+    if coder.use_dp_noise_channels:
+
+        density_sigma = density_sigma[:, None, None] * B.ones(z.dtype, z.shape[0], 1, z.shape[2])
+        value_sigma = value_sigma[:, None, None] * B.ones(z.dtype, z.shape[0], 1, z.shape[2])
+
+        z = B.concat(z, density_sigma, value_sigma, axis=1)
+
     return x, z
 
 
