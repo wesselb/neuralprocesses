@@ -221,7 +221,7 @@ def new_batch(gen, dim_y, *, fix_x_across_batch=False, batch_size=None):
                     gen.state,
                     gen.float64,
                     1,
-                    n,
+                    int(n),
                 )
                 x = B.tile(x, batch_size, 1, 1)
             else:
@@ -229,7 +229,7 @@ def new_batch(gen, dim_y, *, fix_x_across_batch=False, batch_size=None):
                     gen.state,
                     gen.float64,
                     batch_size,
-                    n,
+                    int(n),
                 )
             ns.append(n)
             xs.append(x)

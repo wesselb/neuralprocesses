@@ -7,6 +7,7 @@ from .mixgp import MixtureGPGenerator
 from .scale_mix_gp import ScaleMixtureGPGenerator
 from .sawtooth import SawtoothGenerator
 from ..dist.uniform import UniformDiscrete, UniformContinuous
+from ..dist.mixture import Mixture
 
 __all__ = ["construct_predefined_gens"]
 
@@ -61,8 +62,10 @@ def construct_predefined_gens(
     config = {
         "num_tasks": num_tasks,
         "batch_size": batch_size,
-        "dist_x_context": UniformContinuous(*((x_range_context,) * dim_x)),
-        "dist_x_target": UniformContinuous(*((x_range_target,) * dim_x)),
+        # "dist_x_context": UniformContinuous(*((x_range_context,) * dim_x)),
+        # "dist_x_target": UniformContinuous(*((x_range_target,) * dim_x)),
+        "dist_x_context": Mixture(UniformContinuous(-2, -1), UniformContinuous(1, 2)),
+        "dist_x_target": Mixture(UniformContinuous(-2, -1), UniformContinuous(1, 2)),
         "dim_y": dim_y,
         "device": device,
     }
