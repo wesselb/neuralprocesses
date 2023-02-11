@@ -290,7 +290,7 @@ title="Open an issue"
 
 <div class="viewcode-block" id="PrependDensityChannel"><a class="viewcode-back" href="../../../../coders.html#neuralprocesses.coders.setconv.density.PrependDensityChannel">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">PrependDensityChannel</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Prepend a density channel to the current encoding.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Prepend a density channel to the current encoding.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        multi (bool, optional): Produce a separate density channel for every channel.</span>
@@ -304,7 +304,7 @@ title="Open an issue"
 
 <div class="viewcode-block" id="PrependMultiDensityChannel"><a class="viewcode-back" href="../../../../coders.html#neuralprocesses.coders.setconv.density.PrependMultiDensityChannel">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">PrependMultiDensityChannel</span><span class="p">(</span><span class="n">PrependDensityChannel</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Prepend a separate density channel for every channel to the current encoding.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Prepend a separate density channel for every channel to the current encoding.&quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">PrependDensityChannel</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">multi</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
@@ -338,7 +338,7 @@ title="Open an issue"
 
 <span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">DivideByChannels</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Divide by the first `n` channels.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Divide by the first `n` channels.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        spec (int or str): Channels to divide by.</span>
@@ -357,7 +357,7 @@ title="Open an issue"
 
 <div class="viewcode-block" id="DivideByFirstChannel"><a class="viewcode-back" href="../../../../coders.html#neuralprocesses.coders.setconv.density.DivideByFirstChannel">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">DivideByFirstChannel</span><span class="p">(</span><span class="n">DivideByChannels</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Divide by the first channel.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Divide by the first channel.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        epsilon (float): Value to add to the channel before dividing.</span>
@@ -373,7 +373,7 @@ title="Open an issue"
 
 <div class="viewcode-block" id="DivideByFirstHalf"><a class="viewcode-back" href="../../../../coders.html#neuralprocesses.coders.setconv.density.DivideByFirstHalf">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">DivideByFirstHalf</span><span class="p">(</span><span class="n">DivideByChannels</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Divide by the first half of channels.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Divide by the first half of channels.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        epsilon (float): Value to add to the channels before dividing.</span>
