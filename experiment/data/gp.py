@@ -20,6 +20,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
     config["unet_strides"] = (2,) * 6
     config["conv_receptive_field"] = 4
     config["margin"] = 0.1
+    
     if args.dim_x == 1:
         config["points_per_unit"] = 64
     elif args.dim_x == 2:
@@ -120,7 +121,7 @@ def setup(name, args, config, *, num_tasks_train, num_tasks_cv, num_tasks_eval, 
                     max_log10_scale=log_10_scale,
                 )["scale-mix-eq"], # [args.data],
             )
-            for fixed_epsilon, log_10_scale in product([1., 3., 9.], np.log10(np.array([0.10, 0.15, 0.20, 0.25, 0.35, 0.5, 1.0])))
+            for fixed_epsilon, log_10_scale in product([9.], np.log10(np.array([0.10, 0.15, 0.20, 0.25, 0.35, 0.5, 1.0])))
         ]
 
     return gen_train, gen_cv, gens_eval
