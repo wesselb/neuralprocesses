@@ -68,13 +68,13 @@ def visualise_1d(model, gen, *, path, config, predict):
             s=20,
         )
 
-        plt.scatter(
-            nps.batch_xt(batch, i)[0, 0],
-            nps.batch_yt(batch, i)[0],
-            label="Target",
-            style="test",
-            s=20,
-        )
+        # plt.scatter(
+        #     nps.batch_xt(batch, i)[0, 0],
+        #     nps.batch_yt(batch, i)[0],
+        #     label="Target",
+        #     style="test",
+        #     s=20,
+        # )
 
         # Plot prediction.
         err = 1.96 * B.sqrt(var[i][0, 0])
