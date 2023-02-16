@@ -134,7 +134,7 @@ def objective(epsilon, delta, xc, yc, trial):
     return elbo
 
 
-def visualise_1d(model, gen, batch, path, config):
+def visualise_1d(model, gen, batch, path, config, epsilon, delta):
     try:
         plot_config = config["plot"][1]
     except KeyError:
@@ -215,13 +215,10 @@ def visualise_1d(model, gen, batch, path, config):
 
         for x_axvline in plot_config["axvline"]:
             plt.axvline(x_axvline, c="k", ls="--", lw=0.5)
-
-            nps.batch_yt(batch, i)[0],
+            nps.batch_yt(batch, i)[0]
 
         N = nps.batch_yc(batch, i)[0].shape[0]
         ell = 0.25 if "scale" not in batch else batch["scale"].detach().cpu().numpy()[0]
-        epsilon = batch["epsilon"][i].numpy()[0]
-        delta = batch["delta"][i].numpy()[0]
 
         plt.gca().set_title(
             f"$N = {N:.0f}$  "
@@ -237,6 +234,23 @@ def visualise_1d(model, gen, batch, path, config):
 
     plt.savefig(path)
     plt.close()
+
+
+def evaluate(model, xt: torch.Tensor, yt: torch.Tensor):
+    # Predict with model.
+    with torch.no_grad():
+        qf_params = model(xt)
+
+    mean = qf_params[:, 0].unsqueeze(-1)
+    var = qf_params[:, 1].unsqueeze(-1)
+    qf = torch.distributions.Normal(mean, var.pow(0.5))
+
+    # Compute some predictive metrics.
+    metrics = {
+        "mean_loglik": qf.log_prob(yt).mean().item(),
+        "rmse": (qf.loc - yt).pow(2).mean().sqrt().item(),
+    }
+    return metrics
 
 
 def main(**kw_args):
@@ -268,9 +282,10 @@ def main(**kw_args):
     parser.add_argument("--dp-log10-delta-max", type=float, default=-3.0)
 
     parser.add_argument("--epsilon", type=float, default=1.0)
-    parser.add_argument("--n_trials", type=int, default=100)
-    parser.add_argument("--meta_train", action="store_true", default=False)
-    parser.add_argument("--meta_train_size", type=int, default=1)
+    parser.add_argument("--delta", type=float, default=1e-2)
+    parser.add_argument("--n-trials", type=int, default=100)
+    parser.add_argument("--meta-train-hypers", action="store_true", default=False)
+    parser.add_argument("--meta-train-size", type=int, default=1)
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -317,8 +332,6 @@ def main(**kw_args):
     device = "cpu"
 
     B.set_global_device(device)
-    # Maintain an explicit random state through the execution.
-    state = B.create_random_state(torch.float32, seed=0)
 
     # General config.
     config = {
@@ -337,85 +350,106 @@ def main(**kw_args):
     }
 
     # Setup data generators for training and for evaluation.
-    gen_train, gen_cv, gen_eval = exp.data[args.data]["setup"](
+    gen_train, gen_cv, gens_eval = exp.data[args.data]["setup"](
         args,
         config,
-        num_tasks_train=2**6 if args.train_fast else 2**14,
-        num_tasks_cv=2**6 if args.train_fast else 2**12,
-        num_tasks_eval=2**6 if args.evaluate_fast else 2**14,
+        num_tasks_train=1,
+        num_tasks_cv=1,
+        num_tasks_eval=16,
+        batch_size_eval=1,
         device=device,
     )
 
-    gen = gen_cv()
-    for i in range(args.evaluate_num_plots):
-        batch = nps.batch_index(gen.generate_batch(), slice(0, 1, None))
-        xc = nps.batch_xc(batch, 0)[0, 0].unsqueeze(-1)
-        yc = nps.batch_yc(batch, 0)[0]
+    if args.meta_train_hypers:
+        # Run Bayesian optimisation on datasets drawn from gen_train to find hypers.
+        train_x, train_y = [], []
+        for _ in range(args.meta_train_size):
+            batch = gen_train.generate_batch()
 
-        if args.meta_train:
-            train_batch = [
-                nps.batch_index(gen.generate_batch(), slice(0, 1, None))
-                for i in range(args.meta_train_size)
-            ]
-
-            # Construct data loader.
-            train_xc = [
-                nps.batch_xc(batch_, 0)[0, 0].unsqueeze(-1) for batch_ in train_batch
-            ]
-            train_yc = [nps.batch_yc(batch_, 0)[0] for batch_ in train_batch]
-        else:
-            train_batch = [batch]
-            train_xc = [xc]
-            train_yc = [yc]
+            xc, yc = batch["contexts"][0]
+            x = xc[0, 0, :, None]
+            y = xc[0, 0, :]
+            train_x.append(x)
+            train_y.append(y)
 
         study = optuna.create_study(direction="maximize")
         study.optimize(
-            partial(objective, args.epsilon, 1 / len(xc), train_xc, train_yc),
+            partial(objective, args.epsilon, args.delta, train_x, train_y),
             n_trials=args.n_trials,
         )
-
         best_trial = study.best_trial
 
-        for key, value in best_trial.params.items():
-            print(f"{key}: {value}")
+    for gen_name, gen in gens_eval():
+        with out.Section(gen_name.capitalize()):
+            for i, batch in enumerate(gen.epoch()):
+                xc, yc = batch["contexts"][0]
+                xc = xc[0, 0, :, None]
+                yc = yc[0, 0, :]
 
-        print(f"value: {best_trial.value}")
+                xt, yt = batch["xt"], batch["yt"]
+                xt = xt[0, 0, :, None]
+                yt = yt[0, 0, :]
 
-        num_inducing = best_trial.params["num_inducing"]
-        epochs = best_trial.params["epochs"]
-        batch_size = best_trial.params["batch_size"]
-        lr = best_trial.params["lr"]
-        max_grad_norm = best_trial.params["max_grad_norm"]
+                if not args.meta_train_hypers:
+                    study = optuna.create_study(direction="maximize")
+                    study.optimize(
+                        partial(objective, args.epsilon, args.delta, [xc], [yc]),
+                        n_trials=args.n_trials,
+                    )
+                    best_trial = study.best_trial
 
-        kernel = dpsgp.kernels.RBFKernel()
-        init_z = torch.linspace(xc.min(), xc.max(), num_inducing).unsqueeze(-1)
-        likelihood = dpsgp.likelihoods.GaussianLikelihood(noise=0.1)
-        model = dpsgp.sgp.SparseGP(kernel, likelihood, init_z)
+                num_inducing = best_trial.params["num_inducing"]
+                epochs = best_trial.params["epochs"]
+                batch_size = best_trial.params["batch_size"]
+                lr = best_trial.params["lr"]
+                max_grad_norm = best_trial.params["max_grad_norm"]
 
-        train_dataset = TensorDataset(xc, yc)
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+                # Cosntruct model and optimiser using hyperparameters found via BayesOpt.
+                kernel = dpsgp.kernels.RBFKernel()
+                # TODO: surely we need to do BayesOpt to find optimum min/max initialisation values.
+                init_z = torch.linspace(xc.min(), xc.max(), num_inducing).unsqueeze(-1)
+                likelihood = dpsgp.likelihoods.GaussianLikelihood(noise=0.1)
+                model = dpsgp.sgp.SparseGP(kernel, likelihood, init_z)
 
-        privacy_engine = PrivacyEngine()
-        optimiser = torch.optim.Adam(model.parameters(), lr=lr)
+                train_dataset = TensorDataset(xc, yc)
+                train_loader = DataLoader(
+                    train_dataset, batch_size=batch_size, shuffle=True
+                )
 
-        model, optimiser, train_loader = privacy_engine.make_private_with_epsilon(
-            module=model,
-            optimizer=optimiser,
-            data_loader=train_loader,
-            epochs=epochs,
-            target_epsilon=args.epsilon,
-            target_delta=1 / len(xc),
-            max_grad_norm=max_grad_norm,
-            grad_sample_mode="functorch",
-        )
+                privacy_engine = PrivacyEngine()
+                optimiser = torch.optim.Adam(model.parameters(), lr=lr)
 
-        print(
-            f"For num_inducing={num_inducing}, epochs={epochs}, batch_size={batch_size}, lr={lr}, max_grad_norm={max_grad_norm}, using sigma={optimiser.noise_multiplier}."
-        )
+                (
+                    model,
+                    optimiser,
+                    train_loader,
+                ) = privacy_engine.make_private_with_epsilon(
+                    module=model,
+                    optimizer=optimiser,
+                    data_loader=train_loader,
+                    epochs=epochs,
+                    target_epsilon=args.epsilon,
+                    target_delta=args.delta,
+                    max_grad_norm=max_grad_norm,
+                    grad_sample_mode="functorch",
+                )
 
-        train_model(model, optimiser, epochs, train_loader)
-
-        visualise_1d(model, gen, batch, wd.file(f"evaluate-{i + 1:03d}.pdf"), config)
+                train_model(model, optimiser, epochs, train_loader)
+                visualise_1d(
+                    model,
+                    gen,
+                    batch,
+                    wd.file(f"{gen_name}-{i + 1:03d}.pdf"),
+                    config,
+                    args.epsilon,
+                    args.delta,
+                )
+                metrics = evaluate(model, xt, yt)
+                for metric_name, metric_value in metrics.items():
+                    file_name = wd.file(f"{gen_name}-{metric_name}-{i + 1:03d}.txt")
+                    with open(file_name, "w") as f:
+                        f.write(str(metric_value))
+                        f.close()
 
 
 if __name__ == "__main__":
