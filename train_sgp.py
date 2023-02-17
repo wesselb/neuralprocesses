@@ -34,6 +34,9 @@ def train_model(model, optimiser, epochs, train_loader, trial=None):
         model.train()
         # Within each iteration, we will go over each minibatch of data
         for x_batch, y_batch in train_loader:
+            if len(x_batch) == 0:
+                continue
+
             optimiser.zero_grad()
 
             qf_params = model(x_batch)
@@ -41,9 +44,16 @@ def train_model(model, optimiser, epochs, train_loader, trial=None):
             qf_cov = qf_params[:, 1]
             qf = torch.distributions.Normal(qf_loc, qf_cov.pow(0.5))
 
-            exp_ll = model.likelihood.expected_log_prob(y_batch, qf).sum() * (
-                len(xc) / len(x_batch)
-            )
+            try:
+                exp_ll = model.likelihood.expected_log_prob(y_batch, qf).sum() * (
+                    len(xc) / len(x_batch)
+                )
+            except:
+                import pdb
+
+                pdb.set_trace()
+                print()
+
             kl = model._module.kl_divergence()
 
             elbo = exp_ll - kl
@@ -97,8 +107,14 @@ def dp_train_model(xc, yc, train_args, trial=None):
         max_grad_norm=train_args.max_grad_norm,
         grad_sample_mode="functorch",
     )
+    try:
+        return train_model(model, optimiser, train_args.epochs, train_loader, trial)
+    except:
+        import pdb
 
-    return train_model(model, optimiser, train_args.epochs, train_loader, trial)
+        pdb.set_trace()
+        print()
+        return None
 
 
 def batch_dp_train_model(xc, yc, train_args, trial=None):
@@ -129,7 +145,13 @@ def objective(epsilon, delta, xc, yc, trial):
     }
     train_args = argparse.Namespace(**train_args)
 
-    elbo = batch_dp_train_model(xc, yc, train_args, trial)
+    try:
+        elbo = batch_dp_train_model(xc, yc, train_args, trial)
+    except:
+        import pdb
+
+        pdb.set_trace()
+        print()
 
     return elbo
 
@@ -380,6 +402,9 @@ def main(**kw_args):
         best_trial = study.best_trial
 
     for gen_name, gen in gens_eval():
+        if gen_name == "interpolation in training range":
+            continue
+
         with out.Section(gen_name.capitalize()):
             for i, batch in enumerate(gen.epoch()):
                 xc, yc = batch["contexts"][0]
