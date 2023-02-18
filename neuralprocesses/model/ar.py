@@ -3,12 +3,13 @@ import numpy as np
 from plum import Dispatcher, Union
 from wbml.util import inv_perm
 
-from .model import Model
-from .util import tile_for_sampling
 from .. import _dispatch
-from ..aggregate import AggregateInput, Aggregate
+from ..aggregate import Aggregate, AggregateInput
+from ..datadims import data_dims
 from ..mask import Masked
 from ..numdata import num_data
+from .model import Model
+from .util import tile_for_sampling
 
 __all__ = ["ar_predict", "ar_loglik"]
 
@@ -171,6 +172,65 @@ def ar_predict(
     ft = pred.mean
 
     return state, mean, var, ft, yt
+
+
+@_dispatch
+def ar_predict(
+    state: B.RandomState,
+    model: Model,
+    contexts: list,
+    xt: B.Numeric,
+    **kw_args,
+):
+    # Run the model forward once to determine the number of outputs.
+    # TODO: Is there a better way to do this?
+    state, pred = model(state, contexts, xt)
+    d = data_dims(xt)
+    d_y = B.shape(pred.mean, -(d + 1))
+
+    # Perform AR prediction.
+    state, mean, var, ft, yt = ar_predict(
+        state,
+        model,
+        contexts,
+        AggregateInput(*((xt, i) for i in range(d_y))),
+        **kw_args,
+    )
+
+    # Convert the outputs back from `Aggregate`s to a regular tensors.
+    mean = B.concat(*mean, axis=-(d + 1))
+    var = B.concat(*var, axis=-(d + 1))
+    ft = B.concat(*ft, axis=-(d + 1))
+    yt = B.concat(*yt, axis=-(d + 1))
+
+    return state, mean, var, ft, yt
+
+
+@_dispatch
+def ar_predict(
+    state: B.RandomState,
+    model: Model,
+    xc: B.Numeric,
+    yc: B.Numeric,
+    xt: B.Numeric,
+    **kw_args,
+):
+    # Figure out out how many outputs there are.
+    d = data_dims(xc)
+    d_y = B.shape(yc, -(d + 1))
+
+    def take(y, i):
+        """Take the `i`th output."""
+        colon = slice(None, None, None)
+        return y[(Ellipsis, slice(i, i + 1)) + (colon,) * d]
+
+    return ar_predict(
+        state,
+        model,
+        [(xc, take(yc, i)) for i in range(d_y)],
+        xt,
+        **kw_args,
+    )
 
 
 @_dispatch
