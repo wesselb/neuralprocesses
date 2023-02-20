@@ -83,10 +83,10 @@ def eval(state, model, objective, gen):
             out.kv("KL (diag)", metrics["kl_diag"])
             
         out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
-        out.kv("Encoder y_bound     ", model.encoder.coder[1][0].y_bound)
-        out.kv("Noise fraction      ", torch.mean(model.encoder.coder[1][0].t))
-        out.kv("Density noise scale ", torch.mean(model.encoder.coder[1][0]._density_sigma))
-        out.kv("Data noise scale    ", torch.mean(model.encoder.coder[1][0]._value_sigma))
+        #out.kv("Encoder y_bound     ", model.encoder.coder[1][0].y_bound)
+        #out.kv("Noise fraction      ", torch.mean(model.encoder.coder[1][0].t))
+        #out.kv("Density noise scale ", torch.mean(model.encoder.coder[1][0]._density_sigma))
+        #out.kv("Data noise scale    ", torch.mean(model.encoder.coder[1][0]._value_sigma))
 
         return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), metrics
 
@@ -187,6 +187,7 @@ def main(**kw_args):
     parser.add_argument("--dp-log10-delta-max", type=float, default=-3.)
     parser.add_argument("--dp-y-bound", type=float, default=2.)
     parser.add_argument("--dp-use-noise-channels", default=False, action="store_true")
+    parser.add_argument("--dp-amortise-params", default=False, action="store_true")
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -276,7 +277,8 @@ def main(**kw_args):
         dp_log10_delta_range = (args.dp_log10_delta_min, args.dp_log10_delta_max)
 
         model_name = "dpconvcnp_"
-        model_name = model_name + "1_" if args.dp_use_noise_channels else model_name + "0_"
+        model_name = model_name + "n_" if args.dp_use_noise_channels else model_name + ""
+        model_name = model_name + "a_" if args.dp_amortise_params else model_name + ""
         model_name = model_name + f"{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
         model_name = model_name + f"{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
 
@@ -559,6 +561,7 @@ def main(**kw_args):
                 transform=config["transform"],
                 divide_by_density=False,
                 use_dp=True,
+                amortise_dp_params=args.dp_amortise_params,
                 use_dp_noise_channels=args.dp_use_noise_channels,
                 dp_y_bound=args.dp_y_bound,
             )

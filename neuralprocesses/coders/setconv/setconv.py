@@ -189,6 +189,7 @@ class DPSetConv:
             scale,
             y_bound,
             use_dp_noise_channels,
+            amortise_dp_params=False,
             dtype=None,
             learnable=True,
         ):
@@ -197,21 +198,31 @@ class DPSetConv:
             B.log(scale), dtype=dtype, learnable=learnable
         )
         
-        self.log_y_bound = self.nn.Parameter(
-            B.log(y_bound), dtype=dtype, learnable=learnable
-        )
-        
-        self.logit_t = self.nn.Parameter(
-            0., dtype=dtype, learnable=learnable
-        )
-        
+
         self.use_dp_noise_channels = use_dp_noise_channels
-    
+        self.amortise_dp_params = amortise_dp_params
+
+        if self.amortise_dp_params:
+            self.y_lin = self.nn.Linear(1, 1)
+            self.log_max_y_bound = self.nn.Parameter(
+                B.log(y_bound), dtype=dtype, learnable=learnable
+            )
+            self.t_lin = self.nn.Linear(1, 1)
+
+        else:
+            self.log_y_bound = self.nn.Parameter(
+                B.log(y_bound), dtype=dtype, learnable=learnable
+            )
+            
+            self.logit_t = self.nn.Parameter(
+                0., dtype=dtype, learnable=learnable
+            )
+        
     def density_sigma(self, sens_per_sigma):
-        return 2 ** 0.5 / (sens_per_sigma * (1 - self.t)**0.5)
+        return 2 ** 0.5 / (sens_per_sigma * (1 - self.t(sens_per_sigma))**0.5)
     
     def value_sigma(self, sens_per_sigma):
-        return 2. * self.y_bound / (sens_per_sigma * self.t**0.5)
+        return 2. * self.y_bound(sens_per_sigma) / (sens_per_sigma * self.t(sens_per_sigma)**0.5)
       
     # Correct: 
     #     both_sigma = (2 + 4 * y_bound**2)**0.5 / sens_per_sigma
@@ -230,22 +241,29 @@ class DPSetConv:
     #     density_sigma = 2**0.5 * density_sensitivity / sens_per_sigma = 2 / sens_per_sigma
     #     value_sigma = 2**0.5 * signal_sensitivity / sens_per_sigma = 2 * 2**0.5 * y_bound
         
-    @property
-    def t(self):
-        return B.sigmoid(self.logit_t)
-    
-    @property
-    def y_bound(self):
-        return B.exp(self.log_y_bound)
-        
-    def sample_noise(self, xz, z, x, epsilon, delta):
-        
-        epsilon = epsilon[:, 0]
-        delta = delta[:, 0]
+    def t(self, sens_per_sigma):
 
-        sens_per_sigma = torch.tensor([
-            pa.find_sens_per_sigma(epsilon=e, delta_bound=d) for e, d in zip(epsilon, delta)
-        ]).to(xz.device)
+        mu = 0.5 * sens_per_sigma**2.
+
+        if self.amortise_dp_params:
+            return B.sigmoid(self.t_lin(mu[:, None])[:, 0])
+
+        else:
+            return B.sigmoid(self.logit_t[None])
+
+    
+    def y_bound(self, sens_per_sigma):
+
+        mu = 0.5 * sens_per_sigma**2.
+
+        if self.amortise_dp_params:
+            return B.exp(self.log_max_y_bound) * B.sigmoid(self.y_lin(mu[:, None])[:, 0])
+
+        else:
+            return B.exp(self.log_y_bound[None])
+
+        
+    def sample_noise(self, xz, z, x, sens_per_sigma):
 
         _x = B.transpose(x, [0, 2, 1])
         
@@ -259,25 +277,25 @@ class DPSetConv:
         
         num_channels = noise.shape[1]
 
-        self._density_sigma = self.density_sigma(sens_per_sigma)
-        self._value_sigma = self.value_sigma(sens_per_sigma)
-        
-        density_noise = self._density_sigma[:, None, None] * noise[:, :num_channels//2, :]
-        value_noise = self._value_sigma[:, None, None] * noise[:, num_channels//2:, :]
+        density_sigma = self.density_sigma(sens_per_sigma)
+        value_sigma = self.value_sigma(sens_per_sigma)
+
+        density_noise = density_sigma[:, None, None] * noise[:, :num_channels//2, :]
+        value_noise = value_sigma[:, None, None] * noise[:, num_channels//2:, :]
         
         noise = B.concat(density_noise, value_noise, axis=1)
     
-        return noise, self._density_sigma, self._value_sigma
+        return noise, density_sigma, value_sigma
     
-    def clip_data_channel(self, tensor):
+    def clip_data_channel(self, tensor, sens_per_sigma):
         
         num_channels = tensor.shape[1]
         ones = B.ones(tensor.dtype, *(tensor[:, :num_channels//2, :].shape))
 
         kernel = tensor[:, :num_channels//2, :]
 
-        clipped_data = B.minimum(tensor[:, num_channels//2:, :], self.y_bound * ones)
-        clipped_data = B.maximum(clipped_data, -self.y_bound * ones)
+        clipped_data = B.minimum(tensor[:, num_channels//2:, :], self.y_bound(sens_per_sigma)[:, None, None] * ones)
+        clipped_data = B.maximum(clipped_data, -self.y_bound(sens_per_sigma)[:, None, None] * ones)
         
         tensor = B.concat(kernel, clipped_data, axis=1)
         
@@ -288,12 +306,16 @@ class DPSetConv:
 @_batch_targets
 def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, *, epsilon: B.Numeric, delta: B.Numeric, **kw_args):
 
+    sens_per_sigma = torch.tensor([
+        pa.find_sens_per_sigma(epsilon=e, delta_bound=d) for e, d in zip(epsilon[:, 0], delta[:, 0])
+    ]).to(xz.device)
+
     density_data_channels = B.matmul(
-        coder.clip_data_channel(z),
+        coder.clip_data_channel(z, sens_per_sigma),
         compute_weights(coder, xz, x),
     )
 
-    noise, density_sigma, value_sigma = coder.sample_noise(xz, z, x, epsilon, delta)
+    noise, density_sigma, value_sigma = coder.sample_noise(xz, z, x, sens_per_sigma)
     
     z = density_data_channels + noise
     

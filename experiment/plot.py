@@ -136,8 +136,8 @@ def visualise_1d(model, gen, *, path, config, predict):
         plt.gca().set_title(
             f"$N = {N:.0f}$  " + \
             f"$\\ell = {ell:.3f}$  " + \
-            f"$N\\ell \\approx {N*ell:.0f}$  " + \
             f"$\\epsilon = {epsilon:.2f}$  " + \
+            f"$N\\ell\\epsilon \\approx {N*ell*epsilon:.0f}$  " + \
             f"$\\delta = {delta:.3f}$",
             fontsize=24,
         )

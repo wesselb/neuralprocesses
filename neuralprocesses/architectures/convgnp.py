@@ -43,6 +43,7 @@ def _convgnp_construct_encoder_setconvs(
     disc,
     dtype=None,
     use_dp=False,
+    amortise_dp_params=False,
     dp_y_bound=None,
     use_dp_noise_channels=False,
     init_factor=1,
@@ -65,6 +66,7 @@ def _convgnp_construct_encoder_setconvs(
                     s,
                     y_bound=dp_y_bound,
                     use_dp_noise_channels=use_dp_noise_channels,
+                    amortise_dp_params=amortise_dp_params,
                     dtype=dtype,
                     learnable=encoder_scales_learnable)
                 for s in encoder_scales
@@ -137,6 +139,7 @@ def construct_convgnp(
     dtype=None,
     nps=nps,
     use_dp=False,
+    amortise_dp_params=False,
     use_dp_noise_channels=True,
     dp_y_bound=None,
 ):
@@ -387,6 +390,7 @@ def construct_convgnp(
                     dtype,
                     use_dp=use_dp,
                     dp_y_bound=dp_y_bound,
+                    amortise_dp_params=amortise_dp_params,
                     use_dp_noise_channels=use_dp_noise_channels,
                     encoder_scales_learnable=encoder_scales_learnable,
                 ),
