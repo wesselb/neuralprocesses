@@ -5,6 +5,7 @@ import time
 import warnings
 from functools import partial
 
+import json
 import experiment as exp
 import lab as B
 import neuralprocesses.torch as nps
@@ -44,15 +45,9 @@ def train_model(model, optimiser, epochs, train_loader, trial=None):
             qf_cov = qf_params[:, 1]
             qf = torch.distributions.Normal(qf_loc, qf_cov.pow(0.5))
 
-            try:
-                exp_ll = model.likelihood.expected_log_prob(y_batch, qf).sum() * (
-                    len(xc) / len(x_batch)
-                )
-            except:
-                import pdb
-
-                pdb.set_trace()
-                print()
+            exp_ll = model.likelihood.expected_log_prob(y_batch, qf).sum() * (
+                len(xc) / len(x_batch)
+            )
 
             kl = model._module.kl_divergence()
 
@@ -77,24 +72,32 @@ def train_model(model, optimiser, epochs, train_loader, trial=None):
             kl = model._module.kl_divergence()
             elbo = (exp_ll - kl).item()
 
-            if trial is not None:
-                trial.report(elbo, epoch)
-
     return elbo
 
 
-def dp_train_model(xc, yc, train_args, trial=None):
+def dp_train_model(xc, yc, train_args, trial=None, use_true_kernel=False):
     kernel = dpsgp.kernels.RBFKernel()
     init_z = torch.linspace(xc.min(), xc.max(), train_args.num_inducing).unsqueeze(-1)
-    likelihood = dpsgp.likelihoods.GaussianLikelihood(noise=0.1)
+
+    # Initialise using true lengthscale and noise values. TODO: use BayesOpt on initialisation.
+    kernel.lengthscale = 0.25
+    likelihood = dpsgp.likelihoods.GaussianLikelihood(noise=0.05)
     model = dpsgp.sgp.SparseGP(kernel, likelihood, init_z)
+
+    if use_true_kernel:
+        kernel.lengthscale = 0.25
+        kernel.log_lengthscale.requires_grad = False
+        kernel.scale = 1.0
+        kernel.log_scale.requires_grad = False
+        likelihood.noise = 0.05
+        likelihood.log_noise.requires_grad = False
 
     train_dataset = TensorDataset(xc, yc)
     train_loader = DataLoader(
         train_dataset, batch_size=train_args.batch_size, shuffle=True
     )
 
-    privacy_engine = PrivacyEngine()
+    privacy_engine = PrivacyEngine(accountant="rdp")
     optimiser = torch.optim.Adam(model.parameters(), lr=train_args.lr)
 
     model, optimiser, train_loader = privacy_engine.make_private_with_epsilon(
@@ -107,32 +110,25 @@ def dp_train_model(xc, yc, train_args, trial=None):
         max_grad_norm=train_args.max_grad_norm,
         grad_sample_mode="functorch",
     )
-    try:
-        return train_model(model, optimiser, train_args.epochs, train_loader, trial)
-    except:
-        import pdb
-
-        pdb.set_trace()
-        print()
-        return None
+    return train_model(model, optimiser, train_args.epochs, train_loader, trial)
 
 
-def batch_dp_train_model(xc, yc, train_args, trial=None):
+def batch_dp_train_model(xc, yc, train_args, trial=None, use_true_kernel=False):
     elbo = 0.0
     for xc_batch, yc_batch in zip(xc, yc):
-        elbo += dp_train_model(xc_batch, yc_batch, train_args, trial)
+        elbo += dp_train_model(xc_batch, yc_batch, train_args, trial, use_true_kernel)
 
     return elbo
 
 
 # Define optuna objective function to be maximised.
-def objective(epsilon, delta, xc, yc, trial):
+def objective(epsilon, delta, xc, yc, trial, use_true_kernel=False):
     # Suggest values of hyperparameters using a trial object.
     num_inducing = trial.suggest_int("num_inducing", 10, 20)
     epochs = trial.suggest_int("epochs", 50, 300)
     batch_size = trial.suggest_int("batch_size", 10, 100)
-    lr = trial.suggest_float("lr", 1e-2, 5e-2, log=True)
-    max_grad_norm = trial.suggest_float("max_grad_norm", 5e-1, 2e1, log=True)
+    lr = trial.suggest_float("lr", 1e-3, 5e-2, log=True)
+    max_grad_norm = trial.suggest_float("max_grad_norm", 1e-1, 1e1, log=True)
 
     train_args = {
         "epsilon": epsilon,
@@ -145,18 +141,12 @@ def objective(epsilon, delta, xc, yc, trial):
     }
     train_args = argparse.Namespace(**train_args)
 
-    try:
-        elbo = batch_dp_train_model(xc, yc, train_args, trial)
-    except:
-        import pdb
-
-        pdb.set_trace()
-        print()
+    elbo = batch_dp_train_model(xc, yc, train_args, trial, use_true_kernel)
 
     return elbo
 
 
-def visualise_1d(model, gen, batch, path, config, epsilon, delta):
+def visualise_1d(model, gen, batch, path, config, epsilon, delta, best_trial, elbo):
     try:
         plot_config = config["plot"][1]
     except KeyError:
@@ -170,7 +160,8 @@ def visualise_1d(model, gen, batch, path, config, epsilon, delta):
     with torch.no_grad():
         qf_params = model(x)
         mean = qf_params[:, 0].unsqueeze(-1)
-        var = qf_params[:, 1].unsqueeze(-1)
+        qf_var = qf_params[:, 1].unsqueeze(-1)
+        var = qf_var + model.likelihood.noise
 
     plt.figure(figsize=(8, 6 * config["dim_y"]))
 
@@ -247,8 +238,9 @@ def visualise_1d(model, gen, batch, path, config, epsilon, delta):
             + f"$\\ell = {ell:.3f}$  "
             + f"$N\\ell \\approx {N*ell:.0f}$  "
             + f"$\\epsilon = {epsilon:.2f}$  "
-            + f"$\\delta = {delta:.3f}$",
-            fontsize=24,
+            + f"$\\delta = {delta:.3f}$  "
+            + f"$({best_trial:.1f}, {elbo:.1f})$",
+            fontsize=18,
         )
 
         plt.xlim(B.min(x), B.max(x))
@@ -262,9 +254,9 @@ def evaluate(model, xt: torch.Tensor, yt: torch.Tensor):
     # Predict with model.
     with torch.no_grad():
         qf_params = model(xt)
+        mean = qf_params[:, 0].unsqueeze(-1)
+        var = qf_params[:, 1].unsqueeze(-1) + model.likelihood.noise
 
-    mean = qf_params[:, 0].unsqueeze(-1)
-    var = qf_params[:, 1].unsqueeze(-1)
     qf = torch.distributions.Normal(mean, var.pow(0.5))
 
     # Compute some predictive metrics.
@@ -304,10 +296,12 @@ def main(**kw_args):
     parser.add_argument("--dp-log10-delta-max", type=float, default=-3.0)
 
     parser.add_argument("--epsilon", type=float, default=1.0)
-    parser.add_argument("--delta", type=float, default=1e-2)
+    parser.add_argument("--delta", type=float, default=1e-3)
     parser.add_argument("--n-trials", type=int, default=100)
     parser.add_argument("--meta-train-hypers", action="store_true", default=False)
     parser.add_argument("--meta-train-size", type=int, default=1)
+
+    parser.add_argument("--use-true-kernel", action="store_true", default=False)
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -330,6 +324,9 @@ def main(**kw_args):
     if not exp.data[args.data]["requires_dim_y"]:
         del args.dim_y
 
+    # Set default dtype.
+    torch.set_default_dtype(torch.float64)
+
     # Determine settings for the setup of the script.
     suffix = ""
     observe = False
@@ -345,10 +342,16 @@ def main(**kw_args):
         data_dir,
         *((f"x{args.dim_x}_y{args.dim_y}",) if hasattr(args, "dim_x") else ()),
         "sgp",
+        f"eps_{args.epsilon}_delta_{args.delta}",
+        f"fixed_hypers_{args.use_true_kernel}",
         log=f"log{suffix}.txt",
         diff=f"diff{suffix}.txt",
         observe=observe,
     )
+
+    # Save args.
+    with open(wd.file("args.json"), "w") as f:
+        json.dump(vars(args), f)
 
     # Determine which device to use. Try to use a GPU if one is available.
     device = "cpu"
@@ -396,7 +399,14 @@ def main(**kw_args):
 
         study = optuna.create_study(direction="maximize")
         study.optimize(
-            partial(objective, args.epsilon, args.delta, train_x, train_y),
+            partial(
+                objective,
+                args.epsilon,
+                args.delta,
+                train_x,
+                train_y,
+                args.use_true_kernel,
+            ),
             n_trials=args.n_trials,
         )
         best_trial = study.best_trial
@@ -418,7 +428,14 @@ def main(**kw_args):
                 if not args.meta_train_hypers:
                     study = optuna.create_study(direction="maximize")
                     study.optimize(
-                        partial(objective, args.epsilon, args.delta, [xc], [yc]),
+                        partial(
+                            objective,
+                            args.epsilon,
+                            args.delta,
+                            [xc],
+                            [yc],
+                            args.use_true_kernel,
+                        ),
                         n_trials=args.n_trials,
                     )
                     best_trial = study.best_trial
@@ -431,9 +448,10 @@ def main(**kw_args):
 
                 # Cosntruct model and optimiser using hyperparameters found via BayesOpt.
                 kernel = dpsgp.kernels.RBFKernel()
+                kernel.lengthscale = 0.25
                 # TODO: surely we need to do BayesOpt to find optimum min/max initialisation values.
                 init_z = torch.linspace(xc.min(), xc.max(), num_inducing).unsqueeze(-1)
-                likelihood = dpsgp.likelihoods.GaussianLikelihood(noise=0.1)
+                likelihood = dpsgp.likelihoods.GaussianLikelihood(noise=0.05)
                 model = dpsgp.sgp.SparseGP(kernel, likelihood, init_z)
 
                 train_dataset = TensorDataset(xc, yc)
@@ -441,7 +459,7 @@ def main(**kw_args):
                     train_dataset, batch_size=batch_size, shuffle=True
                 )
 
-                privacy_engine = PrivacyEngine()
+                privacy_engine = PrivacyEngine(accountant="rdp")
                 optimiser = torch.optim.Adam(model.parameters(), lr=lr)
 
                 (
@@ -459,7 +477,7 @@ def main(**kw_args):
                     grad_sample_mode="functorch",
                 )
 
-                train_model(model, optimiser, epochs, train_loader)
+                elbo = train_model(model, optimiser, epochs, train_loader)
                 visualise_1d(
                     model,
                     gen,
@@ -468,6 +486,8 @@ def main(**kw_args):
                     config,
                     args.epsilon,
                     args.delta,
+                    best_trial.value,
+                    elbo,
                 )
                 metrics = evaluate(model, xt, yt)
                 for metric_name, metric_value in metrics.items():
