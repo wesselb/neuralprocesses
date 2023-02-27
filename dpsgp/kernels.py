@@ -45,7 +45,7 @@ class Kernel(nn.Module):
         return self.log_lengthscale.exp()
 
     @lengthscale.setter
-    def lenthscale(self, value: float):
+    def lengthscale(self, value: float):
         lengthscale_num_dims = 1 if self.ard_num_dims is None else self.ard_num_dims
         self.log_lengthscale = nn.Parameter(
             (torch.ones(1, lengthscale_num_dims) * value).log()

@@ -29,4 +29,4 @@ class GaussianLikelihood(nn.Module):
         )
 
     def forward(self, out: torch.Tensor) -> torch.distributions.Normal:
-        return torch.distributions.Normal(out, self.noise)
+        return torch.distributions.Normal(out, self.noise.pow(0.5))
