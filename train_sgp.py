@@ -75,7 +75,7 @@ def train_model(model, optimiser, epochs, train_loader, trial=None):
     return elbo
 
 
-def dp_train_model(xc, yc, train_args, trial=None, use_true_kernel=False):
+def dp_train_model(xc, yc, train_args, trial=None):
     kernel = dpsgp.kernels.RBFKernel()
     init_z = torch.linspace(xc.min(), xc.max(), train_args.num_inducing).unsqueeze(-1)
 
@@ -84,7 +84,7 @@ def dp_train_model(xc, yc, train_args, trial=None, use_true_kernel=False):
     likelihood = dpsgp.likelihoods.GaussianLikelihood(noise=0.05)
     model = dpsgp.sgp.SparseGP(kernel, likelihood, init_z)
 
-    if use_true_kernel:
+    if train_args.use_true_kernel:
         kernel.lengthscale = 0.25
         kernel.log_lengthscale.requires_grad = False
         kernel.scale = 1.0
@@ -113,16 +113,16 @@ def dp_train_model(xc, yc, train_args, trial=None, use_true_kernel=False):
     return train_model(model, optimiser, train_args.epochs, train_loader, trial)
 
 
-def batch_dp_train_model(xc, yc, train_args, trial=None, use_true_kernel=False):
+def batch_dp_train_model(xc, yc, train_args, trial=None):
     elbo = 0.0
     for xc_batch, yc_batch in zip(xc, yc):
-        elbo += dp_train_model(xc_batch, yc_batch, train_args, trial, use_true_kernel)
+        elbo += dp_train_model(xc_batch, yc_batch, train_args, trial)
 
     return elbo
 
 
 # Define optuna objective function to be maximised.
-def objective(epsilon, delta, xc, yc, trial, use_true_kernel=False):
+def objective(epsilon, delta, xc, yc, use_true_kernel, trial):
     # Suggest values of hyperparameters using a trial object.
     num_inducing = trial.suggest_int("num_inducing", 10, 20)
     epochs = trial.suggest_int("epochs", 50, 300)
@@ -138,10 +138,11 @@ def objective(epsilon, delta, xc, yc, trial, use_true_kernel=False):
         "batch_size": batch_size,
         "lr": lr,
         "max_grad_norm": max_grad_norm,
+        "use_true_kernel": use_true_kernel,
     }
     train_args = argparse.Namespace(**train_args)
 
-    elbo = batch_dp_train_model(xc, yc, train_args, trial, use_true_kernel)
+    elbo = batch_dp_train_model(xc, yc, train_args, trial)
 
     return elbo
 
