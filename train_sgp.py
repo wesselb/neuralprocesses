@@ -449,11 +449,21 @@ def main(**kw_args):
 
                 # Cosntruct model and optimiser using hyperparameters found via BayesOpt.
                 kernel = dpsgp.kernels.RBFKernel()
-                kernel.lengthscale = 0.25
                 # TODO: surely we need to do BayesOpt to find optimum min/max initialisation values.
                 init_z = torch.linspace(xc.min(), xc.max(), num_inducing).unsqueeze(-1)
+
+                # Initialise using true lengthscale and noise values. TODO: use BayesOpt on initialisation.
+                kernel.lengthscale = 0.25
                 likelihood = dpsgp.likelihoods.GaussianLikelihood(noise=0.05)
                 model = dpsgp.sgp.SparseGP(kernel, likelihood, init_z)
+
+                if args.use_true_kernel:
+                    kernel.lengthscale = 0.25
+                    kernel.log_lengthscale.requires_grad = False
+                    kernel.scale = 1.0
+                    kernel.log_scale.requires_grad = False
+                    likelihood.noise = 0.05
+                    likelihood.log_noise.requires_grad = False
 
                 train_dataset = TensorDataset(xc, yc)
                 train_loader = DataLoader(
