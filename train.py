@@ -277,8 +277,9 @@ def main(**kw_args):
         dp_log10_delta_range = (args.dp_log10_delta_min, args.dp_log10_delta_max)
 
         model_name = "dpconvcnp_"
-        model_name = model_name + "n_" if args.dp_use_noise_channels else model_name + ""
-        model_name = model_name + "a_" if args.dp_amortise_params else model_name + ""
+        model_name = model_name + "n" if args.dp_use_noise_channels else model_name + "x"
+        model_name = model_name + "a" if args.dp_amortise_params else model_name + "x"
+        model_name = model_name + "_"
         model_name = model_name + f"{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
         model_name = model_name + f"{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
 

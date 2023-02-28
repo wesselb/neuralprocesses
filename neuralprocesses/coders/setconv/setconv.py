@@ -9,6 +9,7 @@ from ...augment import AugmentedInput
 from ...parallel import broadcast_coder_over_parallel
 from ...util import register_module
 
+from torchvision.ops import MLP
 from . import privacy_accounting as pa
 
 from stheno import EQ
@@ -203,13 +204,26 @@ class DPSetConv:
         self.amortise_dp_params = amortise_dp_params
 
         if self.amortise_dp_params:
-            self.y_lin = self.nn.Linear(1, 1)
-            self.log_max_y_bound = self.nn.Parameter(
-                B.log(y_bound), dtype=dtype, learnable=learnable
+            
+            # self.y_lin = self.nn.Linear(1, 1)
+            # self.log_max_y_bound = self.nn.Parameter(
+            #     B.log(y_bound), dtype=dtype, learnable=learnable
+            # )
+            
+            # self.t_lin = self.nn.Linear(1, 1)
+            
+            self.y_mlp = MLP(
+                in_channels=1,
+                hidden_channels=[20, 20, 1],
             )
-            self.t_lin = self.nn.Linear(1, 1)
+            
+            self.t_mlp = MLP(
+                in_channels=1,
+                hidden_channels=[20, 20, 1],
+            )
 
         else:
+            
             self.log_y_bound = self.nn.Parameter(
                 B.log(y_bound), dtype=dtype, learnable=learnable
             )
@@ -235,7 +249,7 @@ class DPSetConv:
     #     density_sensitivity = 2 ** 0.5
     #     signal_sensitivity = 2 * y_bound
     #
-    #     density_sigma = density_sensitivity / (2 (1 - t) μ)**0.5 = density_sens / (sens_per_sigma * (1-t)**0.5)
+    #     density_sigma = density_sensitivity / (2 (1 - t) μ)**0.5 = density_sens / (sens_per_sigma * (1 - t)**0.5)
     #     value_sigma = signal_sensitivity / (2 t μ)**0.5 = signal_sens / (sens_per_sigma * t**0.5)
     #
     #     density_sigma = 2**0.5 * density_sensitivity / sens_per_sigma = 2 / sens_per_sigma
@@ -243,10 +257,10 @@ class DPSetConv:
         
     def t(self, sens_per_sigma):
 
-        mu = 0.5 * sens_per_sigma**2.
-
         if self.amortise_dp_params:
-            return B.sigmoid(self.t_lin(mu[:, None])[:, 0])
+            # mu = 0.5 * sens_per_sigma**2.
+            # return B.sigmoid(self.t_lin(mu[:, None])[:, 0])
+            return B.sigmoid(self.t_mlp(sens_per_sigma[:, None])[:, 0])
 
         else:
             return B.sigmoid(self.logit_t[None])
@@ -254,10 +268,10 @@ class DPSetConv:
     
     def y_bound(self, sens_per_sigma):
 
-        mu = 0.5 * sens_per_sigma**2.
-
         if self.amortise_dp_params:
-            return B.exp(self.log_max_y_bound) * B.sigmoid(self.y_lin(mu[:, None])[:, 0])
+            # mu = 0.5 * sens_per_sigma**2.
+            # return B.exp(self.log_max_y_bound) * B.sigmoid(self.y_lin(mu[:, None])[:, 0])
+            return B.softplus(self.y_mlp(sens_per_sigma[:, None])[:, 0])
 
         else:
             return B.exp(self.log_y_bound[None])
@@ -300,24 +314,66 @@ class DPSetConv:
         tensor = B.concat(kernel, clipped_data, axis=1)
         
         return tensor
+    
+    def sens_per_sigma(self, epsilon, delta):
+
+        sens_per_sigma = torch.tensor([
+            pa.find_sens_per_sigma(epsilon=e, delta_bound=d) for e, d in zip(epsilon[:, 0], delta[:, 0])
+        ])
+        
+        return sens_per_sigma
+        
 
         
 @_dispatch
 @_batch_targets
 def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, *, epsilon: B.Numeric, delta: B.Numeric, **kw_args):
 
-    sens_per_sigma = torch.tensor([
-        pa.find_sens_per_sigma(epsilon=e, delta_bound=d) for e, d in zip(epsilon[:, 0], delta[:, 0])
-    ]).to(xz.device)
+    sens_per_sigma = coder.sens_per_sigma(epsilon, delta).to(xz.device)
 
     density_data_channels = B.matmul(
         coder.clip_data_channel(z, sens_per_sigma),
         compute_weights(coder, xz, x),
     )
+    
+#     print(xz.shape, z.shape, x.shape, density_data_channels.shape)
+#     input("")
+    
+#     import matplotlib.pyplot as plt
+    
+#     plt.figure(figsize=(10, 5))
+#     plt.subplot(1, 2, 1)
+#     plt.plot(x[0, 0, :], density_data_channels[0, 0, :], color="tab:blue", label="Density")
+                                   
+#     plt.subplot(1, 2, 2)
+#     plt.plot(x[0, 0, :], density_data_channels[0, 1, :], color="tab:blue", label="Density + noise")
 
     noise, density_sigma, value_sigma = coder.sample_noise(xz, z, x, sens_per_sigma)
     
     z = density_data_channels + noise
+    
+#     plt.subplot(1, 2, 1)
+#     plt.plot(x[0, 0, :], z[0, 0, :], "--", color="tab:blue", label="Value")
+#     plt.xlabel("$x$", fontsize=18)
+#     plt.ylabel("Density", fontsize=18)
+#     plt.legend()
+                                   
+#     plt.subplot(1, 2, 2)
+#     plt.plot(x[0, 0, :], z[0, 1, :], "--", color="tab:blue", label="Value + noise")
+#     plt.xlabel("$x$", fontsize=18)
+#     plt.ylabel("Value", fontsize=18)
+#     plt.legend()
+    
+#     eps = float(epsilon[0].detach().cpu().numpy())
+#     plt.suptitle(f"Amortised $t, y_b$, $\\epsilon = {eps:.2f}$", fontsize=28)
+    
+#     if not hasattr(coder, "i"):
+#         coder.i = 1
+#     else:
+#         coder.i = coder.i + 1
+        
+#     plt.tight_layout()
+#     plt.savefig(f"_img/amortised-channels-{eps:.2f}-{coder.i}.png")
     
     if coder.use_dp_noise_channels:
 
