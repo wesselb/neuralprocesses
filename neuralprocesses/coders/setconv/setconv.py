@@ -214,12 +214,12 @@ class DPSetConv:
             
             self.y_mlp = MLP(
                 in_channels=1,
-                hidden_channels=[20, 20, 1],
+                hidden_channels=[20, 1],
             )
             
             self.t_mlp = MLP(
                 in_channels=1,
-                hidden_channels=[20, 20, 1],
+                hidden_channels=[20, 1],
             )
 
         else:
