@@ -260,7 +260,7 @@ def main(**kw_args):
 
     # Ensure that the f_model is on the GPU and print the setup.
     f_model = f_model.to(device)
-
+    
     f_model.load_state_dict(
         torch.load(fwd.file("model-best.torch"), map_location=device)["weights"]
     )
@@ -272,12 +272,12 @@ def main(**kw_args):
         torch.load(f1wd.file("model-best.torch"), map_location=device)["weights"]
     )
 
-#     # Ensure that the f_model is on the GPU and print the setup.
-#     f3_model = f3_model.to(device)
+    # Ensure that the f_model is on the GPU and print the setup.
+    f3_model = f3_model.to(device)
 
-#     f3_model.load_state_dict(
-#         torch.load(f3wd.file("model-best.torch"), map_location=device)["weights"]
-#     )
+    f3_model.load_state_dict(
+        torch.load(f3wd.file("model-best.torch"), map_location=device)["weights"]
+    )
 
     # Ensure that the f_model is on the GPU and print the setup.
     f9_model = f9_model.to(device)
@@ -305,11 +305,12 @@ def main(**kw_args):
     sens_per_sigma = torch.linspace(2e-1, 2.5, 100).to(device)
     
     f1_sens_per_sigma = find_sens_per_sigma(epsilon=1., delta_bound=0.001)
+    f3_sens_per_sigma = find_sens_per_sigma(epsilon=3., delta_bound=0.001)
     f9_sens_per_sigma = find_sens_per_sigma(epsilon=9., delta_bound=0.001)
         
     f_t, f_y_bound, f_value_sigma, f_density_sigma = get_t_y_sigmas(f_model, sens_per_sigma, amortised=False)
     f1_t, f1_y_bound, f1_value_sigma, f1_density_sigma = get_t_y_sigmas(f1_model, torch.tensor(f1_sens_per_sigma).to(device), amortised=False)
-    # f3_t, f3_y_bound, f3_value_sigma, f3_density_sigma = get_t_y_sigmas(f3_model, sens_per_sigma, amortised=False)
+    f3_t, f3_y_bound, f3_value_sigma, f3_density_sigma = get_t_y_sigmas(f3_model, torch.tensor(f3_sens_per_sigma).to(device), amortised=False)
     f9_t, f9_y_bound, f9_value_sigma, f9_density_sigma = get_t_y_sigmas(f9_model, torch.tensor(f9_sens_per_sigma).to(device), amortised=False)
     a_t, a_y_bound, a_value_sigma, a_density_sigma = get_t_y_sigmas(a_model, sens_per_sigma, amortised=True)
     
@@ -320,6 +321,7 @@ def main(**kw_args):
     plt.subplot(1, 3, 1)
     plt.plot(sens_per_sigma, f_t * np.ones_like(sens_per_sigma), color="tab:red")
     plt.scatter([f1_sens_per_sigma], [f1_t], color="tab:green", marker="x", zorder=10)
+    plt.scatter([f3_sens_per_sigma], [f3_t], color="tab:orange", marker="x", zorder=10)
     plt.scatter([f9_sens_per_sigma], [f9_t], color="tab:purple", marker="x", zorder=10)
     plt.plot(sens_per_sigma, a_t, color="tab:blue")
     plt.ylim([0., 1.])
@@ -329,6 +331,7 @@ def main(**kw_args):
     plt.subplot(1, 3, 2)
     plt.plot(sens_per_sigma, f_y_bound * np.ones_like(sens_per_sigma), color="tab:red")
     plt.scatter([f1_sens_per_sigma], [f1_y_bound], color="tab:green", marker="x", zorder=10)
+    plt.scatter([f3_sens_per_sigma], [f3_y_bound], color="tab:orange", marker="x", zorder=10)
     plt.scatter([f9_sens_per_sigma], [f9_y_bound], color="tab:purple", marker="x", zorder=10)
     plt.plot(sens_per_sigma, a_y_bound, color="tab:blue")
     plt.ylim([1., 2.5])
@@ -339,10 +342,12 @@ def main(**kw_args):
     plt.plot(sens_per_sigma, f_value_sigma, color="tab:red", label="Value $\\sigma$")
     plt.plot(sens_per_sigma, f_density_sigma, "--", color="tab:red", label="Density $\\sigma$")
     plt.scatter([f1_sens_per_sigma], [f1_value_sigma], marker="o", color="tab:green", zorder=5, linewidth=1., edgecolor="k")
+    plt.scatter([f3_sens_per_sigma], [f3_value_sigma], marker="o", color="tab:orange", zorder=5, linewidth=1., edgecolor="k")
     plt.scatter([f9_sens_per_sigma], [f9_value_sigma], marker="o", color="tab:purple", zorder=5, linewidth=1., edgecolor="k")
     plt.plot(sens_per_sigma, a_value_sigma, color="tab:blue", label="Value $\\sigma$")
     plt.plot(sens_per_sigma, a_density_sigma, "--", color="tab:blue", label="Density $\\sigma$")
     plt.scatter([f1_sens_per_sigma], [f1_density_sigma], marker="o", color="white", linewidth=1., edgecolor="tab:green", zorder=5)
+    plt.scatter([f3_sens_per_sigma], [f3_density_sigma], marker="o", color="white", linewidth=1., edgecolor="tab:orange", zorder=5)
     plt.scatter([f9_sens_per_sigma], [f9_density_sigma], marker="o", color="white", linewidth=1., edgecolor="tab:purple", zorder=5)
     plt.legend(fontsize=12)
     plt.yscale("log")
