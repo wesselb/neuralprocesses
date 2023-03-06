@@ -1,6 +1,8 @@
+from typing import Union
+
 import lab as B
 import numpy as np
-from plum import Dispatcher, Union
+from plum import Dispatcher
 from wbml.util import inv_perm
 
 from .. import _dispatch

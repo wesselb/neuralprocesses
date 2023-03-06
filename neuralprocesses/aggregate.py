@@ -1,5 +1,6 @@
+from typing import Tuple
+
 import lab as B
-from plum import Tuple
 
 from . import _dispatch
 

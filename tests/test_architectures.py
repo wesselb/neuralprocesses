@@ -3,8 +3,10 @@ from itertools import product
 import lab as B
 import numpy as np
 import pytest
+from plum import isinstance
 
-from .util import nps as nps_fixed_dtype, approx, generate_data  # noqa
+from .util import approx, generate_data
+from .util import nps as nps_fixed_dtype  # noqa
 
 
 def generate_conv_arch_variations(configs):

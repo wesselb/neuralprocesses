@@ -1,17 +1,19 @@
+from typing import Union
+
 import lab as B
 import numpy as np
-from plum import convert, Union
+from plum import convert
 
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
 from ..datadims import data_dims
 from ..util import (
-    register_module,
+    merge_dimensions,
     register_composite_coder,
+    register_module,
+    select,
     split,
     split_dimension,
-    merge_dimensions,
-    select,
 )
 
 __all__ = [

@@ -1,6 +1,7 @@
+from typing import Union
+
 import lab as B
 from matrix import Diagonal
-from plum import Union
 
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput

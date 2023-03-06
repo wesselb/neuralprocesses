@@ -1,8 +1,8 @@
 import matrix  # noqa
-from plum import ptype, Signature
+from plum import isinstance, issubclass
 
 from . import _dispatch
-from .dist import Dirac, AbstractMultiOutputDistribution
+from .dist import AbstractMultiOutputDistribution, Dirac
 from .parallel import Parallel
 from .util import is_composite_coder
 
@@ -30,12 +30,17 @@ def code(coder, xz, z, x, **kw_args):
         tuple[input, tensor]: New encoding.
     """
     if any(
-        [ptype(type(coder)) <= s.base[0] < ptype(object) for s in code.methods.keys()]
+        [
+            isinstance(coder, s.types[0])
+            and issubclass(s.types[0], object)
+            and not issubclass(object, s.types[0])
+            for s in code.methods
+        ]
     ):
         raise RuntimeError(
             f"Dispatched to fallback implementation for `code`, but specialised "
-            f"implementation are available. (The signature of the arguments is "
-            f"{Signature(type(coder), type(xz), type(z), type(x))}.)"
+            f"implementation are available. The arguments are "
+            f"`({coder}, {xz}, {z}, {x})`."
         )
     return xz, coder(z)
 

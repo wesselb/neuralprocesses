@@ -1,14 +1,16 @@
+from typing import Union
+
 import lab as B
 import numpy as np
 from matrix import AbstractMatrix, Dense, Diagonal, LowRank, Woodbury
-from plum import parametric, Union
+from plum import parametric
 from stheno import Normal
 from wbml.util import indented_kv
 
-from .dist import AbstractMultiOutputDistribution
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..util import batch, split
+from .dist import AbstractMultiOutputDistribution
 
 __all__ = ["MultiOutputNormal"]
 

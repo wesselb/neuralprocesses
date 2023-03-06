@@ -1,13 +1,14 @@
+from typing import List, Tuple, Union
+
 import lab as B
 from matrix.util import indent
-from plum import List, Tuple, Union
 
-from .util import sample, compress_contexts
 from .. import _dispatch
 from ..augment import AugmentedInput
 from ..coding import code
 from ..mask import Masked
 from ..util import register_module
+from .util import compress_contexts, sample
 
 __all__ = ["Model"]
 
