@@ -167,7 +167,7 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
     def logpdf(self, x):
         x = _monormal_vectorise(x, self.shape)
         d = self.vectorised_normal
-        if B.all(~B.isnan(x)):
+        if B.jit_to_numpy(B.all(~B.isnan(x))):
             return d.logpdf(x)
         else:
             # Data is missing. Unfortunately, which elements are missing can differ
