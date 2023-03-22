@@ -13,6 +13,7 @@ import torch
 import wbml.out as out
 from matrix.util import ToDenseWarning
 from wbml.experiment import WorkingDirectory
+from itertools import chain
 
 __all__ = ["main"]
 
@@ -37,9 +38,11 @@ def train(state, model, opt, objective, gen, *, fix_noise):
         vals.append(B.to_numpy(obj))
         # Be sure to negate the output of `objective`.
         val = -B.mean(obj)
-        opt.zero_grad(set_to_none=True)
+        for _opt in opt:
+            _opt.zero_grad(set_to_none=True)
         val.backward()
-        opt.step()
+        for _opt in opt:
+            _opt.step()
 
 
     vals = B.concat(*vals)
@@ -95,7 +98,7 @@ def main(**kw_args):
 
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_experiments-fixed-scale"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
@@ -743,7 +746,22 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
-        opt = torch.optim.Adam(model.parameters(), args.rate)
+        if args.model == "dpconvcnp":
+            
+            enc_setconv = model.encoder.coder[1]
+            enc_setconv_params = enc_setconv.parameters()
+            
+            enc_other_modules = list(filter(lambda x: x != enc_setconv, model.encoder.coder))
+            other_modules = enc_other_modules + [model.decoder]
+            other_params = chain(*[module.parameters() for module in other_modules])
+            
+            opt = [
+                torch.optim.Adam(enc_setconv_params, args.rate),
+                torch.optim.Adam(other_params, args.rate),
+            ]
+            
+        else:
+            opt = [torch.optim.Adam(model.parameters(), args.rate)]
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon

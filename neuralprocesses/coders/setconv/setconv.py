@@ -199,38 +199,28 @@ class DPSetConv:
             B.log(scale), dtype=dtype, learnable=learnable
         )
         
-
         self.use_dp_noise_channels = use_dp_noise_channels
         self.amortise_dp_params = amortise_dp_params
 
         if self.amortise_dp_params:
             
-            # self.y_lin = self.nn.Linear(1, 1)
-            # self.log_max_y_bound = self.nn.Parameter(
-            #     B.log(y_bound), dtype=dtype, learnable=learnable
-            # )
-            
-            # self.t_lin = self.nn.Linear(1, 1)
-            
             self.y_mlp = MLP(
                 in_channels=1,
-                hidden_channels=[20, 1],
+                hidden_channels=[20, 20, 1],
             )
             
             self.t_mlp = MLP(
                 in_channels=1,
-                hidden_channels=[20, 1],
+                hidden_channels=[20, 20, 1],
             )
 
-        else:
-            
-            self.log_y_bound = self.nn.Parameter(
-                B.log(y_bound), dtype=dtype, learnable=learnable
-            )
-            
-            self.logit_t = self.nn.Parameter(
-                0., dtype=dtype, learnable=learnable
-            )
+        self.log_y_bound = self.nn.Parameter(
+            B.log(y_bound), dtype=dtype, learnable=learnable
+        )
+
+        self.logit_t = self.nn.Parameter(
+            0., dtype=dtype, learnable=learnable
+        )
         
     def density_sigma(self, sens_per_sigma):
         return 2 ** 0.5 / (sens_per_sigma * (1 - self.t(sens_per_sigma))**0.5)
@@ -260,10 +250,10 @@ class DPSetConv:
         if self.amortise_dp_params:
             # mu = 0.5 * sens_per_sigma**2.
             # return B.sigmoid(self.t_lin(mu[:, None])[:, 0])
-            return B.sigmoid(self.t_mlp(sens_per_sigma[:, None])[:, 0])
+            return 0.5 + 0. * B.sigmoid(self.t_mlp(sens_per_sigma[:, None])[:, 0])
 
         else:
-            return B.sigmoid(self.logit_t[None])
+            return 0.5 + 0. * B.sigmoid(self.logit_t[None])
 
     
     def y_bound(self, sens_per_sigma):
@@ -271,10 +261,10 @@ class DPSetConv:
         if self.amortise_dp_params:
             # mu = 0.5 * sens_per_sigma**2.
             # return B.exp(self.log_max_y_bound) * B.sigmoid(self.y_lin(mu[:, None])[:, 0])
-            return B.softplus(self.y_mlp(sens_per_sigma[:, None])[:, 0])
+            return 2.0 + 0. * B.softplus(self.y_mlp(sens_per_sigma[:, None])[:, 0])
 
         else:
-            return B.exp(self.log_y_bound[None])
+            return 2.0 + 0. * B.exp(self.log_y_bound[None])
 
         
     def sample_noise(self, xz, z, x, sens_per_sigma):
