@@ -86,10 +86,7 @@ def eval(state, model, objective, gen):
             out.kv("KL (diag)", metrics["kl_diag"])
             
         out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
-        #out.kv("Encoder y_bound     ", model.encoder.coder[1][0].y_bound)
-        #out.kv("Noise fraction      ", torch.mean(model.encoder.coder[1][0].t))
-        #out.kv("Density noise scale ", torch.mean(model.encoder.coder[1][0]._density_sigma))
-        #out.kv("Data noise scale    ", torch.mean(model.encoder.coder[1][0]._value_sigma))
+        out.kv("Encoder fake scale  ", torch.exp(model.encoder.coder[1][0].fake_log_scale))
 
         return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), metrics
 
