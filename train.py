@@ -38,11 +38,11 @@ def train(state, model, opt, objective, gen, *, fix_noise):
         vals.append(B.to_numpy(obj))
         # Be sure to negate the output of `objective`.
         val = -B.mean(obj)
-        for _opt in opt:
-            _opt.zero_grad(set_to_none=True)
+        opt.zero_grad(set_to_none=True)
         val.backward()
-        for _opt in opt:
-            _opt.step()
+        out.kv("Encoder grad scale       ", model.encoder.coder[1][0].log_scale.grad)
+        out.kv("Encoder grad fake scale  ", model.encoder.coder[1][0].fake_log_scale.grad)
+        opt.step()
 
 
     vals = B.concat(*vals)
@@ -743,6 +743,7 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
+<<<<<<< HEAD
         if args.model == "dpconvcnp":
             
             enc_setconv = model.encoder.coder[1]
@@ -759,6 +760,9 @@ def main(**kw_args):
             
         else:
             opt = [torch.optim.Adam(model.parameters(), args.rate)]
+=======
+        opt = torch.optim.SGD(model.parameters(), args.rate)
+>>>>>>> tmp
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
