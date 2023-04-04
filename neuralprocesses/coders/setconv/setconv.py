@@ -194,8 +194,12 @@ class DPSetConv:
             dtype=None,
             learnable=True,
         ):
-        
+
         self.log_scale = self.nn.Parameter(
+            B.log(scale), dtype=dtype, learnable=learnable
+        )
+        
+        self.fake_log_scale = self.nn.Parameter(
             B.log(scale), dtype=dtype, learnable=learnable
         )
         
@@ -271,7 +275,7 @@ class DPSetConv:
 
         _x = B.transpose(x, [0, 2, 1])
         
-        kernel = EQ().stretch(B.exp(self.log_scale))
+        kernel = EQ().stretch(B.exp(self.log_scale)) #EQ().stretch(B.exp(self.fake_log_scale)) # EQ().stretch(B.exp(self.log_scale))
         
         k = lambda tensor: kernel(tensor, tensor) + \
             1e-6 * B.eye(tensor.dtype, tensor.shape[-1])[None, :, :]
