@@ -756,7 +756,7 @@ def main(**kw_args):
             other_params = chain(*[module.parameters() for module in other_modules])
             
             opt = [
-                torch.optim.Adam(enc_setconv_params, args.rate),
+                torch.optim.Adam(enc_setconv_params, args.rate/10, betas=(0.9, 0.99)),
                 torch.optim.Adam(other_params, args.rate),
             ]
             
