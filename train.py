@@ -38,11 +38,11 @@ def train(state, model, opt, objective, gen, *, fix_noise):
         vals.append(B.to_numpy(obj))
         # Be sure to negate the output of `objective`.
         val = -B.mean(obj)
-        for _opt in opt:
-            _opt.zero_grad(set_to_none=True)
+        opt.zero_grad(set_to_none=True)
         val.backward()
-        for _opt in opt:
-            _opt.step()
+        out.kv("Encoder grad scale       ", model.encoder.coder[1][0].log_scale.grad)
+        out.kv("Encoder grad fake scale  ", model.encoder.coder[1][0].fake_log_scale.grad)
+        opt.step()
 
 
     vals = B.concat(*vals)
@@ -86,6 +86,7 @@ def eval(state, model, objective, gen):
             out.kv("KL (diag)", metrics["kl_diag"])
             
         out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
+        out.kv("Encoder fake scale  ", torch.exp(model.encoder.coder[1][0].fake_log_scale))
         #out.kv("Encoder y_bound     ", model.encoder.coder[1][0].y_bound)
         #out.kv("Noise fraction      ", torch.mean(model.encoder.coder[1][0].t))
         #out.kv("Density noise scale ", torch.mean(model.encoder.coder[1][0]._density_sigma))
@@ -746,22 +747,7 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
-        if args.model == "dpconvcnp":
-            
-            enc_setconv = model.encoder.coder[1]
-            enc_setconv_params = enc_setconv.parameters()
-            
-            enc_other_modules = list(filter(lambda x: x != enc_setconv, model.encoder.coder))
-            other_modules = enc_other_modules + [model.decoder]
-            other_params = chain(*[module.parameters() for module in other_modules])
-            
-            opt = [
-                torch.optim.Adam(enc_setconv_params, args.rate),
-                torch.optim.Adam(other_params, args.rate),
-            ]
-            
-        else:
-            opt = [torch.optim.Adam(model.parameters(), args.rate)]
+        opt = torch.optim.SGD(model.parameters(), args.rate)
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
