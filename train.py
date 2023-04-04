@@ -743,26 +743,7 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
-<<<<<<< HEAD
-        if args.model == "dpconvcnp":
-            
-            enc_setconv = model.encoder.coder[1]
-            enc_setconv_params = enc_setconv.parameters()
-            
-            enc_other_modules = list(filter(lambda x: x != enc_setconv, model.encoder.coder))
-            other_modules = enc_other_modules + [model.decoder]
-            other_params = chain(*[module.parameters() for module in other_modules])
-            
-            opt = [
-                torch.optim.Adam(enc_setconv_params, args.rate/10, betas=(0.9, 0.99)),
-                torch.optim.Adam(other_params, args.rate),
-            ]
-            
-        else:
-            opt = [torch.optim.Adam(model.parameters(), args.rate)]
-=======
         opt = torch.optim.SGD(model.parameters(), args.rate)
->>>>>>> tmp
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
