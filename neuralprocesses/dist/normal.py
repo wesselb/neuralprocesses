@@ -1,14 +1,16 @@
+from typing import Union
+
 import lab as B
 import numpy as np
 from matrix import AbstractMatrix, Dense, Diagonal, LowRank, Woodbury
-from plum import parametric, Union
+from plum import parametric
 from stheno import Normal
 from wbml.util import indented_kv
 
-from .dist import AbstractDistribution, shape_batch
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..util import batch, split
+from .dist import AbstractDistribution, shape_batch
 
 __all__ = ["MultiOutputNormal"]
 
@@ -165,7 +167,7 @@ class MultiOutputNormal(AbstractDistribution):
     def logpdf(self, x):
         x = _monormal_vectorise(x, self.shape)
         d = self.vectorised_normal
-        if B.all(~B.isnan(x)):
+        if B.jit_to_numpy(B.all(~B.isnan(x))):
             return d.logpdf(x)
         else:
             # Data is missing. Unfortunately, which elements are missing can differ

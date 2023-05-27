@@ -1,14 +1,13 @@
-from typing import Optional
+from typing import List, Optional
 
 import lab as B
 from lab.shape import Dimension
-from plum import List
 
 from . import _dispatch
-from .augment import AugmentedInput
 from .aggregate import AggregateInput
+from .augment import AugmentedInput
 from .parallel import Parallel
-from .util import register_module, is_nonempty, batch
+from .util import batch, is_nonempty, register_module
 
 __all__ = ["Discretisation"]
 

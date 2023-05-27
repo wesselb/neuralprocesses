@@ -1,9 +1,10 @@
+from typing import Tuple
+
 import lab as B
 from lab.shape import Dimension
-from plum import Tuple
 
-from .dist import AbstractDistribution
 from .. import _dispatch
+from .dist import AbstractDistribution
 
 __all__ = ["UniformContinuous", "UniformDiscrete"]
 

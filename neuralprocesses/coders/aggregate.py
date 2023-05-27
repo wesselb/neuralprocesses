@@ -1,17 +1,19 @@
+from typing import Union
+
 import lab as B
 import numpy as np
-from plum import convert, Union
+from plum import convert
 
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
 from ..datadims import data_dims
 from ..util import (
-    register_module,
+    merge_dimensions,
     register_composite_coder,
+    register_module,
+    select,
     split,
     split_dimension,
-    merge_dimensions,
-    select,
 )
 
 __all__ = [
@@ -181,7 +183,6 @@ def code(
     select_channel=None,
     **kw_args,
 ):
-
     if select_channel is not None:
         d = data_dims(xz)
         zs = split(z, tuple(map(np.prod, coder.sizes)), -d - 1)
@@ -227,10 +228,10 @@ def code(
 ):
     xz_agg = []
     z_agg = []
-    for (xi, i) in x:
+    for xi, i in x:
         xzi_agg = []
         zi_agg = []
-        for (xj, j) in x:
+        for xj, j in x:
             xij = _aggpairs_combine(xi, xj)
             xzij, zij = code(
                 coder.coder,

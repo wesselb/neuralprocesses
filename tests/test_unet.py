@@ -1,5 +1,6 @@
 import lab as B
 import numpy as np
+from plum import isinstance
 
 from .util import nps  # noqa
 

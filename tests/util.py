@@ -1,6 +1,6 @@
+import socket
 from typing import Union
 
-import socket
 import lab as B
 import neuralprocesses
 import pytest
@@ -63,7 +63,7 @@ def generate_data(nps, batch_size=4, dim_x=1, dim_y=1, n_context=5, n_target=7):
     return xc, yc, xt, yt
 
 
-if socket.gethostname() == "Wessels-Crib":
+if socket.gethostname().lower().startswith("wessel"):
     remote_xfail = lambda f: f  #: `xfail` only on CI.
     remote_skip = lambda f: f  #: `skip` only on CI.
 else:

@@ -182,7 +182,6 @@ def code(
     dtype_lik=None,
     **kw_args,
 ):
-
     mean, var_factor, noise, shape = _lowrank(coder, xz, z)
 
     # Cast the parameters before constructing the distribution.
@@ -274,7 +273,6 @@ def code(
     dtype_lik=None,
     **kw_args,
 ):
-
     z_mean_noise, z_var = z
 
     mean, var, noise, shape = _dense(coder, *xz, *z)

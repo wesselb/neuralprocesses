@@ -1,12 +1,13 @@
 from typing import Optional, Union
 
 import lab as B
+from plum import isinstance
 
 from ... import _dispatch
 from ...datadims import data_dims
 from ...mask import Masked
 from ...parallel import broadcast_coder_over_parallel
-from ...util import register_module, batch
+from ...util import batch, register_module
 
 __all__ = [
     "PrependDensityChannel",

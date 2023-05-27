@@ -1,6 +1,7 @@
+from typing import Tuple, Union
+
 import lab as B
 from lab.util import resolve_axis
-from plum import Tuple, Union
 
 from . import _dispatch
 

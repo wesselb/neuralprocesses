@@ -1,9 +1,10 @@
+from typing import Union
+
 import lab as B
 import numpy as np
-from plum import Union
 
-from .dist import AbstractDistribution
 from .. import _dispatch
+from .dist import AbstractDistribution
 
 __all__ = ["TruncatedGeometric"]
 

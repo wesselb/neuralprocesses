@@ -33,7 +33,6 @@ class AntarcticaGenerator(DataGenerator):
         subset="train",
         device="cpu",
     ):
-
         super().__init__(dtype, seed, num_tasks, batch_size, device)
 
         self.subset = subset
@@ -51,7 +50,6 @@ class AntarcticaGenerator(DataGenerator):
         self.min_stations = min_stations
 
     def load_sim_data(self, root_dir):
-
         # Years to load
         if self.subset == "train":
             self.years = list(range(1950, 2014))
@@ -84,7 +82,6 @@ class AntarcticaGenerator(DataGenerator):
         self.sim_idx_y = self.sim_idx[1]
 
     def load_real_data(self, root_dir):
-
         # Load real data and metadata
         self.real_data = pd.read_csv(f"{root_dir}/all_station_data.csv")
 
@@ -102,7 +99,6 @@ class AntarcticaGenerator(DataGenerator):
         )
 
     def generate_batch(self):
-
         # Draw random number of context ERA5 datapoints
         self.state, num_sim_context = self.num_sim_context.sample(
             self.state,
@@ -132,7 +128,6 @@ class AntarcticaGenerator(DataGenerator):
 
         with B.on_device(self.device):
             while batch_size < self.batch_size:
-
                 date = str(np.random.choice(self.real_dates))
 
                 # Unpack station data and ERA5 data
@@ -235,7 +230,6 @@ class AntarcticaGenerator(DataGenerator):
             )
 
             if self.subset in ["cv", "eval"]:
-
                 sim_trg_x = sim_trg_x[:, :, :0]
                 sim_trg_y = sim_trg_y[:, :, :0]
                 sim_trg_in = sim_trg_in[:, :, :0]
@@ -292,7 +286,6 @@ class AntarcticaGenerator(DataGenerator):
             return batch
 
     def unpack_daily_real_data(self, all_real_data, date):
-
         daily_real_data = all_real_data[date]
 
         real_x = []
@@ -300,7 +293,6 @@ class AntarcticaGenerator(DataGenerator):
         real_temp = []
 
         for real in daily_real_data["station"]:
-
             data_mask = daily_real_data["station"] == real
             metadata_mask = self.real_metadata["station"] == real
 
@@ -325,7 +317,6 @@ class AntarcticaGenerator(DataGenerator):
         return real_x, real_y, real_temp
 
     def unpack_daily_sim_data(self, date):
-
         d2 = datetime_date.fromisoformat(date).toordinal()
         d1 = datetime_date.fromisoformat(f"{date[:4]}-01-01").toordinal()
 
