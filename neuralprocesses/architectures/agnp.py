@@ -1,4 +1,5 @@
 import neuralprocesses as nps  # This fixes inspection below.
+
 from ..util import register_model
 
 __all__ = ["construct_agnp"]
@@ -34,7 +35,7 @@ def construct_agnp(*args, nps=nps, num_heads=8, **kw_args):
             low-rank likelihood. Defaults to 512.
         dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
-            `"het"` or `"dense"`. Defaults to `"het"`.
+            `"het"`, `"dense"`, or `"spikes-beta"`. Defaults to `"het"`.
         transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
             Must be either `"positive"`, `"exp"`, `"softplus"`, or

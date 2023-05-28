@@ -1,10 +1,10 @@
 import lab as B
+import neuralprocesses as nps  # This fixes inspection below.
 import wbml.out as out
 from plum import convert
 
-import neuralprocesses as nps  # This fixes inspection below.
-from .util import construct_likelihood, parse_transform
 from ..util import register_model
+from .util import construct_likelihood, parse_transform
 
 __all__ = ["construct_convgnp"]
 
@@ -140,8 +140,8 @@ def construct_convgnp(
             Defaults to 64.
         margin (float, optional): Margin of the internal discretisation. Defaults to
             0.1.
-        likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank".
-            Defaults to `"lowrank"`.
+        likelihood (str, optional): Likelihood. Must be one of `"het"`, `"lowrank"`,
+            or `"spikes-beta"`. Defaults to `"lowrank"`.
         conv_arch (str, optional): Convolutional architecture to use. Must be one of
             `"unet[-res][-sep]"` or `"conv[-res][-sep]"`. Defaults to `"unet"`.
         unet_channels (tuple[int], optional): Channels of every layer of the UNet.

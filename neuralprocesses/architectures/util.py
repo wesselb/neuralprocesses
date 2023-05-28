@@ -11,8 +11,9 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
 
     Args:
         nps (module): Appropriate backend-specific module.
-        spec (str, optional): Specification. Must be one of `"het"`, `"lowrank"`, or
-            `"dense"`. Defaults to `"lowrank"`. Must be given as a keyword argument.
+        spec (str, optional): Specification. Must be one of `"het"`, `"lowrank"`,
+            `"dense"`, or `"spikes-beta"`. Defaults to `"lowrank"`. Must be given as
+            a keyword argument.
         dim_y (int): Dimensionality of the outputs. Must be given as a keyword argument.
         num_basis_functions (int): Number of basis functions for the low-rank
             likelihood. Must be given as a keyword argument.
