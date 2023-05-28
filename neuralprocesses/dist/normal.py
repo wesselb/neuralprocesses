@@ -203,7 +203,7 @@ class MultiOutputNormal(AbstractDistribution):
             return _monormal_unvectorise(
                 sample,
                 self.shape,
-                # If `shape` is not specified, then the sample dimension ofs
+                # If `shape` is not specified, then the sample dimension of
                 # :class:`stheno.Normal` needs to be squeezed.
                 squeeze_sample_dim=shape == (),
             )
