@@ -1,13 +1,12 @@
-from typing import Union
-
 import lab as B
 from matrix import Diagonal
 
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
 from ..dist import (
-    AbstractMultiOutputDistribution,
+    AbstractDistribution,
     MultiOutputNormal,
+    SpikesSlab,
     TransformedMultiOutputDistribution,
 )
 from ..parallel import Parallel
@@ -18,28 +17,28 @@ __all__ = ["sample", "fix_noise", "compress_contexts", "tile_for_sampling"]
 @_dispatch
 def sample(
     state: B.RandomState,
-    x: AbstractMultiOutputDistribution,
-    num: Union[B.Int, None] = None,
+    x: AbstractDistribution,
+    *shape: B.Int,
 ):
-    """Sample an encoding:
+    """Sample an encoding.
 
     Args:
         state (random state): Random state.
         x (object): Encoding.
-        num (int, optional): Number of samples.
+        *shape (int): Batch shape of the sample.
 
     Returns:
         random state: Random state.
         object: Sample.
     """
-    return x.sample(state, num=num)
+    return x.sample(state, *shape)
 
 
 @_dispatch
-def sample(state: B.RandomState, x: Parallel, num: Union[B.Int, None] = None):
+def sample(state: B.RandomState, x: Parallel, *shape: B.Int):
     samples = []
     for xi in x:
-        state, s = sample(state, xi, num=num)
+        state, s = sample(state, xi, *shape)
         samples.append(s)
     return state, Parallel(*samples)
 
@@ -49,12 +48,12 @@ def fix_noise(d, value: None):
     """Fix the noise of a prediction.
 
     Args:
-        d (:class:`neuralprocesses.dist.dist.AbstractMultiOutputDistribution`):
+        d (:class:`neuralprocesses.dist.dist.AbstractDistribution`):
             Prediction.
         value (float or None): Value to fix it to.
 
     Returns:
-        :class:`neuralprocesses.dist.dist.AbstractMultiOutputDistribution`: Prediction
+        :class:`neuralprocesses.dist.dist.AbstractDistribution`: Prediction
             with noise fixed.
     """
     return d
@@ -77,6 +76,11 @@ def fix_noise(d: TransformedMultiOutputDistribution, value: float):
         fix_noise(d.dist, value),
         d.transform,
     )
+
+
+@_dispatch
+def fix_noise(d: SpikesSlab, value: float):
+    return d
 
 
 @_dispatch

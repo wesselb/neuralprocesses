@@ -33,7 +33,14 @@ class UniformContinuous(AbstractDistribution):
         self.lowers = B.stack(*lowers)
         self.uppers = B.stack(*uppers)
 
-    def sample(self, state, dtype, *shape):
+    def __str__(self):
+        return f"UniformContinuous({self.lower}, {self.upper})"
+
+    def __repr__(self):
+        return f"UniformContinuous({self.lower!r}, {self.uppers!r})"
+
+    @_dispatch
+    def sample(self, state: B.RandomState, dtype: B.DType, *shape):
         lowers = B.to_active_device(B.cast(dtype, self.lowers))
         uppers = B.to_active_device(B.cast(dtype, self.uppers))
         # Wrap everything in `Dimension`s to make dispatch work.
@@ -59,5 +66,12 @@ class UniformDiscrete(AbstractDistribution):
         self.lower = lower
         self.upper = upper
 
-    def sample(self, state, dtype, *shape):
+    @_dispatch
+    def sample(self, state: B.RandomState, dtype: B.DType, *shape):
         return B.randint(state, dtype, lower=self.lower, upper=self.upper + 1, *shape)
+
+    def __str__(self):
+        return f"UniformDiscrete({self.lower}, {self.upper})"
+
+    def __repr__(self):
+        return f"UniformDiscrete({self.lower!r}, {self.uppers!r})"

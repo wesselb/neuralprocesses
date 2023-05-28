@@ -2,7 +2,7 @@ import matrix  # noqa
 from plum import isinstance, issubclass
 
 from . import _dispatch
-from .dist import AbstractMultiOutputDistribution, Dirac
+from .dist import AbstractDistribution, Dirac
 from .parallel import Parallel
 from .util import is_composite_coder
 
@@ -70,7 +70,7 @@ def code_track(coder, xz, z, x, h, **kw_args):
     if is_composite_coder(coder):
         raise RuntimeError(
             f"Dispatched to fallback implementation of `code_track` for "
-            f"`{ptype(type(coder))}`, but the coder is composite."
+            f"`{type(coder)}`, but the coder is composite."
         )
     xz, z = code(coder, xz, z, x, **kw_args)
     return xz, z, h + [x]
@@ -95,7 +95,7 @@ def recode(coder, xz, z, h, **kw_args):
     if is_composite_coder(coder):
         raise RuntimeError(
             f"Dispatched to fallback implementation of `recode` for "
-            f"`{ptype(type(coder))}`, but the coder is composite."
+            f"`{type(coder)}`, but the coder is composite."
         )
     xz, z = code(coder, xz, z, h[0], **kw_args)
     return xz, z, h[1:]
@@ -151,6 +151,6 @@ def _choose(new: Dirac, old: Dirac):
 
 
 @_dispatch
-def _choose(new: AbstractMultiOutputDistribution, old: AbstractMultiOutputDistribution):
+def _choose(new: AbstractDistribution, old: AbstractDistribution):
     # Do recode other distributions.
     return new
