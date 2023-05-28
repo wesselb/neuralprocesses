@@ -72,7 +72,8 @@ class Model:
         xz, pz = code(self.encoder, xc, yc, xt, root=True, **enc_kw_args)
 
         # Sample and convert sample to the right data type.
-        state, z = sample(state, pz, num=num_samples)
+        shape = () if num_samples is None else (num_samples,)
+        state, z = sample(state, pz, *shape)
         if dtype_enc_sample:
             z = B.cast(dtype_enc_sample, z)
 

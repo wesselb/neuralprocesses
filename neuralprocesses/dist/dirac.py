@@ -1,18 +1,18 @@
 import lab as B
+from plum import parametric
 from wbml.util import indented_kv
 
-from .dist import AbstractDistribution
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..util import batch
+from .dist import AbstractDistribution
 
 __all__ = ["Dirac"]
 
 
+@parametric
 class Dirac(AbstractDistribution):
     """A Dirac delta.
-
-    Also accepts aggregated of its arguments.
 
     Args:
         x (tensor): Position of the Dirac delta.
@@ -28,10 +28,10 @@ class Dirac(AbstractDistribution):
         self.d = d
 
     def __repr__(self):
-        return f"<Dirac:\n" + indented_kv("x", repr(self.x), suffix=">")
+        return "<Dirac:\n" + indented_kv("x", repr(self.x), suffix=">")
 
     def __str__(self):
-        return f"<Dirac:\n" + indented_kv("x", str(self.x), suffix=">")
+        return "<Dirac:\n" + indented_kv("x", str(self.x), suffix=">")
 
     @property
     def mean(self):
@@ -39,58 +39,60 @@ class Dirac(AbstractDistribution):
 
     @property
     def var(self):
-        return self._var(self.x)
+        return self._var()
 
-    @staticmethod
     @_dispatch
-    def _var(x: B.Numeric):
-        with B.on_device(x):
-            return B.zeros(x)
+    def _var(self: "Dirac[B.Numeric, B.Numeric]"):
+        with B.on_device(self.x):
+            return B.zeros(self.x)
 
-    @staticmethod
     @_dispatch
-    def _var(x: Aggregate):
-        return Aggregate(*(Dirac._var(xi) for xi in x))
+    def _var(self: "Dirac[Aggregate, Aggregate]"):
+        return Aggregate(*(Dirac(xi, di).var for xi, di in zip(self.x, self.d)))
 
-    def logpdf(self, x):
-        return self._logpdf(self.x, self.d)
-
-    @staticmethod
     @_dispatch
-    def _logpdf(x: B.Numeric, d: B.Int):
-        with B.on_device(x):
-            return B.zeros(B.dtype(x), *batch(x, d + 1))
+    def logpdf(self: "Dirac[B.Numeric, B.Int]", x):
+        with B.on_device(self.x):
+            return B.zeros(B.dtype(self.x), *batch(self.x, self.d + 1))
 
-    @staticmethod
     @_dispatch
-    def _logpdf(x: Aggregate, d: Aggregate):
+    def logpdf(self: "Dirac[Aggregate, Aggregate]", x):
         # Just take the first one. It doesn't matter.
-        return Dirac._logpdf(x[0], d[0])
+        return Dirac(self.x[0], self.d[0]).logpdf(None)
 
     @_dispatch
-    def sample(self, num=None):
-        return self._sample(self.x, num=num)
-
-    @_dispatch
-    def sample(self, state: B.RandomState, num=None):
-        return state, self.sample(num=num)
-
-    @staticmethod
-    @_dispatch
-    def _sample(x: B.Numeric, *, num):
+    def sample(
+        self: "Dirac[B.Numeric, B.Int]",
+        state: B.RandomState,
+        dtype: B.DType,
+        *shape,
+    ):
         # If no number of samples was specified, don't add a sample dimension.
-        if num is None:
-            return x
+        if shape == ():
+            return state, self.x
         else:
             # Don't tile. This way is more efficient.
-            return x[None, ...]
+            return state, B.expand_dims(self.x, axis=0, times=len(shape))
 
-    @staticmethod
     @_dispatch
-    def _sample(x: Aggregate, *, num):
-        return Aggregate(*(Dirac._sample(xi, num=num) for xi in x))
+    def sample(
+        self: "Dirac[Aggregate, Aggregate]",
+        state: B.RandomState,
+        dtype: B.DType,
+        *shape,
+    ):
+        samples = []
+        for xi, di in zip(self.x, self.d):
+            state, sample = Dirac(xi, di).sample(state, dtype, *shape)
+            samples.append(sample)
+        return state, Aggregate(*samples)
 
     @_dispatch
     def kl(self, other: "Dirac"):
         # Same result as `logpdf`, so just reuse that method.
         return self.logpdf(None)
+
+
+@B.dtype.dispatch
+def dtype(dist: Dirac):
+    return B.dtype(dist.x)

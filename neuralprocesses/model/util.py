@@ -1,5 +1,3 @@
-from typing import Union
-
 import lab as B
 from matrix import Diagonal
 
@@ -8,8 +6,8 @@ from ..aggregate import Aggregate, AggregateInput
 from ..dist import (
     AbstractDistribution,
     MultiOutputNormal,
-    TransformedMultiOutputDistribution,
     SpikesSlab,
+    TransformedMultiOutputDistribution,
 )
 from ..parallel import Parallel
 
@@ -20,27 +18,27 @@ __all__ = ["sample", "fix_noise", "compress_contexts", "tile_for_sampling"]
 def sample(
     state: B.RandomState,
     x: AbstractDistribution,
-    num: Union[B.Int, None] = None,
+    *shape: B.Int,
 ):
-    """Sample an encoding:
+    """Sample an encoding.
 
     Args:
         state (random state): Random state.
         x (object): Encoding.
-        num (int, optional): Number of samples.
+        *shape (int): Batch shape of the sample.
 
     Returns:
         random state: Random state.
         object: Sample.
     """
-    return x.sample(state, num=num)
+    return x.sample(state, *shape)
 
 
 @_dispatch
-def sample(state: B.RandomState, x: Parallel, num: Union[B.Int, None] = None):
+def sample(state: B.RandomState, x: Parallel, *shape: B.Int):
     samples = []
     for xi in x:
-        state, s = sample(state, xi, num=num)
+        state, s = sample(state, xi, *shape)
         samples.append(s)
     return state, Parallel(*samples)
 

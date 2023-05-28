@@ -3,6 +3,7 @@ from itertools import product
 import lab as B
 import numpy as np
 import pytest
+from neuralprocesses.aggregate import Aggregate, AggregateInput
 from plum import isinstance
 
 from .util import approx, generate_data
@@ -63,7 +64,7 @@ def product_kw_args(config, **kw_args):
         },
         dim_x=[1, 2],
         dim_y=[1, 2],
-        likelihood=["het", "lowrank"],
+        likelihood=["het", "lowrank", "spikes-beta"],
     )
     # NP:
     + product_kw_args(
@@ -76,7 +77,7 @@ def product_kw_args(config, **kw_args):
         },
         dim_x=[1, 2],
         dim_y=[1, 2],
-        likelihood=["het", "lowrank"],
+        likelihood=["het", "lowrank", "spikes-beta"],
         lv_likelihood=["het", "dense"],
     )
     # ACNP:
@@ -91,7 +92,7 @@ def product_kw_args(config, **kw_args):
         },
         dim_x=[1, 2],
         dim_y=[1, 2],
-        likelihood=["het", "lowrank"],
+        likelihood=["het", "lowrank", "spikes-beta"],
     )
     # ANP:
     + product_kw_args(
@@ -105,7 +106,7 @@ def product_kw_args(config, **kw_args):
         },
         dim_x=[1, 2],
         dim_y=[1, 2],
-        likelihood=["het", "lowrank"],
+        likelihood=["het", "lowrank", "spikes-beta"],
         lv_likelihood=["het", "dense"],
     )
     # ConvCNP and ConvGNP:
@@ -119,7 +120,7 @@ def product_kw_args(config, **kw_args):
             },
             dim_x=[1, 2],
             dim_y=[1, 2],
-            likelihood=["het", "lowrank"],
+            likelihood=["het", "lowrank", "spikes-beta"],
             encoder_scales_learnable=[True, False],
             decoder_scale_learnable=[True, False],
         )
@@ -135,7 +136,7 @@ def product_kw_args(config, **kw_args):
             },
             dim_x=[1, 2],
             dim_y=[1, 2],
-            likelihood=["het", "lowrank"],
+            likelihood=["het", "lowrank", "spikes-beta"],
             lv_likelihood=["het", "lowrank"],
         )
     )
@@ -215,9 +216,25 @@ def model_sample(request, nps, config):
         raise RuntimeError("I don't know how to resample the parameters of the model.")
 
     def sample():
-        return generate_data(nps, dim_x=config["dim_x"], dim_y=config["dim_y"])
+        if "likelihood" in config:
+            binary = config["likelihood"] == "spikes-beta"
+        else:
+            binary = False
+        return generate_data(
+            nps,
+            dim_x=config["dim_x"],
+            dim_y=config["dim_y"],
+            binary=binary,
+        )
 
     return construct_model, sample
+
+
+def shape(x, extra=()):
+    if isinstance(x, Aggregate):
+        return tuple(extra + B.shape(xi) for xi in x)
+    else:
+        return extra + B.shape(x)
 
 
 def check_prediction(nps, pred, yt):
@@ -233,20 +250,28 @@ def check_prediction(nps, pred, yt):
     assert np.isfinite(B.to_numpy(B.sum(objective)))
     assert B.dtype(objective) == nps.dtype
 
-    if not isinstance(yt, nps.Aggregate):
-        # Check mean, variance, and samples.
-        assert B.shape(pred.mean) == B.shape(yt)
-        assert B.shape(pred.var) == B.shape(yt)
-        assert B.shape(pred.sample()) == B.shape(yt)
-        assert B.shape(pred.sample(1)) == (1,) + B.shape(yt)
-        assert B.shape(pred.sample(2)) == (2,) + B.shape(yt)
+    # Check mean, variance, and samples.
+    assert shape(pred.mean) == shape(yt)
+    assert shape(pred.var) == shape(yt)
+    assert shape(pred.sample()) == shape(yt)
+    assert shape(pred.sample(1)) == shape(yt, (1,))
+    assert shape(pred.sample(2)) == shape(yt, (2,))
 
 
+def _aggregate_xt_yt(xt, yt):
+    xt = AggregateInput(*((xt, i) for i in range(B.shape(yt, 1))))
+    yt = Aggregate(*(yt[:, i : i + 1, :] for i in range(B.shape(yt, 1))))
+    return xt, yt
+
+
+@pytest.mark.parametrize("aggregate", [False, True])
 @pytest.mark.flaky(reruns=3)
-def test_forward(nps, model_sample):
+def test_forward(nps, model_sample, aggregate):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
+    if aggregate:
+        xt, yt = _aggregate_xt_yt(xt, yt)
     pred = model(xc, yc, xt, batch_size=2, unused_arg=None)
     check_prediction(nps, pred, yt)
 
@@ -254,6 +279,11 @@ def test_forward(nps, model_sample):
 @pytest.mark.parametrize("normalise", [False, True])
 @pytest.mark.flaky(reruns=3)
 def test_elbo(nps, model_sample, normalise):
+    """Test the ELBO.
+
+    We don't test aggregates here, because `nps.elbo` assumes a particular structure of
+    the context sets in that case.
+    """
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
@@ -263,23 +293,29 @@ def test_elbo(nps, model_sample, normalise):
     assert B.dtype(elbos) == nps.dtype64
 
 
+@pytest.mark.parametrize("aggregate", [False, True])
 @pytest.mark.parametrize("normalise", [False, True])
 @pytest.mark.flaky(reruns=3)
-def test_loglik(nps, model_sample, normalise):
+def test_loglik(nps, model_sample, normalise, aggregate):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
+    if aggregate:
+        xt, yt = _aggregate_xt_yt(xt, yt)
     logpdfs = nps.loglik(model, xc, yc, xt, yt, num_samples=2, normalise=normalise)
     assert B.rank(logpdfs) == 1
     assert np.isfinite(B.to_numpy(B.sum(logpdfs)))
     assert B.dtype(logpdfs) == nps.dtype64
 
 
+@pytest.mark.parametrize("aggregate", [False, True])
 @pytest.mark.flaky(reruns=3)
-def test_predict(nps, model_sample):
+def test_predict(nps, model_sample, aggregate):
     model, sample = model_sample
     model = model()
     xc, yc, xt, yt = sample()
+    if aggregate:
+        xt, yt = _aggregate_xt_yt(xt, yt)
     mean, var, samples, noisy_samples = nps.predict(
         model,
         xc,
@@ -288,10 +324,10 @@ def test_predict(nps, model_sample):
         num_samples=3,
         batch_size=2,
     )
-    assert B.shape(mean) == B.shape(yt)
-    assert B.shape(var) == B.shape(yt)
-    assert B.shape(samples) == (3,) + B.shape(yt)
-    assert B.shape(noisy_samples) == (3,) + B.shape(yt)
+    assert shape(mean) == shape(yt)
+    assert shape(var) == shape(yt)
+    assert shape(samples) == shape(yt, (3,))
+    assert shape(noisy_samples) == shape(yt, (3,))
 
 
 @pytest.mark.flaky(reruns=3)

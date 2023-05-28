@@ -1,14 +1,16 @@
 import lab as B
 import numpy as np
 
-from .model import Model
-from .util import sample, fix_noise as fix_noise_in_pred, compress_contexts
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
 from ..coding import code, code_track, recode_stochastic
 from ..dist import AbstractDistribution
 from ..numdata import num_data
 from ..parallel import Parallel
+from .model import Model
+from .util import compress_contexts
+from .util import fix_noise as fix_noise_in_pred
+from .util import sample
 
 __all__ = ["elbo"]
 
@@ -78,7 +80,8 @@ def elbo(
     )
 
     # Sample from posterior.
-    state, z = sample(state, qz, num=num_samples)
+    shape = () if num_samples is None else (num_samples,)
+    state, z = sample(state, qz, *shape)
     z = B.cast(float, z)
 
     # Run sample through decoder.
@@ -157,7 +160,7 @@ def _merge_context_target(contexts: list, xt: AggregateInput, yt: Aggregate):
         # the context set for output `i` for the approximate posterior.
         if q_context_updates[i] is not None:
             raise ValueError(
-                f"Aggregate target inputs specified the same output multiple times."
+                "Aggregate target inputs specified the same output multiple times."
             )
         q_context_updates[i] = (xti, yti)
 

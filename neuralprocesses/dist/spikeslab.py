@@ -1,16 +1,18 @@
 import lab as B
 from matrix.shape import broadcast
+from plum import parametric
 from wbml.util import indented_kv
 
-from .dist import AbstractDistribution, shape_batch
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..mask import Masked
 from .dirac import Dirac
+from .dist import AbstractDistribution, shape_batch
 
 __all__ = ["SpikesSlab"]
 
 
+@parametric
 class SpikesSlab(AbstractDistribution):
     """Spikes-and-slab distribution.
 
@@ -19,6 +21,7 @@ class SpikesSlab(AbstractDistribution):
         slab (:class:`neuralprocesses.dist.dist.AbstractDistribution`): Slab.
         logprobs (tensor): Log-probabilities for the spikes and the slab with the
             log-probability for the slab last.
+        d (int): Dimensionality of the data.
         epsilon (float, optional): Tolerance for equality checking. Defaults to `1e-6`.
 
     Attributes:
@@ -26,6 +29,7 @@ class SpikesSlab(AbstractDistribution):
         slab (:class:`neuralprocesses.dist.dist.AbstractDistribution`): Slab.
         logprobs (tensor): Log-probabilities for the spikes and the slab with the
             log-probability for the slab last.
+        d (int): Dimensionality of the data.
         epsilon (float): Tolerance for equality checking.
     """
 
@@ -87,19 +91,28 @@ class SpikesSlab(AbstractDistribution):
 
     @_dispatch
     def logpdf(self, x):
-        logprob_cat, ind_slab = self.logpdf_cat(self.logprobs, self.d, x)
+        logprob_cat, ind_slab = self.logpdf_cat(x)
         logpdf_slab = self.slab.logpdf(_mask(x, ind_slab))
         return logprob_cat + logpdf_slab
 
     @_dispatch
-    def logpdf_cat(self, logprobs: Aggregate, d: Aggregate, x: Aggregate):
+    def logpdf_cat(
+        self: "SpikesSlab[B.Numeric, AbstractDistribution, Aggregate, Aggregate]",
+        x: Aggregate,
+    ):
         li, ii = zip(
-            *(self.logpdf_cat(li, di, xi) for li, di, xi in zip(logprobs, d, x))
+            *(
+                SpikesSlab(self.spikes, self.slab, li, di).logpdf_cat(xi)
+                for li, di, xi in zip(self.logprobs, self.d, x)
+            )
         )
         return sum(li, 0), Aggregate(*ii)
 
     @_dispatch
-    def logpdf_cat(self, logprobs: B.Numeric, d: B.Int, x: B.Numeric):
+    def logpdf_cat(
+        self: "SpikesSlab[B.Numeric, AbstractDistribution, B.Numeric, B.Int]",
+        x: B.Numeric,
+    ):
         # Construct indicators which filter out the spikes.
         ind_spikes = B.cast(
             B.dtype(x),
@@ -115,17 +128,16 @@ class SpikesSlab(AbstractDistribution):
             ind_slab = B.one(x) - any_spike
         # Compute the log-probability of the categorical random variable.
         full_indicator = B.concat(ind_spikes, ind_slab[..., None], axis=-1)
-        logprob_cat = B.sum(full_indicator * logprobs, axis=-1)
+        logprob_cat = B.sum(full_indicator * self.logprobs, axis=-1)
         # Sum over the sample dimensions.
-        dims = tuple(range(B.rank(logprob_cat)))[-d:]
+        dims = tuple(range(B.rank(logprob_cat)))[-self.d :]
         return B.sum(logprob_cat, axis=dims), ind_slab
 
     @_dispatch
     def sample(self, state: B.RandomState, dtype: B.DType, *shape):
-        state, slab_sample = self.slab.sample(state, dtype, *shape)
+        state, sample_slab = self.slab.sample(state, dtype, *shape)
         return self.sample_spikes(
-            self.logprobs,
-            slab_sample,
+            sample_slab,
             state,
             dtype,
             *shape,
@@ -133,31 +145,30 @@ class SpikesSlab(AbstractDistribution):
 
     @_dispatch
     def sample_spikes(
-        self,
-        logprobs: Aggregate,
+        self: "SpikesSlab[B.Numeric, AbstractDistribution, Aggregate, Aggregate]",
         sample_slab: Aggregate,
         state: B.RandomState,
         dtype: B.DType,
         *shape,
     ):
         samples = []
-        for li, si in zip(logprobs, sample_slab):
-            state, sample = self.sample_spikes(li, si, state, dtype, *shape)
+        for li, di, si in zip(self.logprobs, self.d, sample_slab):
+            dist = SpikesSlab(self.spikes, self.slab, li, di, epsilon=self.epsilon)
+            state, sample = dist.sample_spikes(si, state, dtype, *shape)
             samples.append(sample)
         return state, Aggregate(*samples)
 
     @_dispatch
     def sample_spikes(
-        self,
-        logprobs: B.Numeric,
+        self: "SpikesSlab[B.Numeric, AbstractDistribution, B.Numeric, B.Int]",
         sample_slab: B.Numeric,
         state: B.RandomState,
         dtype: B.DType,
         *shape,
     ):
-        with B.on_device(logprobs):
+        with B.on_device(self.logprobs):
             # Sample the categorical variable.
-            state, inds = B.randcat(state, B.exp(logprobs), *shape)
+            state, inds = B.randcat(state, B.exp(self.logprobs), *shape)
 
             # Construct indicators to filter the spikes or slab samples.
             spikes_and_zero = B.concat(self.spikes, B.zero(self.spikes)[None])
@@ -180,19 +191,23 @@ def dtype(d: SpikesSlab):
 
 
 @shape_batch.dispatch
-def shape_batch(dist: SpikesSlab):
-    return broadcast(shape_batch(dist.slab), shape_batch(dist, dist.logprobs, dist.d))
-
-
-@shape_batch.dispatch
-def shape_batch(dist: SpikesSlab, logprobs: B.Numeric, d: B.Int):
+def shape_batch(dist: SpikesSlab[B.Numeric, AbstractDistribution, B.Numeric, B.Int]):
+    shape_slab = shape_batch(dist.slab)
     # `logprobs` has one extra dimension!
-    return B.shape(logprobs)[: -(d + 1)]
+    shape_spikes = B.shape(dist.logprobs)[: -(dist.d + 1)]
+    return broadcast(shape_slab, shape_spikes)
 
 
 @shape_batch.dispatch
-def shape_batch(dist: SpikesSlab, logprobs: Aggregate, d: Aggregate):
-    return broadcast(*(shape_batch(dist, li, di) for li, di in zip(logprobs, d)))
+def shape_batch(
+    dist: SpikesSlab[B.Numeric, AbstractDistribution, Aggregate, Aggregate]
+):
+    return broadcast(
+        *(
+            shape_batch(SpikesSlab(dist.spikes, dist.slab, li, di))
+            for li, di in zip(dist.logprobs, dist.d)
+        )
+    )
 
 
 @_dispatch

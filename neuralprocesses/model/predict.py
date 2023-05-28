@@ -1,9 +1,10 @@
 import lab as B
 import numpy as np
 
-from .model import Model
 from .. import _dispatch
+from ..aggregate import Aggregate
 from ..dist import shape_batch
+from .model import Model
 
 __all__ = ["predict"]
 
@@ -64,6 +65,10 @@ def predict(
         if this_num_samples > 1 and shape_batch(pred, 0) == 1:
             state, ft = pred.noiseless.sample(state, num_samples)
             state, yt = pred.sample(state, num_samples)
+            # If `pred` or `pred.noiseless` were `Dirac`s, then `ft` or `yt` might not
+            # have the right number of samples.
+            ft = _possibly_tile(ft, num_samples)
+            yt = _possibly_tile(yt, num_samples)
             return (
                 state,
                 # Squeeze the newly introduced sample dimension.
@@ -110,3 +115,16 @@ def predict(model: Model, *args, **kw_args):
     state, res = res[0], res[1:]
     B.set_global_random_state(state)
     return res
+
+
+@_dispatch
+def _possibly_tile(x: B.Numeric, n: B.Int):
+    if B.shape(x, 0) == 1 and n > 1:
+        return B.tile(x, n, *((1,) * (B.rank(x) - 1)))
+    else:
+        return x
+
+
+@_dispatch
+def _possibly_tile(x: Aggregate, n: B.Int):
+    return Aggregate(*(_possibly_tile(xi, n) for xi in x))

@@ -1,26 +1,28 @@
 import lab as B
 from matrix.shape import broadcast
+from plum import parametric
 
-from .dist import AbstractDistribution, shape_batch
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..mask import Masked
+from .dist import AbstractDistribution, shape_batch
 
 __all__ = ["Beta"]
 
 
+@parametric
 class Beta(AbstractDistribution):
     """Beta distribution.
 
     Args:
         alpha (tensor): Shape parameter `alpha`.
         beta (tensor): Shape parameter `beta`.
-        d (int): Dimensionality of the sample.
+        d (int): Dimensionality of the data.
 
     Attributes:
         alpha (tensor): Shape parameter `alpha`.
         beta (tensor): Shape parameter `beta`.
-        d (int): Dimensionality of the sample.
+        d (int): Dimensionality of the data.
     """
 
     def __init__(self, alpha, beta, d):
@@ -44,73 +46,51 @@ class Beta(AbstractDistribution):
 
     @_dispatch
     def sample(
-        self,
-        state: B.RandomState,
-        dtype: B.DType,
-        *shape,
-    ):
-        return self.sample(self.alpha, self.beta, state, dtype, *shape)
-
-    @_dispatch
-    def sample(
-        self,
-        alpha: Aggregate,
-        beta: Aggregate,
+        self: "Beta[Aggregate, Aggregate, Aggregate]",
         state: B.RandomState,
         dtype: B.DType,
         *shape,
     ):
         samples = []
-        for ai, bi in zip(alpha, beta):
-            state, sample = self.sample(ai, bi, state, dtype, *shape)
+        for ai, bi, di in zip(self.alpha, self.beta, self.d):
+            state, sample = Beta(ai, bi, di).sample(state, dtype, *shape)
             samples.append(sample)
         return state, Aggregate(*samples)
 
     @_dispatch
     def sample(
-        self,
-        alpha: B.Numeric,
-        beta: B.Numeric,
+        self: "Beta[B.Numeric, B.Numeric, B.Int]",
         state: B.RandomState,
         dtype: B.DType,
         *shape,
     ):
-        return B.randbeta(state, dtype, *shape, alpha=alpha, beta=beta)
+        return B.randbeta(state, dtype, *shape, alpha=self.alpha, beta=self.beta)
 
     @_dispatch
-    def logpdf(self, x):
-        return self.logpdf(self.alpha, self.beta, self.d, x)
-
-    @_dispatch
-    def logpdf(self, alpha: Aggregate, beta: Aggregate, d: Aggregate, x: Aggregate):
+    def logpdf(self: "Beta[Aggregate, Aggregate, Aggregate]", x: Aggregate):
         return sum(
-            [self.logpdf(ai, bi, di, xi) for ai, bi, di, xi in zip(alpha, beta, d, x)],
+            [
+                Beta(ai, bi, di).logpdf(xi)
+                for ai, bi, di, xi in zip(self.alpha, self.beta, self.d, x)
+            ],
             0,
         )
 
     @_dispatch
-    def logpdf(self, alpha: B.Numeric, beta: B.Numeric, d: B.Int, x: Masked):
+    def logpdf(self: "Beta[B.Numeric, B.Numeric, B.Int]", x: Masked):
         x, mask = x.y, x.mask
-        with B.on_device(alpha):
-            safe = B.to_active_device(B.cast(B.dtype(alpha), 0.5))
+        with B.on_device(self.alpha):
+            safe = B.to_active_device(B.cast(B.dtype(self.alpha), 0.5))
         # Make inputs safe.
         x = mask * x + (1 - mask) * safe
         # Run with safe inputs, and filter out the right logpdfs.
-        return self.logpdf(alpha, beta, d, x, mask=mask)
+        return self.logpdf(x, mask=mask)
 
     @_dispatch
-    def logpdf(
-        self,
-        alpha: B.Numeric,
-        beta: B.Numeric,
-        d: B.Int,
-        x: B.Numeric,
-        *,
-        mask=1,
-    ):
-        logz = B.logbeta(alpha, beta)
-        logpdf = (alpha - 1) * B.log(x) + (beta - 1) * B.log(1 - x) - logz
-        return B.sum(mask * logpdf, axis=tuple(range(B.rank(logpdf)))[-d:])
+    def logpdf(self: "Beta[B.Numeric, B.Numeric, B.Int]", x: B.Numeric, *, mask=1):
+        logz = B.logbeta(self.alpha, self.beta)
+        logpdf = (self.alpha - 1) * B.log(x) + (self.beta - 1) * B.log(1 - x) - logz
+        return B.sum(mask * logpdf, axis=tuple(range(B.rank(logpdf)))[-self.d :])
 
     def __str__(self):
         return f"Beta({self.alpha}, {self.beta})"
@@ -125,17 +105,15 @@ def dtype(dist: Beta):
 
 
 @shape_batch.dispatch
-def shape_batch(dist: Beta):
-    return shape_batch(dist, dist.alpha, dist.beta, dist.d)
+def shape_batch(dist: "Beta[B.Numeric, B.Numeric, B.Int]"):
+    return B.shape_broadcast(dist.alpha, dist.beta)[: -dist.d]
 
 
 @shape_batch.dispatch
-def shape_batch(dist: Beta, alpha: B.Numeric, beta: B.Numeric, d: B.Int):
-    return B.shape_broadcast(alpha, beta)[:-d]
-
-
-@shape_batch.dispatch
-def shape_batch(dist: Beta, alpha: Aggregate, beta: Aggregate, d: Aggregate):
+def shape_batch(dist: "Beta[Aggregate, Aggregate, Aggregate]"):
     return broadcast(
-        *(shape_batch(dist, ai, bi, di) for ai, bi, di in zip(alpha, beta, d))
+        *(
+            shape_batch(Beta(ai, bi, di))
+            for ai, bi, di in zip(dist.alpha, dist.beta, dist.d)
+        )
     )
