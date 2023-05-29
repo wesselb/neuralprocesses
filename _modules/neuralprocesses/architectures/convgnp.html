@@ -307,9 +307,7 @@ document.write(`
                 <article class="bd-article" role="main">
                   
   <h1>Source code for neuralprocesses.architectures.convgnp</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span> <span class="nn">lab</span> <span class="k">as</span> <span class="nn">B</span>
-<span class="kn">import</span> <span class="nn">neuralprocesses</span> <span class="k">as</span> <span class="nn">nps</span>  <span class="c1"># This fixes inspection below.</span>
-<span class="kn">import</span> <span class="nn">wbml.out</span> <span class="k">as</span> <span class="nn">out</span>
+<span></span><span class="kn">import</span> <span class="nn">neuralprocesses</span> <span class="k">as</span> <span class="nn">nps</span>  <span class="c1"># This fixes inspection below.</span>
 <span class="kn">from</span> <span class="nn">plum</span> <span class="kn">import</span> <span class="n">convert</span>
 
 <span class="kn">from</span> <span class="nn">..util</span> <span class="kn">import</span> <span class="n">register_model</span>
@@ -339,7 +337,7 @@ document.write(`
     <span class="k">elif</span> <span class="s2">&quot;conv&quot;</span> <span class="ow">in</span> <span class="n">conv_arch</span><span class="p">:</span>
         <span class="n">conv_out_channels</span> <span class="o">=</span> <span class="n">conv_channels</span>
         <span class="k">if</span> <span class="n">conv_receptive_field</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Must specify `conv_receptive_field`.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must specify `conv_receptive_field`.&quot;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Architecture &quot;</span><span class="si">{</span><span class="n">conv_arch</span><span class="si">}</span><span class="s1">&quot; invalid.&#39;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">conv_out_channels</span>
@@ -369,6 +367,16 @@ document.write(`
             <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">encoder_scales</span>
         <span class="p">)</span>
     <span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_convgnp_assert_form_contexts</span><span class="p">(</span><span class="n">nps</span><span class="p">,</span> <span class="n">dim_yc</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dim_yc</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">nps</span><span class="o">.</span><span class="n">Chain</span><span class="p">(</span>
+            <span class="n">nps</span><span class="o">.</span><span class="n">SqueezeParallel</span><span class="p">(),</span>
+            <span class="n">nps</span><span class="o">.</span><span class="n">AssertNoParallel</span><span class="p">(),</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">nps</span><span class="o">.</span><span class="n">AssertParallel</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">dim_yc</span><span class="p">))</span>
 
 
 <span class="k">def</span> <span class="nf">_convgnp_construct_decoder_setconv</span><span class="p">(</span>
@@ -468,8 +476,8 @@ document.write(`
 <span class="sd">        conv_receptive_field (float, optional): Receptive field of the standard</span>
 <span class="sd">            architecture. Must be specified if `conv_arch` is set to `&quot;conv&quot;`.</span>
 <span class="sd">        conv_layers (int, optional): Layers of the standard architecture. Defaults to 8.</span>
-<span class="sd">        conv_channels (int, optional): Channels of the standard architecture. Defaults to</span>
-<span class="sd">            64.</span>
+<span class="sd">        conv_channels (int, optional): Channels of the standard architecture. Defaults</span>
+<span class="sd">            to 64.</span>
 <span class="sd">        num_basis_functions (int, optional): Number of basis functions for the</span>
 <span class="sd">            low-rank likelihood. Defaults to `512`.</span>
 <span class="sd">        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.</span>
@@ -564,6 +572,8 @@ document.write(`
             <span class="c1"># Not necessary. Just let the CNN produce the right number of channels.</span>
             <span class="n">conv_out_channels</span> <span class="o">=</span> <span class="n">likelihood_in_channels</span>
             <span class="n">linear_after_set_conv</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span>
+        <span class="c1"># Also assert that there is no augmentation given.</span>
+        <span class="n">likelihood</span> <span class="o">=</span> <span class="n">nps</span><span class="o">.</span><span class="n">Chain</span><span class="p">(</span><span class="n">nps</span><span class="o">.</span><span class="n">AssertNoAugmentation</span><span class="p">(),</span> <span class="n">likelihood</span><span class="p">)</span>
 
     <span class="c1"># Construct the core CNN architectures for the encoder, which is only necessary</span>
     <span class="c1"># if we&#39;re using a latent variable, and for the decoder. First, we determine</span>
@@ -657,6 +667,7 @@ document.write(`
         <span class="n">nps</span><span class="o">.</span><span class="n">FunctionalCoder</span><span class="p">(</span>
             <span class="n">disc</span><span class="p">,</span>
             <span class="n">nps</span><span class="o">.</span><span class="n">Chain</span><span class="p">(</span>
+                <span class="n">_convgnp_assert_form_contexts</span><span class="p">(</span><span class="n">nps</span><span class="p">,</span> <span class="n">dim_yc</span><span class="p">),</span>
                 <span class="n">nps</span><span class="o">.</span><span class="n">PrependDensityChannel</span><span class="p">(),</span>
                 <span class="n">_convgnp_construct_encoder_setconvs</span><span class="p">(</span>
                     <span class="n">nps</span><span class="p">,</span>

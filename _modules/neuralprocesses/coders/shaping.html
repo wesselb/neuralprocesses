@@ -314,7 +314,14 @@ document.write(`
 <span class="kn">from</span> <span class="nn">..parallel</span> <span class="kn">import</span> <span class="n">Parallel</span>
 <span class="kn">from</span> <span class="nn">..util</span> <span class="kn">import</span> <span class="n">register_module</span><span class="p">,</span> <span class="n">split</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Identity&quot;</span><span class="p">,</span> <span class="s2">&quot;Splitter&quot;</span><span class="p">,</span> <span class="s2">&quot;RestructureParallel&quot;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;Identity&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;Splitter&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;RestructureParallel&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;AssertParallel&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;SqueezeParallel&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;AssertNoParallel&quot;</span><span class="p">,</span>
+<span class="p">]</span>
 
 
 <div class="viewcode-block" id="Identity"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.shaping.Identity">[docs]</a><span class="nd">@register_module</span>
@@ -402,6 +409,85 @@ document.write(`
 <span class="nd">@_dispatch</span>
 <span class="k">def</span> <span class="nf">_restructure_create</span><span class="p">(</span><span class="n">element_map</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">Parallel</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">_restructure_create</span><span class="p">(</span><span class="n">element_map</span><span class="p">,</span> <span class="n">xi</span><span class="p">)</span> <span class="k">for</span> <span class="n">xi</span> <span class="ow">in</span> <span class="n">x</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="AssertParallel"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.shaping.AssertParallel">[docs]</a><span class="nd">@register_module</span>
+<span class="k">class</span> <span class="nc">AssertParallel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Assert a parallel of `n` elements.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        n (int): Number of elements asserted in parallel.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        n (int): Number of elements asserted in parallel.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span></div>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">AssertParallel</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected a parallel of elements, but got `</span><span class="si">{</span><span class="n">xz</span><span class="si">}</span><span class="s2">` and `</span><span class="si">{</span><span class="n">z</span><span class="si">}</span><span class="s2">`.&quot;</span><span class="p">)</span>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">AssertParallel</span><span class="p">,</span> <span class="n">xz</span><span class="p">:</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">xz</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">z</span><span class="p">)</span> <span class="o">==</span> <span class="n">p</span><span class="o">.</span><span class="n">n</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Expected a parallel of </span><span class="si">{</span><span class="n">p</span><span class="o">.</span><span class="n">n</span><span class="si">}</span><span class="s2"> elements, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;but got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">xz</span><span class="p">)</span><span class="si">}</span><span class="s2"> inputs and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">z</span><span class="p">)</span><span class="si">}</span><span class="s2"> outputs.&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span>
+
+
+<div class="viewcode-block" id="SqueezeParallel"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.shaping.SqueezeParallel">[docs]</a><span class="nd">@register_module</span>
+<span class="k">class</span> <span class="nc">SqueezeParallel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;If there is a parallel of exactly one element, remove the parallel.&quot;&quot;&quot;</span></div>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">SqueezeParallel</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">SqueezeParallel</span><span class="p">,</span> <span class="n">xz</span><span class="p">:</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">xz</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">z</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">xz</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">z</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span>
+
+
+<div class="viewcode-block" id="AssertNoParallel"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.shaping.AssertNoParallel">[docs]</a><span class="nd">@register_module</span>
+<span class="k">class</span> <span class="nc">AssertNoParallel</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Assert exactly one element in parallel or not a parallel of elements.&quot;&quot;&quot;</span></div>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">AssertNoParallel</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">AssertNoParallel</span><span class="p">,</span> <span class="n">xz</span><span class="p">:</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+        <span class="s2">&quot;Expected not a parallel of elements, but got inputs in parallel.&quot;</span>
+    <span class="p">)</span>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">AssertNoParallel</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+        <span class="s2">&quot;Expected not a parallel of elements, but got outputs in parallel.&quot;</span>
+    <span class="p">)</span>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">p</span><span class="p">:</span> <span class="n">AssertNoParallel</span><span class="p">,</span> <span class="n">xz</span><span class="p">:</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">z</span><span class="p">:</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span>
+        <span class="s2">&quot;Expected not a parallel of elements, but got inputs and outputs in parallel.&quot;</span>
+    <span class="p">)</span>
 </pre></div>
 
                 </article>

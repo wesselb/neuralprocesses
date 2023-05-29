@@ -313,9 +313,9 @@ document.write(`
 <span class="kn">from</span> <span class="nn">..augment</span> <span class="kn">import</span> <span class="n">AugmentedInput</span>
 <span class="kn">from</span> <span class="nn">..datadims</span> <span class="kn">import</span> <span class="n">data_dims</span>
 <span class="kn">from</span> <span class="nn">..materialise</span> <span class="kn">import</span> <span class="n">_repeat_concat</span>
-<span class="kn">from</span> <span class="nn">..util</span> <span class="kn">import</span> <span class="n">register_module</span><span class="p">,</span> <span class="n">register_composite_coder</span>
+<span class="kn">from</span> <span class="nn">..util</span> <span class="kn">import</span> <span class="n">register_composite_coder</span><span class="p">,</span> <span class="n">register_module</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Augment&quot;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Augment&quot;</span><span class="p">,</span> <span class="s2">&quot;AssertNoAugmentation&quot;</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="Augment"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.augment.Augment">[docs]</a><span class="nd">@register_composite_coder</span>
@@ -356,6 +356,21 @@ document.write(`
 <span class="nd">@_dispatch</span>
 <span class="k">def</span> <span class="nf">_augment</span><span class="p">(</span><span class="n">xz</span><span class="p">:</span> <span class="n">AugmentedInput</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">xz</span><span class="o">.</span><span class="n">x</span>
+
+
+<div class="viewcode-block" id="AssertNoAugmentation"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.augment.AssertNoAugmentation">[docs]</a><span class="nd">@register_module</span>
+<span class="k">class</span> <span class="nc">AssertNoAugmentation</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Assert no augmentation of the target inputs.&quot;&quot;&quot;</span></div>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">coder</span><span class="p">:</span> <span class="n">AssertNoAugmentation</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span>
+
+
+<span class="nd">@_dispatch</span>
+<span class="k">def</span> <span class="nf">code</span><span class="p">(</span><span class="n">coder</span><span class="p">:</span> <span class="n">AssertNoAugmentation</span><span class="p">,</span> <span class="n">xz</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">AugmentedInput</span><span class="p">,</span> <span class="o">**</span><span class="n">kw_args</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;Did not expect augmentation of the target inputs.&quot;</span><span class="p">)</span>
 </pre></div>
 
                 </article>

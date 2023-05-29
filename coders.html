@@ -1224,6 +1224,12 @@ the _last_ unpacked dimension.</p>
 <section id="module-neuralprocesses.coders.augment">
 <span id="auxiliary-variables"></span><h2>Auxiliary Variables<a class="headerlink" href="#module-neuralprocesses.coders.augment" title="Permalink to this heading">#</a></h2>
 <dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.augment.AssertNoAugmentation">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.augment.</span></span><span class="sig-name descname"><span class="pre">AssertNoAugmentation</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/augment.html#AssertNoAugmentation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.augment.AssertNoAugmentation" title="Permalink to this definition">#</a></dt>
+<dd><p>Assert no augmentation of the target inputs.</p>
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="neuralprocesses.coders.augment.Augment">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.augment.</span></span><span class="sig-name descname"><span class="pre">Augment</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coder</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/augment.html#Augment"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.augment.Augment" title="Permalink to this definition">#</a></dt>
 <dd><p>Concatenate the augmentation of the input to the encoding, and remove any
@@ -1250,6 +1256,34 @@ augmentation of target inputs.</p>
 <section id="module-neuralprocesses.coders.copy">
 <span id="utility"></span><h2>Utility<a class="headerlink" href="#module-neuralprocesses.coders.copy" title="Permalink to this heading">#</a></h2>
 <span class="target" id="module-neuralprocesses.coders.shaping"></span><dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.shaping.AssertNoParallel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.shaping.</span></span><span class="sig-name descname"><span class="pre">AssertNoParallel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/shaping.html#AssertNoParallel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.shaping.AssertNoParallel" title="Permalink to this definition">#</a></dt>
+<dd><p>Assert exactly one element in parallel or not a parallel of elements.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.shaping.AssertParallel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.shaping.</span></span><span class="sig-name descname"><span class="pre">AssertParallel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/neuralprocesses/coders/shaping.html#AssertParallel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.shaping.AssertParallel" title="Permalink to this definition">#</a></dt>
+<dd><p>Assert a parallel of <cite>n</cite> elements.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>n</strong> (<em>int</em>) – Number of elements asserted in parallel.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="neuralprocesses.coders.shaping.AssertParallel.n">
+<span class="sig-name descname"><span class="pre">n</span></span><a class="headerlink" href="#neuralprocesses.coders.shaping.AssertParallel.n" title="Permalink to this definition">#</a></dt>
+<dd><p>Number of elements asserted in parallel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="neuralprocesses.coders.shaping.Identity">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.shaping.</span></span><span class="sig-name descname"><span class="pre">Identity</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/shaping.html#Identity"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.shaping.Identity" title="Permalink to this definition">#</a></dt>
 <dd><p>Identity coder.</p>
@@ -1311,6 +1345,12 @@ augmentation of target inputs.</p>
 </dl>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="neuralprocesses.coders.shaping.SqueezeParallel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neuralprocesses.coders.shaping.</span></span><span class="sig-name descname"><span class="pre">SqueezeParallel</span></span><a class="reference internal" href="_modules/neuralprocesses/coders/shaping.html#SqueezeParallel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neuralprocesses.coders.shaping.SqueezeParallel" title="Permalink to this definition">#</a></dt>
+<dd><p>If there is a parallel of exactly one element, remove the parallel.</p>
 </dd></dl>
 
 <span class="target" id="module-neuralprocesses.coders.fuse"></span><dl class="py class">
