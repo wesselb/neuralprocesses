@@ -2,6 +2,7 @@ import neuralprocesses as nps  # This fixes inspection below.
 from plum import convert
 
 from ..util import register_model
+from .convgnp import _convgnp_assert_form_contexts
 from .util import construct_likelihood, parse_transform
 
 __all__ = ["construct_gnp"]
@@ -185,6 +186,7 @@ def construct_gnp(
     encoder = nps.Chain(
         # We need to explicitly copy, because there will be multiple context sets in
         # parallel, which will otherwise dispatch to the wrong method.
+        _convgnp_assert_form_contexts(nps, dim_yc),
         nps.Copy(2 + (dim_lv > 0)),
         nps.Parallel(
             nps.Chain(

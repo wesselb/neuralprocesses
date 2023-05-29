@@ -5,7 +5,14 @@ from ..datadims import data_dims
 from ..parallel import Parallel
 from ..util import register_module, split
 
-__all__ = ["Identity", "Splitter", "RestructureParallel"]
+__all__ = [
+    "Identity",
+    "Splitter",
+    "RestructureParallel",
+    "AssertParallel",
+    "SqueezeParallel",
+    "AssertNoParallel",
+]
 
 
 @register_module
@@ -93,3 +100,82 @@ def _restructure_create(element_map, i):
 @_dispatch
 def _restructure_create(element_map, x: tuple):
     return Parallel(*(_restructure_create(element_map, xi) for xi in x))
+
+
+@register_module
+class AssertParallel:
+    """Assert a parallel of `n` elements.
+
+    Args:
+        n (int): Number of elements asserted in parallel.
+
+    Attributes:
+        n (int): Number of elements asserted in parallel.
+    """
+
+    def __init__(self, n):
+        self.n = n
+
+
+@_dispatch
+def code(p: AssertParallel, xz, z, x, **kw_args):
+    raise AssertionError(f"Expected a parallel of elements, but got `{xz}` and `{z}`.")
+
+
+@_dispatch
+def code(p: AssertParallel, xz: Parallel, z: Parallel, x, **kw_args):
+    if not len(xz) == len(z) == p.n:
+        raise AssertionError(
+            f"Expected a parallel of {p.n} elements, "
+            f"but got {len(xz)} inputs and {len(z)} outputs."
+        )
+    return xz, z
+
+
+@register_module
+class SqueezeParallel:
+    """If there is a parallel of exactly one element, remove the parallel."""
+
+
+@_dispatch
+def code(p: SqueezeParallel, xz, z, x, **kw_args):
+    return xz, z
+
+
+@_dispatch
+def code(p: SqueezeParallel, xz: Parallel, z: Parallel, x, **kw_args):
+    if len(xz) == len(z) == 1:
+        return xz[0], z[0]
+    else:
+        return xz, z
+
+
+@register_module
+class AssertNoParallel:
+    """Assert exactly one element in parallel or not a parallel of elements."""
+
+
+@_dispatch
+def code(p: AssertNoParallel, xz, z, x, **kw_args):
+    return xz, z
+
+
+@_dispatch
+def code(p: AssertNoParallel, xz: Parallel, z, x, **kw_args):
+    raise AssertionError(
+        "Expected not a parallel of elements, but got inputs in parallel."
+    )
+
+
+@_dispatch
+def code(p: AssertNoParallel, xz, z: Parallel, x, **kw_args):
+    raise AssertionError(
+        "Expected not a parallel of elements, but got outputs in parallel."
+    )
+
+
+@_dispatch
+def code(p: AssertNoParallel, xz: Parallel, z: Parallel, x, **kw_args):
+    raise AssertionError(
+        "Expected not a parallel of elements, but got inputs and outputs in parallel."
+    )

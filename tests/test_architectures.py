@@ -4,6 +4,7 @@ import lab as B
 import numpy as np
 import pytest
 from neuralprocesses.aggregate import Aggregate, AggregateInput
+from neuralprocesses.parallel import Parallel
 from plum import isinstance
 
 from .util import approx, generate_data
@@ -420,3 +421,42 @@ def test_data_eq(nps, dim_x, dim_y, constructor, config, dim_lv):
     batch = gen.generate_batch()
     pred = model(batch["contexts"], batch["xt"])
     check_prediction(nps, pred, batch["yt"])
+
+
+@pytest.mark.parametrize(
+    "constructor_kw_args",
+    [
+        ("construct_gnp", {}),
+        ("construct_agnp", {}),
+        ("construct_convgnp", {"points_per_unit": 4}),
+        ("construct_fullconvgnp", {"points_per_unit": 4}),
+    ],
+)
+def test_context_verification(nps, constructor_kw_args):
+    constructor, kw_args = constructor_kw_args
+
+    c = (B.randn(nps.dtype, 4, 1, 5), B.randn(nps.dtype, 4, 1, 5))
+    xt = B.randn(nps.dtype, 4, 1, 15)
+
+    # Test one context set.
+    model = getattr(nps, constructor)(dim_yc=1, dtype=nps.dtype, **kw_args)
+    pred1 = model(*c, xt)
+    pred2 = model([c], xt)
+    approx(pred1.mean, pred2.mean)
+    with pytest.raises(AssertionError, match="(?i)got inputs and outputs in parallel"):
+        model([c, c], xt)
+    with pytest.raises(AssertionError, match="(?i) got inputs in parallel"):
+        model(Parallel(c[0], c[0]), c[1], xt)
+    with pytest.raises(AssertionError, match="(?i) got outputs in parallel"):
+        model(c[0], Parallel(c[1], c[1]), xt)
+
+    # Test two context sets.
+    model = getattr(nps, constructor)(dim_yc=(1, 1), dtype=nps.dtype, **kw_args)
+    model([c, c], xt)
+    with pytest.raises(AssertionError, match="(?i)expected a parallel of elements"):
+        model([c], xt)
+    with pytest.raises(
+        AssertionError,
+        match="(?i)expected a parallel of 2 elements, but got 4 inputs and 4 outputs",
+    ):
+        model([c, c, c, c], xt)
