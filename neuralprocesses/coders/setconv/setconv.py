@@ -199,14 +199,6 @@ class DPSetConv:
             B.log(scale).copy(), dtype=dtype, learnable=learnable
         )
         
-        self.fake_log_scale = self.nn.Parameter(
-            B.log(scale).copy() + 1., dtype=dtype, learnable=learnable
-        )
-        
-        self.fake_log_scale = self.nn.Parameter(
-            B.log(scale), dtype=dtype, learnable=learnable
-        )
-        
         self.use_dp_noise_channels = use_dp_noise_channels
         self.amortise_dp_params = amortise_dp_params
 
@@ -280,10 +272,8 @@ class DPSetConv:
         _x = B.transpose(x, [0, 2, 1])
         
         kernel = EQ().stretch(B.exp(self.log_scale))
-        print(B.exp(self.log_scale), B.exp(self.fake_log_scale))
         
-        k = lambda tensor: kernel(tensor, tensor) + \
-            1e-6 * B.eye(tensor.dtype, tensor.shape[-1])[None, :, :]
+        k = lambda tensor: kernel(tensor, tensor) + 1e-6 * B.eye(tensor.dtype, tensor.shape[-1])[None, :, :]
         
         noise = [B.sample(k(_x.double()))[:, None, :, 0] for i in range(z.shape[1])]
         noise = B.cast(z.dtype, B.concat(*noise, axis=1))
@@ -306,6 +296,8 @@ class DPSetConv:
         ones = B.ones(tensor.dtype, *(tensor[:, :num_channels//2, :].shape))
 
         kernel = tensor[:, :num_channels//2, :]
+        
+        assert torch.all(kernel == 1.)
 
         clipped_data = B.minimum(tensor[:, num_channels//2:, :], self.y_bound(sens_per_sigma)[:, None, None] * ones)
         clipped_data = B.maximum(clipped_data, -self.y_bound(sens_per_sigma)[:, None, None] * ones)
@@ -328,59 +320,17 @@ class DPSetConv:
 @_batch_targets
 def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, *, epsilon: B.Numeric, delta: B.Numeric, **kw_args):
 
-    sens_per_sigma = coder.sens_per_sigma(epsilon, delta).to(xz.device)
+    sens_per_sigma = coder.sens_per_sigma(epsilon, delta).to(xz.device)  # shape: (batch_size,)
 
     density_data_channels = B.matmul(
         coder.clip_data_channel(z, sens_per_sigma),
         compute_weights(coder, xz, x),
     )
-    
-#     print(xz.shape, z.shape, x.shape, density_data_channels.shape)
-#     input("")
-    
-#     import matplotlib.pyplot as plt
-    
-#     plt.figure(figsize=(10, 5))
-#     plt.subplot(1, 2, 1)
-#     plt.plot(x[0, 0, :], density_data_channels[0, 0, :], color="tab:blue", label="Density")
-                                   
-#     plt.subplot(1, 2, 2)
-#     plt.plot(x[0, 0, :], density_data_channels[0, 1, :], color="tab:blue", label="Density + noise")
 
     noise, density_sigma, value_sigma = coder.sample_noise(xz, z, x, sens_per_sigma)
     
-    z = density_data_channels + noise
-    
-#     plt.subplot(1, 2, 1)
-#     plt.plot(x[0, 0, :], z[0, 0, :], "--", color="tab:blue", label="Value")
-#     plt.xlabel("$x$", fontsize=18)
-#     plt.ylabel("Density", fontsize=18)
-#     plt.legend()
-                                   
-#     plt.subplot(1, 2, 2)
-#     plt.plot(x[0, 0, :], z[0, 1, :], "--", color="tab:blue", label="Value + noise")
-#     plt.xlabel("$x$", fontsize=18)
-#     plt.ylabel("Value", fontsize=18)
-#     plt.legend()
-    
-#     eps = float(epsilon[0].detach().cpu().numpy())
-#     plt.suptitle(f"Amortised $t, y_b$, $\\epsilon = {eps:.2f}$", fontsize=28)
-    
-#     if not hasattr(coder, "i"):
-#         coder.i = 1
-#     else:
-#         coder.i = coder.i + 1
-        
-#     plt.tight_layout()
-#     plt.savefig(f"_img/amortised-channels-{eps:.2f}-{coder.i}.png")
-    
-    if coder.use_dp_noise_channels:
-
-        density_sigma = density_sigma[:, None, None] * B.ones(z.dtype, z.shape[0], 1, z.shape[2])
-        value_sigma = value_sigma[:, None, None] * B.ones(z.dtype, z.shape[0], 1, z.shape[2])
-
-        z = B.concat(z, density_sigma, value_sigma, axis=1)
-
+    z = density_data_channels # + noise
+   
     return x, z
 
 
