@@ -13,7 +13,6 @@ import torch
 import wbml.out as out
 from matrix.util import ToDenseWarning
 from wbml.experiment import WorkingDirectory
-from itertools import chain
 
 __all__ = ["main"]
 
