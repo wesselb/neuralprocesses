@@ -1,5 +1,6 @@
 import lab as B
 import pytest
+from plum import NotFoundLookupError
 
 from .test_architectures import check_prediction
 from .util import nps  # noqa
@@ -37,3 +38,23 @@ def test_convgnp_auxiliary_variable(nps):
     )
 
     check_prediction(nps, pred, B.randn(nps.dtype, 16, 3, 15))
+
+    # Check that the model cannot be run forward without the auxiliary variable.
+    with pytest.raises(NotFoundLookupError):
+        model(
+            [observed_data, aux_var1, aux_var2],
+            B.randn(nps.dtype, 16, 2, 15),
+        )
+
+
+def test_convgnp_auxiliary_variable_given_but_not_specified(nps):
+    """Test that giving the auxiliary variable without specifying `dim_aux_t` raises
+    an error."""
+    model = nps.construct_convgnp(points_per_unit=4)
+    with pytest.raises(AssertionError, match="(?i)did not expect augmentation"):
+        model(
+            B.randn(nps.dtype, 4, 1, 15),
+            B.randn(nps.dtype, 4, 1, 15),
+            B.randn(nps.dtype, 4, 1, 10),
+            aux_t=B.randn(nps.dtype, 4, 2, 10),
+        )

@@ -1,6 +1,6 @@
+import socket
 from typing import Union
 
-import socket
 import lab as B
 import neuralprocesses
 import pytest
@@ -55,15 +55,26 @@ def nps(request):
     return request.param
 
 
-def generate_data(nps, batch_size=4, dim_x=1, dim_y=1, n_context=5, n_target=7):
+def generate_data(
+    nps,
+    batch_size=4,
+    dim_x=1,
+    dim_y=1,
+    n_context=5,
+    n_target=7,
+    binary=False,
+):
     xc = B.randn(nps.dtype, batch_size, dim_x, n_context)
     yc = B.randn(nps.dtype, batch_size, dim_y, n_context)
     xt = B.randn(nps.dtype, batch_size, dim_x, n_target)
     yt = B.randn(nps.dtype, batch_size, dim_y, n_target)
+    if binary:
+        yc = B.cast(nps.dtype, yc >= 0)
+        yt = B.cast(nps.dtype, yt >= 0)
     return xc, yc, xt, yt
 
 
-if socket.gethostname() == "Wessels-Crib":
+if socket.gethostname().lower().startswith("wessel"):
     remote_xfail = lambda f: f  #: `xfail` only on CI.
     remote_skip = lambda f: f  #: `skip` only on CI.
 else:

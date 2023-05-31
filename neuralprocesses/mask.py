@@ -1,6 +1,7 @@
+from typing import Tuple, Union
+
 import lab as B
 from lab.util import resolve_axis
-from plum import Tuple, Union
 
 from . import _dispatch
 
@@ -11,7 +12,8 @@ class Masked:
     """A masked output.
 
     Args:
-        y (tensor): Output to mask.
+        y (tensor): Output to mask. The masked values can have any non-NaN value, but
+            they cannot be NaN!
         mask (tensor): A mask consisting of zeros and ones and just one channel.
 
     Attributes:

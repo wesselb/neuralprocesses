@@ -1,9 +1,10 @@
+from typing import Union
+
 import lab as B
 import numpy as np
-from plum import Union
 
-from .dist import AbstractDistribution
 from .. import _dispatch
+from .dist import AbstractDistribution
 
 __all__ = ["TruncatedGeometric"]
 
@@ -49,3 +50,17 @@ class TruncatedGeometric(AbstractDistribution):
         else:
             probs = B.to_active_device(B.ones(dtype_float, 1))
         return B.choice(state, realisations, *shape, p=probs)
+
+    def __str__(self):
+        return (
+            f"TruncatedGeometric("
+            f"{self.lower}, {self.upper}, {self.factor}, {self.factor_at}"
+            f")"
+        )
+
+    def __repr__(self):
+        return (
+            f"TruncatedGeometric("
+            f"{self.lower!r}, {self.uppers!r}, {self.factor!r}, {self.factor_at!r}"
+            f")"
+        )

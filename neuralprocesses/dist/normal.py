@@ -1,14 +1,16 @@
+from typing import Union
+
 import lab as B
 import numpy as np
 from matrix import AbstractMatrix, Dense, Diagonal, LowRank, Woodbury
-from plum import parametric, Union
+from plum import parametric
 from stheno import Normal
 from wbml.util import indented_kv
 
-from .dist import AbstractMultiOutputDistribution
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..util import batch, split
+from .dist import AbstractDistribution, shape_batch
 
 __all__ = ["MultiOutputNormal"]
 
@@ -35,24 +37,24 @@ def _monormal_vectorise(x: Aggregate, shape: Aggregate):
 
 
 @_dispatch
-def _monormal_unvectorise(x: B.Numeric, shape, *, squeeze_sample_dim=False):
-    x = B.reshape(x, *B.shape(x)[:-1], *shape)
+def _monormal_unvectorise(x: B.Numeric, data_shape, *, squeeze_sample_dim=False):
+    x = B.reshape(x, *B.shape(x)[:-1], *data_shape)
     if squeeze_sample_dim:
         x = B.squeeze(x, axis=0)
     return x
 
 
 @_dispatch
-def _monormal_unvectorise(x: B.Numeric, shape: Aggregate, **kw_args):
-    ns = [np.prod(si) for si in shape]
+def _monormal_unvectorise(x: B.Numeric, data_shape: Aggregate, **kw_args):
+    ns = [np.prod(si) for si in data_shape]
     xs = split(x, ns, -1)
     return Aggregate(
-        *(_monormal_unvectorise(xi, si, **kw_args) for xi, si in zip(xs, shape))
+        *(_monormal_unvectorise(xi, di, **kw_args) for xi, di in zip(xs, data_shape))
     )
 
 
 @parametric
-class MultiOutputNormal(AbstractMultiOutputDistribution):
+class MultiOutputNormal(AbstractDistribution):
     """A normal distribution for multiple outputs. Use one of the class methods to
     construct the object.
 
@@ -165,7 +167,7 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
     def logpdf(self, x):
         x = _monormal_vectorise(x, self.shape)
         d = self.vectorised_normal
-        if B.all(~B.isnan(x)):
+        if B.jit_to_numpy(B.all(~B.isnan(x))):
             return d.logpdf(x)
         else:
             # Data is missing. Unfortunately, which elements are missing can differ
@@ -191,29 +193,23 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
             return B.stack(*logpdfs, axis=-1)
 
     @_dispatch
-    def sample(self, state: B.RandomState, num: Union[B.Int, None] = None):
+    def sample(self, state: B.RandomState, dtype: B.DType, *shape: B.Int):
         def f(sample):
             # Put the sample dimension first.
             perm = list(range(B.rank(sample)))
             perm = perm[-1:] + perm[:-1]
             sample = B.transpose(sample, perm=perm)
             # Undo the vectorisation.
-            sample = _monormal_unvectorise(
+            return _monormal_unvectorise(
                 sample,
                 self.shape,
-                # Squeeze the sample dimension if no number of samples was specified.
-                squeeze_sample_dim=num is None,
+                # If `shape` is not specified, then the sample dimension of
+                # :class:`stheno.Normal` needs to be squeezed.
+                squeeze_sample_dim=shape == (),
             )
-            return sample
 
-        return _map_sample_output(f, self.vectorised_normal.sample(state, num or 1))
-
-    @_dispatch
-    def sample(self, num: Union[B.Int, None] = None):
-        state = B.global_random_state(B.dtype(self._mean, self._var, self._noise))
-        state, sample = self.sample(state, num)
-        B.set_global_random_state(state)
-        return sample
+        # TODO: Use `dtype` here. :class:`stheno.Normal` doesn't yet support `dtype`.
+        return _map_sample_output(f, self.vectorised_normal.sample(state, *shape))
 
     def kl(self, other: "MultiOutputNormal"):
         return self.vectorised_normal.kl(other.vectorised_normal)
@@ -224,7 +220,7 @@ class MultiOutputNormal(AbstractMultiOutputDistribution):
 
 @B.dispatch
 def dtype(dist: MultiOutputNormal):
-    return B.dtype(dist.vectorised_normal)
+    return B.dtype(dist._mean, dist._var, dist._noise)
 
 
 @B.dispatch
@@ -237,7 +233,7 @@ def cast(dtype: B.DType, dist: MultiOutputNormal):
     )
 
 
-@B.dispatch
+@shape_batch.dispatch
 def shape_batch(dist: MultiOutputNormal):
     return B.shape_batch_broadcast(dist._mean, dist._var, dist._noise)
 

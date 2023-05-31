@@ -1,8 +1,9 @@
+import neuralprocesses as nps  # This fixes inspection below.
 from plum import convert
 
-import neuralprocesses as nps  # This fixes inspection below.
-from .util import construct_likelihood, parse_transform
 from ..util import register_model
+from .convgnp import _convgnp_assert_form_contexts
+from .util import construct_likelihood, parse_transform
 
 __all__ = ["construct_gnp"]
 
@@ -58,7 +59,7 @@ def construct_gnp(
             low-rank likelihood. Defaults to 512.
         dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
-            `"het"` or `"dense"`. Defaults to `"het"`.
+            `"het"`, `"dense"`, or `"spikes-beta"`. Defaults to `"het"`.
         transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
             Must be either `"positive"`, `"exp"`, `"softplus"`, or
@@ -185,6 +186,7 @@ def construct_gnp(
     encoder = nps.Chain(
         # We need to explicitly copy, because there will be multiple context sets in
         # parallel, which will otherwise dispatch to the wrong method.
+        _convgnp_assert_form_contexts(nps, dim_yc),
         nps.Copy(2 + (dim_lv > 0)),
         nps.Parallel(
             nps.Chain(

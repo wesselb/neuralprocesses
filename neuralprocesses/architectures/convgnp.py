@@ -1,10 +1,8 @@
-import lab as B
-import wbml.out as out
+import neuralprocesses as nps  # This fixes inspection below.
 from plum import convert
 
-import neuralprocesses as nps  # This fixes inspection below.
-from .util import construct_likelihood, parse_transform
 from ..util import register_model
+from .util import construct_likelihood, parse_transform
 
 __all__ = ["construct_convgnp"]
 
@@ -30,7 +28,7 @@ def _convgnp_resolve_architecture(
     elif "conv" in conv_arch:
         conv_out_channels = conv_channels
         if conv_receptive_field is None:
-            raise ValueError(f"Must specify `conv_receptive_field`.")
+            raise ValueError("Must specify `conv_receptive_field`.")
     else:
         raise ValueError(f'Architecture "{conv_arch}" invalid.')
     return conv_out_channels
@@ -81,6 +79,16 @@ def _convgnp_construct_encoder_setconvs(
                 for s in encoder_scales
             )
         )
+
+
+def _convgnp_assert_form_contexts(nps, dim_yc):
+    if len(dim_yc) == 1:
+        return nps.Chain(
+            nps.SqueezeParallel(),
+            nps.AssertNoParallel(),
+        )
+    else:
+        return nps.AssertParallel(len(dim_yc))
 
 
 def _convgnp_construct_decoder_setconv(
@@ -165,8 +173,8 @@ def construct_convgnp(
             Defaults to 64.
         margin (float, optional): Margin of the internal discretisation. Defaults to
             0.1.
-        likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank".
-            Defaults to `"lowrank"`.
+        likelihood (str, optional): Likelihood. Must be one of `"het"`, `"lowrank"`,
+            or `"spikes-beta"`. Defaults to `"lowrank"`.
         conv_arch (str, optional): Convolutional architecture to use. Must be one of
             `"unet[-res][-sep]"` or `"conv[-res][-sep]"`. Defaults to `"unet"`.
         unet_channels (tuple[int], optional): Channels of every layer of the UNet.
@@ -184,8 +192,8 @@ def construct_convgnp(
         conv_receptive_field (float, optional): Receptive field of the standard
             architecture. Must be specified if `conv_arch` is set to `"conv"`.
         conv_layers (int, optional): Layers of the standard architecture. Defaults to 8.
-        conv_channels (int, optional): Channels of the standard architecture. Defaults to
-            64.
+        conv_channels (int, optional): Channels of the standard architecture. Defaults
+            to 64.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to `512`.
         dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
@@ -280,6 +288,8 @@ def construct_convgnp(
             # Not necessary. Just let the CNN produce the right number of channels.
             conv_out_channels = likelihood_in_channels
             linear_after_set_conv = lambda x: x
+        # Also assert that there is no augmentation given.
+        likelihood = nps.Chain(nps.AssertNoAugmentation(), likelihood)
 
     # Construct the core CNN architectures for the encoder, which is only necessary
     # if we're using a latent variable, and for the decoder. First, we determine
@@ -381,6 +391,7 @@ def construct_convgnp(
         nps.FunctionalCoder(
             disc,
             nps.Chain(
+                _convgnp_assert_form_contexts(nps, dim_yc),
                 nps.PrependDensityChannel(),
                 _convgnp_construct_encoder_setconvs(
                     nps,

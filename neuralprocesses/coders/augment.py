@@ -4,9 +4,9 @@ from .. import _dispatch
 from ..augment import AugmentedInput
 from ..datadims import data_dims
 from ..materialise import _repeat_concat
-from ..util import register_module, register_composite_coder
+from ..util import register_composite_coder, register_module
 
-__all__ = ["Augment"]
+__all__ = ["Augment", "AssertNoAugmentation"]
 
 
 @register_composite_coder
@@ -47,3 +47,18 @@ def _augment(xz: AugmentedInput, z: B.Numeric):
 @_dispatch
 def _augment(xz: AugmentedInput):
     return xz.x
+
+
+@register_module
+class AssertNoAugmentation:
+    """Assert no augmentation of the target inputs."""
+
+
+@_dispatch
+def code(coder: AssertNoAugmentation, xz, z, x, **kw_args):
+    return xz, z
+
+
+@_dispatch
+def code(coder: AssertNoAugmentation, xz, z, x: AugmentedInput, **kw_args):
+    raise AssertionError("Did not expect augmentation of the target inputs.")

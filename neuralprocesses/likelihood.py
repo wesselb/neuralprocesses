@@ -7,7 +7,7 @@ from lab.util import resolve_axis
 from . import _dispatch
 from .aggregate import AggregateInput, Aggregate
 from .datadims import data_dims
-from .dist import MultiOutputNormal, Dirac
+from .dist import MultiOutputNormal, Dirac, SpikesSlab, Beta
 from .parallel import Parallel
 from .util import register_module, split, split_dimension
 
@@ -89,7 +89,7 @@ class HeterogeneousGaussianLikelihood(AbstractLikelihood):
         return repr(self)
 
     def __repr__(self):
-        return "HeterogeneousGaussianLikelihood()"
+        return f"HeterogeneousGaussianLikelihood(epsilon={self.epsilon!r})"
 
 
 @_dispatch
@@ -102,7 +102,7 @@ def code(
     dtype_lik=None,
     **kw_args,
 ):
-    mean, noise, shape = _code_het(coder, xz, z)
+    mean, noise, shape = _het(coder, xz, z)
 
     # Cast parameters to the right data type.
     if dtype_lik:
@@ -112,14 +112,12 @@ def code(
 
 
 @_dispatch
-def _code_het(
+def _het(
     coder: HeterogeneousGaussianLikelihood,
     xz: AggregateInput,
     z: Aggregate,
 ):
-    means, noises, shapes = zip(
-        *[_code_het(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
-    )
+    means, noises, shapes = zip(*[_het(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)])
 
     # Concatenate into one big Gaussian.
     mean = B.concat(*means, axis=-1)
@@ -130,7 +128,7 @@ def _code_het(
 
 
 @_dispatch
-def _code_het(coder: HeterogeneousGaussianLikelihood, xz, z: B.Numeric):
+def _het(coder: HeterogeneousGaussianLikelihood, xz, z: B.Numeric):
     d = data_dims(xz)
     dim_y = B.shape(z, -d - 1) // 2
 
@@ -169,7 +167,9 @@ class LowRankGaussianLikelihood(AbstractLikelihood):
         return repr(self)
 
     def __repr__(self):
-        return f"LowRankGaussianLikelihood(rank={self.rank})"
+        return (
+            f"LowRankGaussianLikelihood(rank={self.rank!r}, epsilon={self.epsilon!r})"
+        )
 
 
 @_dispatch
@@ -182,7 +182,6 @@ def code(
     dtype_lik=None,
     **kw_args,
 ):
-
     mean, var_factor, noise, shape = _lowrank(coder, xz, z)
 
     # Cast the parameters before constructing the distribution.
@@ -261,7 +260,7 @@ class DenseGaussianLikelihood(AbstractLikelihood):
         return repr(self)
 
     def __repr__(self):
-        return "DenseGaussianLikelihood()"
+        return r"DenseGaussianLikelihood(epsilon={self.epsilon!r})"
 
 
 @_dispatch
@@ -274,7 +273,6 @@ def code(
     dtype_lik=None,
     **kw_args,
 ):
-
     z_mean_noise, z_var = z
 
     mean, var, noise, shape = _dense(coder, *xz, *z)
@@ -357,3 +355,99 @@ def _dense_var(coder: DenseGaussianLikelihood, xz, z: B.Numeric):
     z, _ = _vectorise(z, d + 1)
 
     return z
+
+
+@register_module
+class SpikesBetaLikelihood(AbstractLikelihood):
+    """Gaussian likelihood with heterogeneous noise.
+
+    Args:
+        epsilon (float, optional): Tolerance for equality checking. Defaults to `1e-6`.
+
+    Args:
+        epsilon (float): Tolerance for equality checking.
+    """
+
+    @_dispatch
+    def __init__(self, epsilon: float = 1e-6):
+        self.epsilon = epsilon
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return f"SpikesBetaLikelihood(epsilon={self.epsilon!r})"
+
+
+@_dispatch
+def code(
+    coder: SpikesBetaLikelihood,
+    xz,
+    z,
+    x,
+    *,
+    dtype_lik=None,
+    **kw_args,
+):
+    alpha, beta, logp0, logp1, logps, d = _spikesbeta(coder, xz, z)
+
+    # Cast parameters to the right data type.
+    if dtype_lik:
+        alpha = B.cast(dtype_lik, alpha)
+        beta = B.cast(dtype_lik, beta)
+        logp0 = B.cast(dtype_lik, logp0)
+        logp1 = B.cast(dtype_lik, logp1)
+        logps = B.cast(dtype_lik, logps)
+
+    # Create the spikes vector.
+    with B.on_device(z):
+        dtype = dtype_lik or B.dtype(z)
+        spikes = B.stack(B.one(dtype), B.zero(dtype))
+
+    return xz, SpikesSlab(
+        spikes,
+        Beta(alpha, beta, d),
+        B.stack(logp0, logp1, logps, axis=-1),
+        d,
+        epsilon=coder.epsilon,
+    )
+
+
+@_dispatch
+def _spikesbeta(
+    coder: SpikesBetaLikelihood,
+    xz: AggregateInput,
+    z: Aggregate,
+):
+    alphas, betas, logp0s, logp1s, logpss, ds = zip(
+        *[_spikesbeta(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
+    )
+
+    # Concatenate into one big distribution.
+    alpha = Aggregate(*alphas)
+    beta = Aggregate(*betas)
+    logp0 = Aggregate(*logp0s)
+    logp1 = Aggregate(*logp1s)
+    logps = Aggregate(*logpss)
+    d = Aggregate(*ds)
+
+    return alpha, beta, logp0, logp1, logps, d
+
+
+@_dispatch
+def _spikesbeta(coder: SpikesBetaLikelihood, xz, z: B.Numeric):
+    d = data_dims(xz)
+    dim_y = B.shape(z, -d - 1) // 5
+
+    z_alpha, z_beta, z_logp0, z_logp1, z_logps = split(
+        z, (dim_y, dim_y, dim_y, dim_y, dim_y), -d - 1
+    )
+
+    # Transform into parameters.
+    alpha = 1e-3 + B.softplus(z_alpha)
+    beta = 1e-3 + B.softplus(z_beta)
+    logp0 = z_logp0
+    logp1 = z_logp1
+    logps = z_logps
+
+    return alpha, beta, logp0, logp1, logps, d + 1

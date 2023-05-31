@@ -1,13 +1,14 @@
+from typing import List, Tuple, Union
+
 import lab as B
 from matrix.util import indent
-from plum import List, Tuple, Union
 
-from .util import sample, compress_contexts
 from .. import _dispatch
 from ..augment import AugmentedInput
 from ..coding import code
 from ..mask import Masked
 from ..util import register_module
+from .util import compress_contexts, sample
 
 __all__ = ["Model"]
 
@@ -71,7 +72,8 @@ class Model:
         xz, pz = code(self.encoder, xc, yc, xt, root=True, **enc_kw_args)
 
         # Sample and convert sample to the right data type.
-        state, z = sample(state, pz, num=num_samples)
+        shape = () if num_samples is None else (num_samples,)
+        state, z = sample(state, pz, *shape)
         if dtype_enc_sample:
             z = B.cast(dtype_enc_sample, z)
 

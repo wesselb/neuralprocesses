@@ -91,7 +91,6 @@ def eval(state, model, objective, gen):
 
 
 def main(**kw_args):
-
     # Setup arguments.
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str, nargs="*", default=["_experiments-fixed-scale"])

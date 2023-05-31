@@ -39,7 +39,6 @@ def predefined_gen(request, nps, dim_x, dim_y):
 def test_predefined_gens(nps, predefined_gen, dim_x, dim_y):
     # Limit the epoch to 10 batches.
     for _, batch in zip(range(10), predefined_gen.epoch()):
-
         # Unpack batch.
         cs = batch["contexts"]
         xt = batch["xt"]

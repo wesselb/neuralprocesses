@@ -1,15 +1,16 @@
+import neuralprocesses as nps  # This fixes inspection below.
 import wbml.out as out
 
-import neuralprocesses as nps  # This fixes inspection below.
+from ..util import register_model
 from .convgnp import (
-    _convgnp_init_dims,
-    _convgnp_resolve_architecture,
-    _convgnp_construct_encoder_setconvs,
-    _convgnp_optional_division_by_density,
+    _convgnp_assert_form_contexts,
     _convgnp_construct_decoder_setconv,
+    _convgnp_construct_encoder_setconvs,
+    _convgnp_init_dims,
+    _convgnp_optional_division_by_density,
+    _convgnp_resolve_architecture,
 )
 from .util import parse_transform
-from ..util import register_model
 
 __all__ = ["construct_fullconvgnp"]
 
@@ -211,6 +212,7 @@ def construct_fullconvgnp(
                 nps.FunctionalCoder(
                     disc_mean,
                     nps.Chain(
+                        _convgnp_assert_form_contexts(nps, dim_yc),
                         nps.PrependDensityChannel(),
                         _convgnp_construct_encoder_setconvs(
                             nps,
@@ -232,6 +234,7 @@ def construct_fullconvgnp(
                     disc_kernel,
                     nps.MapDiagonal(  # Map to diagonal of squared space.
                         nps.Chain(
+                            _convgnp_assert_form_contexts(nps, dim_yc),
                             nps.PrependDensityChannel(),
                             _convgnp_construct_encoder_setconvs(
                                 nps,

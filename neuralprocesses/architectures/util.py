@@ -11,8 +11,9 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
 
     Args:
         nps (module): Appropriate backend-specific module.
-        spec (str, optional): Specification. Must be one of `"het"`, `"lowrank"`, or
-            `"dense"`. Defaults to `"lowrank"`. Must be given as a keyword argument.
+        spec (str, optional): Specification. Must be one of `"het"`, `"lowrank"`,
+            `"dense"`, or `"spikes-beta"`. Defaults to `"lowrank"`. Must be given as
+            a keyword argument.
         dim_y (int): Dimensionality of the outputs. Must be given as a keyword argument.
         num_basis_functions (int): Number of basis functions for the low-rank
             likelihood. Must be given as a keyword argument.
@@ -47,6 +48,10 @@ def construct_likelihood(nps=nps, *, spec, dim_y, num_basis_functions, dtype):
             ),
             nps.DenseGaussianLikelihood(),
         )
+    elif spec == "spikes-beta":
+        num_channels = (2 + 3) * dim_y  # Alpha, beta, and three log-probabilities
+        selector = nps.SelectFromChannels(dim_y, dim_y, dim_y, dim_y, dim_y)
+        lik = nps.SpikesBetaLikelihood()
 
     else:
         raise ValueError(f'Incorrect likelihood specification "{spec}".')
