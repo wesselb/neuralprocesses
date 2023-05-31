@@ -1,9 +1,12 @@
 import argparse
 import os
+import shutil
 import sys
 import time
 import warnings
 from functools import partial
+
+from tensorboardX import SummaryWriter
 
 import experiment as exp
 import lab as B
@@ -19,7 +22,7 @@ __all__ = ["main"]
 warnings.filterwarnings("ignore", category=ToDenseWarning)
 
 
-def train(state, model, opt, objective, gen, *, fix_noise):
+def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_writer):
     """Train for an epoch."""
 
     vals = []
@@ -39,17 +42,19 @@ def train(state, model, opt, objective, gen, *, fix_noise):
         val = -B.mean(obj)
         opt.zero_grad(set_to_none=True)
         val.backward()
-        out.kv("Encoder grad scale       ", model.encoder.coder[1][0].log_scale.grad)
-        out.kv("Encoder grad fake scale  ", model.encoder.coder[1][0].fake_log_scale.grad)
+        #out.kv("Encoder grad scale       ", model.encoder.coder[1][0].log_scale.grad)
         opt.step()
 
+        summary_writer.add_scalar("train_step_loss", val, step)
+        step = step + 1
 
     vals = B.concat(*vals)
     out.kv("Loglik (T)", exp.with_err(vals, and_lower=True))
-    return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
+    summary_writer.add_scalar("train_epoch_loglik", B.mean(vals), epoch)
+    return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), step
 
 
-def eval(state, model, objective, gen):
+def eval(state, model, objective, gen, *, epoch, summary_writer):
     """Perform evaluation."""
     with torch.no_grad():
         vals, kls, kls_diag = [], [], []
@@ -84,8 +89,10 @@ def eval(state, model, objective, gen):
             metrics["kl_diag"] = exp.with_err(B.concat(*kls_diag), and_upper=True)
             out.kv("KL (diag)", metrics["kl_diag"])
             
-        out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
-        out.kv("Encoder fake scale  ", torch.exp(model.encoder.coder[1][0].fake_log_scale))
+        #out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
+        summary_writer.add_scalar("val_loglik", np.mean(-vals), epoch)
+        summary_writer.add_scalar("val_kl_full", np.mean(kls), epoch)
+        summary_writer.add_scalar("val_kl_diag", np.mean(kls_diag), epoch)
 
         return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), metrics
 
@@ -93,7 +100,7 @@ def eval(state, model, objective, gen):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments-fixed-scale"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_experiments-dry-run"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
@@ -299,6 +306,12 @@ def main(**kw_args):
         diff=f"diff{suffix}.txt",
         observe=observe,
     )
+
+    # Create summary writer
+    if os.path.exists(f"{wd.root}/metrics"):
+        shutil.rmtree(f"{wd.root}/metrics")
+    
+    summary_writer = SummaryWriter(log_dir=f"{wd.root}/metrics")
 
     # Determine which device to use. Try to use a GPU if one is available.
     if args.device:
@@ -741,11 +754,13 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
-        opt = torch.optim.SGD(model.parameters(), args.rate)
+        opt = torch.optim.Adam(model.parameters(), args.rate)
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
         B.epsilon = config["epsilon_start"]
+
+        step = 0
 
         for i in range(start, args.epochs):
             with out.Section(f"Epoch {i + 1}"):
@@ -769,17 +784,20 @@ def main(**kw_args):
                     fix_noise = 1e-4
                 else:
                     fix_noise = None
-                state, _ = train(
+                state, _, step = train(
                     state,
                     model,
                     opt,
                     objective,
                     gen_train,
                     fix_noise=fix_noise,
+                    epoch=i,
+                    step=step,
+                    summary_writer=summary_writer,
                 )
 
                 # The epoch is done. Now evaluate.
-                state, val, metrics = eval(state, model, objective_cv, gen_cv())
+                state, val, metrics = eval(state, model, objective_cv, gen_cv(), epoch=i, summary_writer=summary_writer)
 
                 # Save current model.
                 torch.save(

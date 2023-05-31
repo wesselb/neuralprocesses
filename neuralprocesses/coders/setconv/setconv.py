@@ -9,7 +9,7 @@ from ...augment import AugmentedInput
 from ...parallel import broadcast_coder_over_parallel
 from ...util import register_module
 
-from torchvision.ops import MLP
+# from torchvision.ops import MLP
 from . import privacy_accounting as pa
 
 from stheno import EQ
@@ -202,17 +202,17 @@ class DPSetConv:
         self.use_dp_noise_channels = use_dp_noise_channels
         self.amortise_dp_params = amortise_dp_params
 
-        if self.amortise_dp_params:
-            
-            self.y_mlp = MLP(
-                in_channels=1,
-                hidden_channels=[20, 20, 1],
-            )
-            
-            self.t_mlp = MLP(
-                in_channels=1,
-                hidden_channels=[20, 20, 1],
-            )
+        #if self.amortise_dp_params:
+        #    
+        #    self.y_mlp = MLP(
+        #        in_channels=1,
+        #        hidden_channels=[20, 20, 1],
+        #    )
+        #    
+        #    self.t_mlp = MLP(
+        #        in_channels=1,
+        #        hidden_channels=[20, 20, 1],
+        #    )
 
         self.log_y_bound = self.nn.Parameter(
             B.log(y_bound), dtype=dtype, learnable=learnable
@@ -329,7 +329,7 @@ def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, *, epsilon
 
     noise, density_sigma, value_sigma = coder.sample_noise(xz, z, x, sens_per_sigma)
     
-    z = density_data_channels # + noise
+    z = density_data_channels + noise
    
     return x, z
 
