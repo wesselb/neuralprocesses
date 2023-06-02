@@ -14,6 +14,8 @@ from . import privacy_accounting as pa
 
 from stheno import EQ
 
+import gpytorch
+
 __all__ = ["SetConv", "DPSetConv"]
 
 
@@ -186,29 +188,28 @@ class DPSetConv:
     """
 
     def __init__(
-            self,
-            scale,
-            y_bound,
-            use_dp_noise_channels,
-            amortise_dp_params=False,
-            dtype=None,
-            learnable=True,
-        ):
-
+        self,
+        scale,
+        y_bound,
+        use_dp_noise_channels,
+        amortise_dp_params=False,
+        dtype=None,
+        learnable=True,
+    ):
         self.log_scale = self.nn.Parameter(
             B.log(scale).copy(), dtype=dtype, learnable=learnable
         )
-        
+
         self.use_dp_noise_channels = use_dp_noise_channels
         self.amortise_dp_params = amortise_dp_params
 
-        #if self.amortise_dp_params:
-        #    
+        # if self.amortise_dp_params:
+        #
         #    self.y_mlp = MLP(
         #        in_channels=1,
         #        hidden_channels=[20, 20, 1],
         #    )
-        #    
+        #
         #    self.t_mlp = MLP(
         #        in_channels=1,
         #        hidden_channels=[20, 20, 1],
@@ -218,20 +219,22 @@ class DPSetConv:
             B.log(y_bound), dtype=dtype, learnable=learnable
         )
 
-        self.logit_t = self.nn.Parameter(
-            0., dtype=dtype, learnable=learnable
-        )
-        
+        self.logit_t = self.nn.Parameter(0.0, dtype=dtype, learnable=learnable)
+
     def density_sigma(self, sens_per_sigma):
-        return 2 ** 0.5 / (sens_per_sigma * (1 - self.t(sens_per_sigma))**0.5)
-    
+        return 2**0.5 / (sens_per_sigma * (1 - self.t(sens_per_sigma)) ** 0.5)
+
     def value_sigma(self, sens_per_sigma):
-        return 2. * self.y_bound(sens_per_sigma) / (sens_per_sigma * self.t(sens_per_sigma)**0.5)
-      
-    # Correct: 
+        return (
+            2.0
+            * self.y_bound(sens_per_sigma)
+            / (sens_per_sigma * self.t(sens_per_sigma) ** 0.5)
+        )
+
+    # Correct:
     #     both_sigma = (2 + 4 * y_bound**2)**0.5 / sens_per_sigma
     #
-    # Also correct: 
+    # Also correct:
     #
     #     t in [0, 1]
     #
@@ -244,81 +247,116 @@ class DPSetConv:
     #
     #     density_sigma = 2**0.5 * density_sensitivity / sens_per_sigma = 2 / sens_per_sigma
     #     value_sigma = 2**0.5 * signal_sensitivity / sens_per_sigma = 2 * 2**0.5 * y_bound
-        
-    def t(self, sens_per_sigma):
 
+    def t(self, sens_per_sigma):
         if self.amortise_dp_params:
             # mu = 0.5 * sens_per_sigma**2.
             # return B.sigmoid(self.t_lin(mu[:, None])[:, 0])
-            return 0.5 + 0. * B.sigmoid(self.t_mlp(sens_per_sigma[:, None])[:, 0])
+            return 0.5 + 0.0 * B.sigmoid(self.t_mlp(sens_per_sigma[:, None])[:, 0])
 
         else:
-            return 0.5 + 0. * B.sigmoid(self.logit_t[None])
+            return 0.5 + 0.0 * B.sigmoid(self.logit_t[None])
 
-    
     def y_bound(self, sens_per_sigma):
-
         if self.amortise_dp_params:
             # mu = 0.5 * sens_per_sigma**2.
             # return B.exp(self.log_max_y_bound) * B.sigmoid(self.y_lin(mu[:, None])[:, 0])
-            return 2.0 + 0. * B.softplus(self.y_mlp(sens_per_sigma[:, None])[:, 0])
+            return 2.0 + 0.0 * B.softplus(self.y_mlp(sens_per_sigma[:, None])[:, 0])
 
         else:
-            return 2.0 + 0. * B.exp(self.log_y_bound[None])
+            return 2.0 + 0.0 * B.exp(self.log_y_bound[None])
 
-        
     def sample_noise(self, xz, z, x, sens_per_sigma):
-
         _x = B.transpose(x, [0, 2, 1])
-        
-        kernel = EQ().stretch(B.exp(self.log_scale))
-        
-        k = lambda tensor: kernel(tensor, tensor) + 1e-6 * B.eye(tensor.dtype, tensor.shape[-1])[None, :, :]
-        
-        noise = [B.sample(k(_x.double()))[:, None, :, 0] for i in range(z.shape[1])]
+
+        # kernel = EQ().stretch(B.exp(self.log_scale))
+        torch.set_default_dtype(torch.float64)
+        # import pdb
+
+        # pdb.set_trace()
+        kernel = gpytorch.kernels.RBFKernel().to(z.device)
+        # # kernel._lengthscale = self.log_scale.exp().double()
+        kernel.lengthscale = self.log_scale.exp().double()
+
+        # k = (
+        #     lambda tensor: kernel(tensor, tensor)
+        #     + 1e-6 * B.eye(tensor.dtype, tensor.shape[-1])[None, :, :]
+        # )
+        kxx = (
+            kernel(_x.double())
+            # + 1e-4 * B.eye(_x.dtype, _x.shape[-1])[None, :, :]
+        )
+        # p_noise = torch.distributions.MultivariateNormal(
+        #     loc=torch.zeros(*kxx.shape[:-1], device=kxx.device), scale_tril=kxx.cholesky()
+        # )
+        p_noise = gpytorch.distributions.MultivariateNormal(
+            mean=torch.zeros(*kxx.shape[:-1], device=kxx.device),
+            covariance_matrix=kxx,
+        )
+        noise = [p_noise.rsample()[:, None, :] for i in range(z.shape[1])]
         noise = B.cast(z.dtype, B.concat(*noise, axis=1))
-        
+
+        torch.set_default_dtype(z.dtype)
+
+        # noise = [B.sample(k(_x.double()))[:, None, :, 0] for i in range(z.shape[1])]
+        # noise = B.cast(z.dtype, B.concat(*noise, axis=1))
+
         num_channels = noise.shape[1]
 
         density_sigma = self.density_sigma(sens_per_sigma)
         value_sigma = self.value_sigma(sens_per_sigma)
 
-        density_noise = density_sigma[:, None, None] * noise[:, :num_channels//2, :]
-        value_noise = value_sigma[:, None, None] * noise[:, num_channels//2:, :]
-        
+        density_noise = density_sigma[:, None, None] * noise[:, : num_channels // 2, :]
+        value_noise = value_sigma[:, None, None] * noise[:, num_channels // 2 :, :]
+
         noise = B.concat(density_noise, value_noise, axis=1)
-    
+
         return noise, density_sigma, value_sigma
-    
+
     def clip_data_channel(self, tensor, sens_per_sigma):
-        
         num_channels = tensor.shape[1]
-        ones = B.ones(tensor.dtype, *(tensor[:, :num_channels//2, :].shape))
+        ones = B.ones(tensor.dtype, *(tensor[:, : num_channels // 2, :].shape))
 
-        kernel = tensor[:, :num_channels//2, :]
+        kernel = tensor[:, : num_channels // 2, :]
 
-        clipped_data = B.minimum(tensor[:, num_channels//2:, :], self.y_bound(sens_per_sigma)[:, None, None] * ones)
-        clipped_data = B.maximum(clipped_data, -self.y_bound(sens_per_sigma)[:, None, None] * ones)
-        
+        clipped_data = B.minimum(
+            tensor[:, num_channels // 2 :, :],
+            self.y_bound(sens_per_sigma)[:, None, None] * ones,
+        )
+        clipped_data = B.maximum(
+            clipped_data, -self.y_bound(sens_per_sigma)[:, None, None] * ones
+        )
+
         tensor = B.concat(kernel, clipped_data, axis=1)
-        
+
         return tensor
-    
+
     def sens_per_sigma(self, epsilon, delta):
+        sens_per_sigma = torch.tensor(
+            [
+                pa.find_sens_per_sigma(epsilon=e, delta_bound=d)
+                for e, d in zip(epsilon[:, 0], delta[:, 0])
+            ]
+        )
 
-        sens_per_sigma = torch.tensor([
-            pa.find_sens_per_sigma(epsilon=e, delta_bound=d) for e, d in zip(epsilon[:, 0], delta[:, 0])
-        ])
-        
         return sens_per_sigma
-        
 
-        
+
 @_dispatch
 @_batch_targets
-def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, *, epsilon: B.Numeric, delta: B.Numeric, **kw_args):
-
-    sens_per_sigma = coder.sens_per_sigma(epsilon, delta).to(xz.device)  # shape: (batch_size,)
+def code(
+    coder: DPSetConv,
+    xz: B.Numeric,
+    z: B.Numeric,
+    x: B.Numeric,
+    *,
+    epsilon: B.Numeric,
+    delta: B.Numeric,
+    **kw_args,
+):
+    sens_per_sigma = coder.sens_per_sigma(epsilon, delta).to(
+        xz.device
+    )  # shape: (batch_size,)
 
     density_data_channels = B.matmul(
         coder.clip_data_channel(z, sens_per_sigma),
@@ -326,9 +364,9 @@ def code(coder: DPSetConv, xz: B.Numeric, z: B.Numeric, x: B.Numeric, *, epsilon
     )
 
     noise, density_sigma, value_sigma = coder.sample_noise(xz, z, x, sens_per_sigma)
-    
+
     z = density_data_channels + noise
-   
+
     return x, z
 
 
