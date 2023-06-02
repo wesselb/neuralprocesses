@@ -46,6 +46,7 @@ def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_
         opt.step()
 
         summary_writer.add_scalar("train_step_loss", val, step)
+        summary_writer.add_scalar("train_step_scale", B.exp(model.encoder.coder[2][0].log_scale), step)
         step = step + 1
 
     vals = B.concat(*vals)
@@ -90,9 +91,9 @@ def eval(state, model, objective, gen, *, epoch, summary_writer):
             out.kv("KL (diag)", metrics["kl_diag"])
             
         #out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
-        summary_writer.add_scalar("val_loglik", np.mean(-vals), epoch)
-        summary_writer.add_scalar("val_kl_full", np.mean(kls), epoch)
-        summary_writer.add_scalar("val_kl_diag", np.mean(kls_diag), epoch)
+        summary_writer.add_scalar("val_epoch_loglik", np.mean(-vals), epoch)
+        summary_writer.add_scalar("val_epoch_kl_full", np.mean(kls), epoch)
+        summary_writer.add_scalar("val_epoch_kl_diag", np.mean(kls_diag), epoch)
 
         return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), metrics
 
@@ -285,6 +286,7 @@ def main(**kw_args):
         model_name = model_name + "n" if args.dp_use_noise_channels else model_name + "x"
         model_name = model_name + "a" if args.dp_amortise_params else model_name + "x"
         model_name = model_name + "_"
+        model_name = model_name + f"e-{args.encoder_scales:.3f}_"
         model_name = model_name + f"{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
         model_name = model_name + f"{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
 

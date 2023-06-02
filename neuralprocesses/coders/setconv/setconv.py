@@ -296,8 +296,6 @@ class DPSetConv:
         ones = B.ones(tensor.dtype, *(tensor[:, :num_channels//2, :].shape))
 
         kernel = tensor[:, :num_channels//2, :]
-        
-        assert torch.all(kernel == 1.)
 
         clipped_data = B.minimum(tensor[:, num_channels//2:, :], self.y_bound(sens_per_sigma)[:, None, None] * ones)
         clipped_data = B.maximum(clipped_data, -self.y_bound(sens_per_sigma)[:, None, None] * ones)
