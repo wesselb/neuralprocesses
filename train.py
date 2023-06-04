@@ -193,9 +193,9 @@ def main(**kw_args):
     parser.add_argument("--dp-log10-delta-max", type=float, default=-3.)
     parser.add_argument("--dp-y-bound", type=float, default=2.)
     parser.add_argument("--dp-t", type=float, default=0.5)
-    parser.add_argument("--dp-learn-params", default=False, type=bool)
-    parser.add_argument("--dp-amortise-params", default=False, type=bool)
-    parser.add_argument("--dp-use-noise-channels", default=False, type=bool)
+    parser.add_argument("--dp-learn-params", default=False, action="store_true")
+    parser.add_argument("--dp-amortise-params", default=False, action="store_true")
+    parser.add_argument("--dp-use-noise-channels", default=False, action="store_true")
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -302,7 +302,7 @@ def main(**kw_args):
 
     else:
         model_name = args.model
-    
+
     # Setup script.
     if not observe:
         out.report_time = True
