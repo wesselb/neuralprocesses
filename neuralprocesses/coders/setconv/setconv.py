@@ -480,11 +480,11 @@ def code(
 
         # Broadcast density and data sigmas to the same shape as z, except
         # for the last dimension, which is one for the density and data
-        density_sigma = density_sigma * B.ones(z.dtype, *(z.shape[:-1] + (1,)))
-        data_sigma = data_sigma * B.ones(z.dtype, *(z.shape[:-1] + (1,)))
+        density_sigma = density_sigma * B.ones(z.dtype, z.shape[0], 1, z.shape[2])
+        data_sigma = data_sigma * B.ones(z.dtype, z.shape[0], 1, z.shape[2])
 
         # Concatenate density and data sigmas to the output
-        z = B.concat(z, density_sigma, data_sigma, axis=-1)
+        z = B.concat(z, density_sigma, data_sigma, axis=1)
 
     return x, z
 
