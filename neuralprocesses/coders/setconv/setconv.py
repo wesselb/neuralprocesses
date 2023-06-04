@@ -193,9 +193,9 @@ class DPSetConv:
             scale (float): Initial value for the length scale.
             y_bound (float): Initial value for the y-bound DP parameter.
             t (float): Initial value for the t DP parameter.
-            learnable_scale (bool): Whether the length scale is learnable.
             dp_learn_params (bool): Whether to learn the DP parameters.
             dp_amortise_params (bool): Whether to amortise the DP parameters.
+            learnable_scale (bool): Whether the length scale is learnable.
             dp_use_noise_channels (bool): Whether to append noise std to output.
             dtype (dtype, optional): Data type for the DPSetConv.
         """
@@ -207,30 +207,33 @@ class DPSetConv:
         self.dp_use_noise_channels = dp_use_noise_channels
 
         # If amortising the DP parameeters, use a small MLP to learn them
-        if self.amortise_dp_params:
+        if self.dp_amortise_params:
 
-            assert dp_learn_params, "Must learn DP parameters if amortising them"
-    
             self.y_mlp = MLP(
                 in_channels=1,
-                hidden_channels=[20, 1],
+                hidden_channels=[20, 20, 1],
             )
     
             self.t_mlp = MLP(
                 in_channels=1,
-                hidden_channels=[20, 1],
+                hidden_channels=[20, 20, 1],
             )
 
         # If not amortising the DP parameters, use a single parameter for each,
         # set them to the given values and specify whether they are learnable
         else:
 
+            assert y_bound is not None and t is not None, (
+                f"Must specify y_bound and t if not amortising DP parameters, "
+                f"got {y_bound=} and {t=}."
+            )
+
             self.log_y_bound = self.nn.Parameter(
-                B.log(y_bound), dtype=dtype, learnable=dp_learn_params,
+                B.log(torch.tensor(y_bound)), dtype=dtype, learnable=dp_learn_params,
             )
 
             self.logit_t = self.nn.Parameter(
-                torch.logit(t), dtype=dtype, learnable=dp_learn_params,
+                torch.logit(torch.tensor(t)), dtype=dtype, learnable=dp_learn_params,
             )
 
         # Initialise the log-scale and specify whether it is learnable
@@ -473,7 +476,7 @@ def code(
     z = z + noise
 
     # If specified, concatenate density and data sigmas to the output
-    if coder.use_dp_noise_channels:
+    if coder.dp_use_noise_channels:
 
         # Broadcast density and data sigmas to the same shape as z, except
         # for the last dimension, which is one for the density and data

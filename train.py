@@ -101,7 +101,7 @@ def eval(state, model, objective, gen, *, epoch, summary_writer):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments-fixed"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
@@ -288,16 +288,16 @@ def main(**kw_args):
             dp_param_prefix = "a_"
 
         elif args.dp_learn_params:
-            dp_param_prefix = f"l-{args.encoder_scales:.2f}_"
+            dp_param_prefix = f"l-{args.dp_y_bound:.2f}-{args.dp_t}_"
 
         else:
-            dp_param_prefix = f"f-{args.encoder_scales:.2f}_"
+            dp_param_prefix = f"f-{args.dp_y_bound:.2f}-{args.dp_t}_"
 
         model_name = "dpconvcnp_"
         model_name = model_name + dp_param_prefix
-        model_name = model_name + f"nc_" if args.dp_use_noise_channels else ""
-        model_name = model_name + f"{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
-        model_name = model_name + f"{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
+        model_name = model_name + (f"nc_" if args.dp_use_noise_channels else "")
+        model_name = model_name + f"e-{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
+        model_name = model_name + f"d-{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
 
     else:
         model_name = args.model
@@ -366,7 +366,6 @@ def main(**kw_args):
         # the CNN architecture. We therefore set it to 64.
         "num_basis_functions": 64,
         "eeg_mode": args.eeg_mode,
-        "use_dp_noise_channels": args.dp_use_noise_channels,
         "dp_epsilon_range": dp_epsilon_range,
         "dp_log10_delta_range": dp_log10_delta_range,
         "min_log10_scale": args.min_log10_scale,
