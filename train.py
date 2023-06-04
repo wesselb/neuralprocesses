@@ -101,7 +101,7 @@ def eval(state, model, objective, gen, *, epoch, summary_writer):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments-dry-run"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_experiments-fixed"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
@@ -192,8 +192,10 @@ def main(**kw_args):
     parser.add_argument("--dp-log10-delta-min", type=float, default=-3.)
     parser.add_argument("--dp-log10-delta-max", type=float, default=-3.)
     parser.add_argument("--dp-y-bound", type=float, default=2.)
-    parser.add_argument("--dp-use-noise-channels", default=False, action="store_true")
+    parser.add_argument("--dp-t", type=float, default=0.5)
+    parser.add_argument("--dp-learn-params", default=False, action="store_true")
     parser.add_argument("--dp-amortise-params", default=False, action="store_true")
+    parser.add_argument("--dp-use-noise-channels", default=False, action="store_true")
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -282,11 +284,18 @@ def main(**kw_args):
         dp_epsilon_range = (args.dp_epsilon_min, args.dp_epsilon_max)
         dp_log10_delta_range = (args.dp_log10_delta_min, args.dp_log10_delta_max)
 
+        if args.dp_amortise_params:
+            dp_param_prefix = "a_"
+
+        elif args.dp_learn_params:
+            dp_param_prefix = f"l-{args.encoder_scales:.2f}_"
+
+        else:
+            dp_param_prefix = f"f-{args.encoder_scales:.2f}_"
+
         model_name = "dpconvcnp_"
-        model_name = model_name + "n" if args.dp_use_noise_channels else model_name + "x"
-        model_name = model_name + "a" if args.dp_amortise_params else model_name + "x"
-        model_name = model_name + "_"
-        model_name = model_name + f"e-{args.encoder_scales:.3f}_"
+        model_name = model_name + dp_param_prefix
+        model_name = model_name + f"nc_" if args.dp_use_noise_channels else ""
         model_name = model_name + f"{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
         model_name = model_name + f"{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
 
@@ -578,6 +587,7 @@ def main(**kw_args):
                 amortise_dp_params=args.dp_amortise_params,
                 use_dp_noise_channels=args.dp_use_noise_channels,
                 dp_y_bound=args.dp_y_bound,
+                dp_t=args.dp_t,
             )
         else:
             raise ValueError(f'Invalid model "{args.model}".')

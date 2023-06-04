@@ -43,9 +43,10 @@ def _convgnp_construct_encoder_setconvs(
     use_dp=False,
     amortise_dp_params=False,
     dp_y_bound=None,
+    dp_t=None,
     use_dp_noise_channels=False,
     init_factor=1,
-    encoder_scales_learnable=True,
+    learnable=True,
 ):
     # Initialise scale.
     if encoder_scales is not None:
@@ -63,10 +64,11 @@ def _convgnp_construct_encoder_setconvs(
                 nps.DPSetConv(
                     s,
                     y_bound=dp_y_bound,
+                    t=dp_t,
                     use_dp_noise_channels=use_dp_noise_channels,
                     amortise_dp_params=amortise_dp_params,
                     dtype=dtype,
-                    learnable=encoder_scales_learnable)
+                    learnable=learnable)
                 for s in encoder_scales
             )
         )
@@ -137,7 +139,7 @@ def construct_convgnp(
     dim_lv=0,
     lv_likelihood="het",
     encoder_scales=None,
-    encoder_scales_learnable=True,
+    learnable=True,
     decoder_scale=None,
     decoder_scale_learnable=True,
     aux_t_mlp_layers=(128,) * 3,
@@ -150,6 +152,7 @@ def construct_convgnp(
     amortise_dp_params=False,
     use_dp_noise_channels=True,
     dp_y_bound=None,
+    dp_t=None,
 ):
     """A Convolutional Gaussian Neural Process.
 
@@ -401,9 +404,10 @@ def construct_convgnp(
                     dtype,
                     use_dp=use_dp,
                     dp_y_bound=dp_y_bound,
+                    dp_t=dp_t,
                     amortise_dp_params=amortise_dp_params,
                     use_dp_noise_channels=use_dp_noise_channels,
-                    encoder_scales_learnable=encoder_scales_learnable,
+                    learnable=learnable,
                 ),
                 _convgnp_optional_division_by_density(nps, divide_by_density, epsilon),
                 nps.Concatenate(),
