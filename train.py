@@ -184,8 +184,8 @@ def main(**kw_args):
     parser.add_argument("--patch", type=str)
     parser.add_argument("--encoder-scales", type=float, default=None)
 
-    parser.add_argument("--min-log10-scale", type=float, default=np.log10(0.1))
-    parser.add_argument("--max-log10-scale", type=float, default=np.log10(5.0))
+    parser.add_argument("--min-scale", type=float)
+    parser.add_argument("--max-scale", type=float)
 
     parser.add_argument("--dp-epsilon-min", type=float, default=1.)
     parser.add_argument("--dp-epsilon-max", type=float, default=9.)
@@ -296,6 +296,7 @@ def main(**kw_args):
         model_name = "dpconvcnp_"
         model_name = model_name + dp_param_prefix
         model_name = model_name + (f"nc_" if args.dp_use_noise_channels else "")
+        model_name = model_name + f"s-{args.min_scale:.2f}-{args.max_scale:.2f}_"
         model_name = model_name + f"e-{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
         model_name = model_name + f"d-{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
 
@@ -368,8 +369,8 @@ def main(**kw_args):
         "eeg_mode": args.eeg_mode,
         "dp_epsilon_range": dp_epsilon_range,
         "dp_log10_delta_range": dp_log10_delta_range,
-        "min_log10_scale": args.min_log10_scale,
-        "max_log10_scale": args.max_log10_scale,
+        "min_log10_scale": np.log10(args.min_scale),
+        "max_log10_scale": np.log10(args.max_scale),
     }
 
     # Setup data generators for training and for evaluation.
