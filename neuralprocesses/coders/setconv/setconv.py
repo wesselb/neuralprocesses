@@ -294,6 +294,10 @@ class DPSetConv:
         Returns:
             torch.Tensor: t DP parameter.
         """
+
+        # Compute the t parameter: if this is amortised, it is a function of
+        # the sensitivity per sigma, otherwise it is a constant, and the
+        # sensitivity per sigma is ignored
         t = B.sigmoid(
             self.t_mlp(sens_per_sigma[:, None])[:, 0]
         ) if self.dp_amortise_params else B.sigmoid(self.logit_t[None])
@@ -312,6 +316,10 @@ class DPSetConv:
         Returns:
             torch.Tensor: y-bound DP parameter.
         """
+
+        # Compute the y-bound parameter: if this is amortised, it is a function
+        # of the sensitivity per sigma, otherwise it is a constant, and the
+        # sensitivity per sigma is ignored
         y_bound = B.exp(
             self.y_mlp(sens_per_sigma[:, None])[:, 0]
         ) if self.dp_amortise_params else B.exp(self.log_y_bound[None])
