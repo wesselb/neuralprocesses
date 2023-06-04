@@ -184,6 +184,7 @@ class DPSetConv:
         amortise_dp_params,
         learnable_scale,
         learnable_dp_params,
+        use_dp_noise_channels,
         dtype,
     ):
         """Initialise DPSetConv, a set convolution with a DP mechanism.
@@ -193,13 +194,17 @@ class DPSetConv:
             y_bound (float): Initial value for the y-bound DP parameter.
             t (float): Initial value for the t DP parameter.
             amortise_dp_params (bool): Whether to amortise the DP parameters.
-            learnable_scale (bool): Whether the SetConv length scale is learnable.
+            learnable_scale (bool): Whether the length scale is learnable.
             learnable_dp_params (bool): Whether the DP parameters are learnable.
+            use_dp_noise_channels (bool): Whether to append noise std to output.
             dtype (dtype, optional): Data type for the DPSetConv.
         """
 
         # Whether to amortise the y_bound and t DP parameters
         self.amortise_dp_params = amortise_dp_params
+
+        # Whether to append the density and data channel noise std to the output
+        self.use_dp_noise_channels = use_dp_noise_channels
 
         # If amortising the DP parameeters, use a small MLP to learn them
         if self.amortise_dp_params:
@@ -233,6 +238,7 @@ class DPSetConv:
             B.log(scale), dtype=dtype, learnable=learnable_scale,
         )
 
+
     def density_sigma(self, sens_per_sigma):
         """Compuete the density noise sigma for a given sensitivity per sigma.
 
@@ -243,6 +249,7 @@ class DPSetConv:
             torch.Tensor: Density channel noise sigma.
         """
         return 2**0.5 / (sens_per_sigma * (1 - self.t(sens_per_sigma)) ** 0.5)
+
 
     def data_sigma(self, sens_per_sigma):
         """Compuete the data noise sigma for a given sensitivity per sigma.
@@ -277,65 +284,133 @@ class DPSetConv:
     #     data_sigma = 2**0.5 * signal_sensitivity / sens_per_sigma = 2 * 2**0.5 * y_bound
 
     def t(self, sens_per_sigma):
+        """Compute the t DP parameter for a given sensitivity per sigma. The
+        t parameter determines how the total noise level is split between the
+        density and data channels.
+
+        Arguments:
+            sens_per_sigma (torch.Tensor): Sensitivity per sigma.
+
+        Returns:
+            torch.Tensor: t DP parameter.
+        """
         t = B.sigmoid(
             self.t_mlp(sens_per_sigma[:, None])[:, 0]
         ) if self.amortise_dp_params else B.sigmoid(self.logit_t[None])
 
         return 1e-2 + (1 - 2e-2) * t
 
+
     def y_bound(self, sens_per_sigma):
+        """Compute the y-bound DP parameter for a given sensitivity per sigma.
+        The y-bound parameter determines the maximum value of the data channel,
+        i.e. it is threshold value with which the datapoint values are clipped.
+
+        Arguments:
+            sens_per_sigma (torch.Tensor): Sensitivity per sigma.
+
+        Returns:
+            torch.Tensor: y-bound DP parameter.
+        """
         y_bound = B.exp(
             self.y_mlp(sens_per_sigma[:, None])[:, 0]
         ) if self.amortise_dp_params else B.exp(self.log_y_bound[None])
 
         return 1e-3 + y_bound
 
-    def sample_noise(self, z, x, sens_per_sigma):
-        _x = B.transpose(x, [0, 2, 1])
 
+    def sample_noise(self, x, sens_per_sigma, num_channels):
+        """Sample EQ-GP noise for the density and data channels. The lengthscale
+        of the EQ-GP is the same as the scale of the EQ basis function used in
+        the density and data channels.
+
+        Arguments:
+            x (torch.Tensor): Input to the SetConv.
+            sens_per_sigma (torch.Tensor): Sensitivity per sigma.
+            num_channels (int): Number of channels (density + data channels).
+
+        Returns:
+            torch.Tensor: Sampled noise.
+        """
+
+        # Transpose x so that the x-dimensions are the last dimensions
+        xT = B.transpose(x, [0, 2, 1])
+
+        # Use double precision for sampling the noise
         torch.set_default_dtype(torch.float64)
 
-        kernel = gpytorch.kernels.RBFKernel().to(z.device)
+        # Initialise the EQ kernel and set its lengthscale
+        kernel = gpytorch.kernels.RBFKernel().to(x.device)
         kernel.lengthscale = self.log_scale.exp().double()
 
-        kxx = kernel(_x.double()) + 1e-6 * B.eye(_x.dtype, _x.shape[-1])[None, :, :]
+        # Compute the covariance matrix of the EQ-GP
+        kxx = kernel(xT.double()) + 1e-6 * B.eye(xT.dtype, xT.shape[-1])[None, :, :]
+
+        # Set noise distribution
         p_noise = gpytorch.distributions.MultivariateNormal(
             mean=torch.zeros(*kxx.shape[:-1], device=kxx.device),
             covariance_matrix=kxx,
         )
-        noise = [p_noise.rsample()[:, None, :] for _ in range(z.shape[1])]
-        noise = B.cast(z.dtype, B.concat(*noise, axis=1))
 
-        torch.set_default_dtype(z.dtype)
+        # Sample noise for each channel separately and concatenate
+        noise = [p_noise.rsample()[:, None, :] for _ in range(num_channels)]
+        noise = B.cast(x.dtype, B.concat(*noise, axis=1))
 
-        num_channels = noise.shape[1]
+        # Reset the default dtype to the original setting
+        torch.set_default_dtype(x.dtype)
 
-        density_noise = self.density_sigma(sens_per_sigma)[:, None, None] * noise[:, : num_channels // 2, :]
-        data_noise = self.data_sigma(sens_per_sigma)[:, None, None] * noise[:, num_channels // 2 :, :]
+        # Compute the noise sigma for the density and data channels
+        density_sigma = self.density_sigma(sens_per_sigma=sens_per_sigma)[:, None, None]
+        density_noise = density_sigma * noise[:, : num_channels // 2, :]
 
+        data_sigma = self.data_sigma(sens_per_sigma=sens_per_sigma)[:, None, None]
+        data_noise = data_sigma * noise[:, num_channels // 2 :, :]
+
+        # Concatenate the density and data channel noise
         noise = B.concat(density_noise, data_noise, axis=1)
 
-        return noise
+        return noise, density_sigma, data_sigma
 
-    def clip_data_channel(self, tensor, sens_per_sigma):
-        num_channels = tensor.shape[1]
-        ones = B.ones(tensor.dtype, *(tensor[:, : num_channels // 2, :].shape))
 
-        kernel = tensor[:, : num_channels // 2, :]
+    def clip_data(self, z, sens_per_sigma):
+        """Clip the data channel values to the y-bound DP parameter.
 
-        clipped_data = B.minimum(
-            tensor[:, num_channels // 2 :, :],
-            self.y_bound(sens_per_sigma)[:, None, None] * ones,
-        )
-        clipped_data = B.maximum(
-            clipped_data, -self.y_bound(sens_per_sigma)[:, None, None] * ones
-        )
+        Arguments:
+            tensor (torch.Tensor): Input to the SetConv.
+        """
 
-        tensor = B.concat(kernel, clipped_data, axis=1)
+        # Get the number of channels
+        num_channels = z.shape[1]
 
-        return tensor
+        # Compute clipping threshold y_bound: if this is amortised, it is a
+        # function of the sensitivity per sigma, otherwise it is a constant,
+        # and the sensitivity per sigma is ignored
+        threshold = self.y_bound(
+            sens_per_sigma=sens_per_sigma,
+        )[:, None, None] * B.ones(z.dtype, *(z[:, : num_channels // 2, :].shape))
+
+        # Threshold data from aboeve and then from below
+        clipped_data = B.minimum(z[:, num_channels // 2 :, :], threshold)
+        clipped_data = B.maximum(clipped_data, -threshold)
+        
+        # Concatenate the density with the clipped data
+        z = B.concat(z[:, : num_channels // 2, :], clipped_data, axis=1)
+
+        return z
 
     def sens_per_sigma(self, epsilon, delta):
+        """Compute the sensitivity per sigma for a given epsilon and delta,
+        using the privacy accounting module.
+
+        Arguments:
+            epsilon (torch.Tensor): Epsilon.
+            delta (torch.Tensor): Delta.
+
+        Returns:
+            torch.Tensor: Sensitivity per sigma.
+        """
+
+        # Compute the sensitivity per sigma for each task in the batch
         sens_per_sigma = torch.tensor(
             [
                 pa.find_sens_per_sigma(epsilon=e, delta_bound=d)
@@ -358,16 +433,40 @@ def code(
     delta: B.Numeric,
     **kw_args,
 ):
+
+    # Compute the sensitivity per sigma for the given epsilon and delta.
+    # Note: each task in the batch may have different epsilon and delta.
     sens_per_sigma = coder.sens_per_sigma(epsilon, delta).to(
         xz.device
     )  # shape: (batch_size,)
 
-    density_data_channels = B.matmul(
-        coder.clip_data_channel(z, sens_per_sigma),
+    # Clip the data channel values to the y-bound DP parameter, and apply
+    # the SetConv to the clipped data.
+    z = B.matmul(
+        coder.clip_data(z, sens_per_sigma),
         compute_weights(coder, xz, x),
     )
 
-    z = density_data_channels + coder.sample_noise(z, x, sens_per_sigma)
+    # Sample noise for the density and data channels
+    noise, density_sigma, data_sigma =  coder.sample_noise(
+        x=x,
+        sens_per_sigma=sens_per_sigma,
+        num_channels=z.shape[1],
+    )
+
+    # Add noise to the density and data channels
+    z = z + noise
+
+    # If specified, concatenate density and data sigmas to the output
+    if coder.use_dp_noise_channels:
+
+        # Broadcast density and data sigmas to the same shape as z, except
+        # for the last dimension, which is one for the density and data
+        density_sigma = density_sigma * B.ones(z.dtype, *(z.shape[:-1] + (1,)))
+        data_sigma = data_sigma * B.ones(z.dtype, *(z.shape[:-1] + (1,)))
+
+        # Concatenate density and data sigmas to the output
+        z = B.concat(z, density_sigma, data_sigma, axis=-1)
 
     return x, z
 
