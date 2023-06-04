@@ -40,13 +40,14 @@ def _convgnp_construct_encoder_setconvs(
     dim_yc,
     disc,
     dtype=None,
+    learnable_scale=True,
     use_dp=False,
-    amortise_dp_params=False,
+    dp_learn_params=True,
+    dp_amortise_params=True,
+    dp_use_noise_channels=False,
     dp_y_bound=None,
     dp_t=None,
-    use_dp_noise_channels=False,
     init_factor=1,
-    learnable=True,
 ):
     # Initialise scale.
     if encoder_scales is not None:
@@ -65,10 +66,12 @@ def _convgnp_construct_encoder_setconvs(
                     s,
                     y_bound=dp_y_bound,
                     t=dp_t,
-                    use_dp_noise_channels=use_dp_noise_channels,
-                    amortise_dp_params=amortise_dp_params,
+                    dp_learn_params=dp_learn_params,
+                    dp_amortise_params=dp_amortise_params,
+                    learnable_scale=learnable_scale,
+                    dp_use_noise_channels=dp_use_noise_channels,
                     dtype=dtype,
-                    learnable=learnable)
+                )
                 for s in encoder_scales
             )
         )
@@ -77,7 +80,7 @@ def _convgnp_construct_encoder_setconvs(
         # Construct set convs.
         return nps.Parallel(
             *(
-                nps.SetConv(s, dtype=dtype, learnable=encoder_scales_learnable)
+                nps.SetConv(s, dtype=dtype, learnable=learnable_scale)
                 for s in encoder_scales
             )
         )
@@ -139,7 +142,7 @@ def construct_convgnp(
     dim_lv=0,
     lv_likelihood="het",
     encoder_scales=None,
-    learnable=True,
+    encoder_scale_learnable=True,
     decoder_scale=None,
     decoder_scale_learnable=True,
     aux_t_mlp_layers=(128,) * 3,
@@ -149,8 +152,9 @@ def construct_convgnp(
     dtype=None,
     nps=nps,
     use_dp=False,
-    amortise_dp_params=False,
-    use_dp_noise_channels=True,
+    dp_learn_params=True,
+    dp_amortise_params=False,
+    dp_use_noise_channels=True,
     dp_y_bound=None,
     dp_t=None,
 ):
@@ -303,7 +307,7 @@ def construct_convgnp(
         in_channels = dim_lv
         out_channels = conv_out_channels  # These must be equal!
     else:
-        in_channels = 2 * conv_in_channels if use_dp and use_dp_noise_channels else conv_in_channels
+        in_channels = 2 * conv_in_channels if use_dp and dp_use_noise_channels else conv_in_channels
         out_channels = conv_out_channels  # These must be equal!
     if "unet" in conv_arch:
         if dim_lv > 0:
@@ -403,11 +407,12 @@ def construct_convgnp(
                     disc,
                     dtype,
                     use_dp=use_dp,
+                    learnable_scale=encoder_scale_learnable,
+                    dp_learn_params=dp_learn_params,
+                    dp_amortise_params=dp_amortise_params,
+                    dp_use_noise_channels=dp_use_noise_channels,
                     dp_y_bound=dp_y_bound,
                     dp_t=dp_t,
-                    amortise_dp_params=amortise_dp_params,
-                    use_dp_noise_channels=use_dp_noise_channels,
-                    learnable=learnable,
                 ),
                 _convgnp_optional_division_by_density(nps, divide_by_density, epsilon),
                 nps.Concatenate(),

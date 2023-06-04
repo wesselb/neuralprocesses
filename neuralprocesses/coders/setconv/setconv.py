@@ -181,10 +181,10 @@ class DPSetConv:
         scale,
         y_bound,
         t,
-        amortise_dp_params,
+        dp_learn_params,
+        dp_amortise_params,
         learnable_scale,
-        learnable_dp_params,
-        use_dp_noise_channels,
+        dp_use_noise_channels,
         dtype,
     ):
         """Initialise DPSetConv, a set convolution with a DP mechanism.
@@ -193,23 +193,23 @@ class DPSetConv:
             scale (float): Initial value for the length scale.
             y_bound (float): Initial value for the y-bound DP parameter.
             t (float): Initial value for the t DP parameter.
-            amortise_dp_params (bool): Whether to amortise the DP parameters.
             learnable_scale (bool): Whether the length scale is learnable.
-            learnable_dp_params (bool): Whether the DP parameters are learnable.
-            use_dp_noise_channels (bool): Whether to append noise std to output.
+            dp_learn_params (bool): Whether to learn the DP parameters.
+            dp_amortise_params (bool): Whether to amortise the DP parameters.
+            dp_use_noise_channels (bool): Whether to append noise std to output.
             dtype (dtype, optional): Data type for the DPSetConv.
         """
 
         # Whether to amortise the y_bound and t DP parameters
-        self.amortise_dp_params = amortise_dp_params
+        self.dp_amortise_params = dp_amortise_params
 
         # Whether to append the density and data channel noise std to the output
-        self.use_dp_noise_channels = use_dp_noise_channels
+        self.dp_use_noise_channels = dp_use_noise_channels
 
         # If amortising the DP parameeters, use a small MLP to learn them
         if self.amortise_dp_params:
 
-            assert learnable_dp_params
+            assert dp_learn_params, "Must learn DP parameters if amortising them"
     
             self.y_mlp = MLP(
                 in_channels=1,
@@ -226,11 +226,11 @@ class DPSetConv:
         else:
 
             self.log_y_bound = self.nn.Parameter(
-                B.log(y_bound), dtype=dtype, learnable=learnable_dp_params,
+                B.log(y_bound), dtype=dtype, learnable=dp_learn_params,
             )
 
             self.logit_t = self.nn.Parameter(
-                torch.logit(t), dtype=dtype, learnable=learnable_dp_params,
+                torch.logit(t), dtype=dtype, learnable=dp_learn_params,
             )
 
         # Initialise the log-scale and specify whether it is learnable
@@ -296,7 +296,7 @@ class DPSetConv:
         """
         t = B.sigmoid(
             self.t_mlp(sens_per_sigma[:, None])[:, 0]
-        ) if self.amortise_dp_params else B.sigmoid(self.logit_t[None])
+        ) if self.dp_amortise_params else B.sigmoid(self.logit_t[None])
 
         return 1e-2 + (1 - 2e-2) * t
 
@@ -314,7 +314,7 @@ class DPSetConv:
         """
         y_bound = B.exp(
             self.y_mlp(sens_per_sigma[:, None])[:, 0]
-        ) if self.amortise_dp_params else B.exp(self.log_y_bound[None])
+        ) if self.dp_amortise_params else B.exp(self.log_y_bound[None])
 
         return 1e-3 + y_bound
 
@@ -344,7 +344,10 @@ class DPSetConv:
         kernel.lengthscale = self.log_scale.exp().double()
 
         # Compute the covariance matrix of the EQ-GP
-        kxx = kernel(xT.double()) + 1e-6 * B.eye(xT.dtype, xT.shape[-1])[None, :, :]
+        kxx = kernel(xT.double()) + 1e-6 * B.eye(
+            xT.dtype,
+            xT.shape[-1],
+        )[None, :, :]
 
         # Set noise distribution
         p_noise = gpytorch.distributions.MultivariateNormal(
@@ -360,10 +363,14 @@ class DPSetConv:
         torch.set_default_dtype(x.dtype)
 
         # Compute the noise sigma for the density and data channels
-        density_sigma = self.density_sigma(sens_per_sigma=sens_per_sigma)[:, None, None]
+        density_sigma = self.density_sigma(
+            sens_per_sigma=sens_per_sigma,
+        )[:, None, None]
         density_noise = density_sigma * noise[:, : num_channels // 2, :]
 
-        data_sigma = self.data_sigma(sens_per_sigma=sens_per_sigma)[:, None, None]
+        data_sigma = self.data_sigma(
+            sens_per_sigma=sens_per_sigma,
+        )[:, None, None]
         data_noise = data_sigma * noise[:, num_channels // 2 :, :]
 
         # Concatenate the density and data channel noise

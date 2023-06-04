@@ -584,8 +584,9 @@ def main(**kw_args):
                 transform=config["transform"],
                 divide_by_density=False,
                 use_dp=True,
-                amortise_dp_params=args.dp_amortise_params,
-                use_dp_noise_channels=args.dp_use_noise_channels,
+                dp_learn_params=args.dp_learn_params,
+                dp_amortise_params=args.dp_amortise_params,
+                dp_use_noise_channels=args.dp_use_noise_channels,
                 dp_y_bound=args.dp_y_bound,
                 dp_t=args.dp_t,
             )
