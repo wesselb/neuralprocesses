@@ -71,10 +71,10 @@ def construct_predefined_gens(
         name: GPGenerator(
             dtype,
             seed=seed,
-            noise=1e-6,
+            noise=0.05**2.,
             kernel=kernel,
-            num_context=UniformDiscrete(0, 30 * dim_x),
-            num_target=UniformDiscrete(500, 500),
+            num_context=UniformDiscrete(4, 8),
+            num_target=UniformDiscrete(200, 200),
             pred_logpdf=pred_logpdf,
             pred_logpdf_diag=pred_logpdf_diag,
             **config,

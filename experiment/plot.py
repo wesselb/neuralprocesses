@@ -52,69 +52,76 @@ def visualise_1d(model, gen, *, path, config, predict):
             ),
         )
 
-    plt.figure(figsize=(8, 6 * config["dim_y"]))
+    eps_noise = B.to_active_device(torch.randn(len(x), 1)).double()
 
-    for i in range(config["dim_y"]):
-        plt.subplot(config["dim_y"], 1, 1 + i)
+    for j in [0, 1, 2]:
+        plt.figure(figsize=(8, 6 * config["dim_y"]))
 
-        # Plot context and target.
-        plt.scatter(
-            nps.batch_xc(batch, i)[0, 0],
-            nps.batch_yc(batch, i)[0],
-            label="Context",
-            style="train",
-            s=40,
-        )
+        for i in range(config["dim_y"]):
+            plt.subplot(config["dim_y"], 1, 1 + i)
 
-        # Plot prediction.
-        err = 1.96 * B.sqrt(var[i][0, 0])
-        plt.plot(
-            x,
-            mean[i][0, 0],
-            label="Prediction",
-            style="pred",
-        )
-        plt.fill_between(
-            x,
-            mean[i][0, 0] - err,
-            mean[i][0, 0] + err,
-            style="pred",
-        )
-        plt.plot(
-            x,
-            B.transpose(samples[i][:10, 0, 0]),
-            style="pred",
-            ls="-",
-            lw=0.5,
-        )
+            # Plot context and target.
+            plt.scatter(
+                nps.batch_xc(batch, i)[0, 0],
+                nps.batch_yc(batch, i)[0],
+                label="Context",
+                style="train",
+                s=40,
+            )
 
-        # Plot prediction by ground truth.
-        if hasattr(gen, "kernel") and config["dim_y"] == 1:
-            f = stheno.GP(gen.kernel)
-            # Make sure that everything is of `float64`s and on the GPU.
-            noise = B.to_active_device(B.cast(torch.float64, gen.noise))
-            xc = B.to_active_device(B.cast(torch.float64, nps.batch_xc(batch, 0)[0, 0]))
-            yc = B.to_active_device(B.cast(torch.float64, nps.batch_yc(batch, 0)[0]))
-            x = B.to_active_device(B.cast(torch.float64, x))
-            # Compute posterior GP.
-            f_post = f | (f(xc, noise), yc)
-            kxx = f_post.kernel(x).mat + 1e-6 * B.to_active_device(B.eye(B.dtype(x), len(x)))
-            kxx_chol = torch.linalg.cholesky(torch.tensor(kxx)).double()
-            sample = torch.matmul(kxx_chol, B.to_active_device(torch.randn(len(x), 1)).double())
-            sample = f_post.mean(x) + sample
+            # Plot prediction.
+            if j > 0:
+                err = 1.96 * B.sqrt(var[i][0, 0])
+                plt.plot(
+                    x,
+                    mean[i][0, 0],
+                    label="Prediction",
+                    style="pred",
+                )
+                plt.fill_between(
+                    x,
+                    mean[i][0, 0] - err,
+                    mean[i][0, 0] + err,
+                    style="pred",
+                )
+                plt.plot(
+                    x,
+                    B.transpose(samples[i][:10, 0, 0]),
+                    style="pred",
+                    ls="-",
+                    lw=0.5,
+                )
 
-            plt.plot(x, sample[:, 0], ls="--", lw=1.0, color="k")
-            plt.plot(x, f_post.mean(x)[:, 0], ls="-", lw=1.0, color="k")
-            plt.plot(x, f_post.mean(x)[:, 0] + 2. * f_post.kernel(x).diagonal() ** 0.5, ls="-", lw=1.0, color="k")
-            plt.plot(x, f_post.mean(x)[:, 0] - 2. * f_post.kernel(x).diagonal() ** 0.5, ls="-", lw=1.0, color="k")
+            # Plot prediction by ground truth.
+            if hasattr(gen, "kernel") and config["dim_y"] == 1:
+                f = stheno.GP(gen.kernel)
+                # Make sure that everything is of `float64`s and on the GPU.
+                noise = B.to_active_device(B.cast(torch.float64, gen.noise))
+                xc = B.to_active_device(B.cast(torch.float64, nps.batch_xc(batch, 0)[0, 0]))
+                yc = B.to_active_device(B.cast(torch.float64, nps.batch_yc(batch, 0)[0]))
+                x = B.to_active_device(B.cast(torch.float64, x))
+                # Compute posterior GP.
+                f_post = f | (f(xc, noise), yc)
+                kxx = f_post.kernel(x).mat + 1e-6 * B.to_active_device(B.eye(B.dtype(x), len(x)))
+                kxx_chol = torch.linalg.cholesky(torch.tensor(kxx)).double()
+                sample = torch.matmul(kxx_chol, eps_noise)
+                sample = f_post.mean(x) + sample
 
-        plt.xlim(B.min(x), B.max(x))
-        plt.axis("off")
-        #tweak()
+                plt.plot(x, sample[:, 0], ls="--", lw=1.0, color="k")
 
-    plt.tight_layout()
-    plt.savefig(path, bbox_inches="tight")
-    plt.close()
+                if j == 2:
+                    plt.plot(x, f_post.mean(x)[:, 0], ls="-", lw=1.0, color="k")
+                    plt.plot(x, f_post.mean(x)[:, 0] + 2. * f_post.kernel(x).diagonal() ** 0.5, ls="-", lw=1.0, color="k")
+                    plt.plot(x, f_post.mean(x)[:, 0] - 2. * f_post.kernel(x).diagonal() ** 0.5, ls="-", lw=1.0, color="k")
+
+            plt.xlim(B.min(x), B.max(x))
+            plt.axis("off")
+            plt.ylim([-3.0, 3.0])
+            #tweak()
+
+        plt.tight_layout()
+        plt.savefig(f"{path}-{j}.pdf", bbox_inches="tight")
+        plt.close()
 
 
 def visualise_2d(model, gen, *, path, config, predict):

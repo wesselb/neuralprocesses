@@ -738,7 +738,7 @@ def main(**kw_args):
                     exp.visualise(
                         model,
                         gen,
-                        path=wd.file(f"train-epoch-{i + 1:03d}-{j + 1}.pdf"),
+                        path=wd.file(f"train-epoch-{i + 1:03d}-{j + 1}"),
                         config=config,
                     )
 
