@@ -22,31 +22,58 @@ __all__ = ["main"]
 warnings.filterwarnings("ignore", category=ToDenseWarning)
 
 
-def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_writer):
+def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_writer, num_forward=1):
     """Train for an epoch."""
+
+    NUM_STEPS_PER_GRAD_BIN = 1000
+    scale_param_grads = []
 
     vals = []
     for batch in gen.epoch():
-        state, obj = objective(
-            state,
-            model,
-            batch["contexts"],
-            batch["xt"],
-            batch["yt"],
-            epsilon=batch["epsilon"],
-            delta=batch["delta"],
-            fix_noise=fix_noise,
-        )
-        vals.append(B.to_numpy(obj))
-        # Be sure to negate the output of `objective`.
-        val = -B.mean(obj)
         opt.zero_grad(set_to_none=True)
-        val.backward()
+        losses_logging = []
+        for _ in range(num_forward):
+            state, forward_obj = objective(
+                state,
+                model,
+                batch["contexts"],
+                batch["xt"],
+                batch["yt"],
+                epsilon=batch["epsilon"],
+                delta=batch["delta"],
+                fix_noise=fix_noise,
+            )
+            forward_obj = - B.mean(forward_obj / num_forward)
+            forward_obj.backward()
+            vals.append(B.to_numpy(forward_obj)[None])
+            losses_logging.append(B.to_numpy(forward_obj))
         #out.kv("Encoder grad scale       ", model.encoder.coder[1][0].log_scale.grad)
         opt.step()
 
-        summary_writer.add_scalar("train_step_loss", val, step)
+        scale_param_grad = model.encoder.coder[2][0]._log_scale.grad
+        scale_param_grads.append(scale_param_grad)
+
+        summary_writer.add_scalar("train_step_loss", np.sum(losses_logging), step)
         summary_writer.add_scalar("train_step_scale", B.exp(model.encoder.coder[2][0].log_scale), step)
+        summary_writer.add_scalar("train_step_scale_param_grad", scale_param_grad, step)
+
+        if len(scale_param_grads) >= NUM_STEPS_PER_GRAD_BIN:
+            summary_writer.add_scalar(
+                f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_var",
+                torch.var(torch.tensor(scale_param_grads)),
+                step,
+            )
+            summary_writer.add_scalar(
+                f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_stddev",
+                torch.var(torch.tensor(scale_param_grads))**0.5,
+                step,
+            )
+            summary_writer.add_scalar(
+                f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_mean",
+                torch.mean(torch.tensor(scale_param_grads)),
+                step,
+            )
+            scale_param_grads = []
         step = step + 1
 
     vals = B.concat(*vals)
@@ -101,7 +128,7 @@ def eval(state, model, objective, gen, *, epoch, summary_writer):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_experiments_scratch"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
@@ -187,6 +214,8 @@ def main(**kw_args):
     parser.add_argument("--min-scale", type=float)
     parser.add_argument("--max-scale", type=float)
 
+    parser.add_argument("--prefix", type=str, default=None)
+    parser.add_argument("--num-forward", type=int, default=1)
     parser.add_argument("--dp-epsilon-min", type=float, default=1.)
     parser.add_argument("--dp-epsilon-max", type=float, default=9.)
     parser.add_argument("--dp-log10-delta-min", type=float, default=-3.)
@@ -293,7 +322,7 @@ def main(**kw_args):
         else:
             dp_param_prefix = f"f-{args.dp_y_bound:.2f}-{args.dp_t}_"
 
-        model_name = "dpconvcnp_"
+        model_name = args.prefix + "_dpconvcnp_"
         model_name = model_name + dp_param_prefix
         model_name = model_name + (f"nc_" if args.dp_use_noise_channels else "")
         model_name = model_name + f"s-{args.min_scale:.2f}-{args.max_scale:.2f}_"
@@ -767,7 +796,15 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
-        opt = torch.optim.Adam(model.parameters(), args.rate)
+        encoder_scale_param = model.encoder.coder[2][0]._log_scale
+        model_params = [param for param in model.parameters() if param is not encoder_scale_param]
+        opt = torch.optim.SGD(
+            [
+                {"params": model_params}, 
+                {"params": encoder_scale_param, "lr": args.rate / 20.}
+            ],
+            args.rate,
+        )
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
@@ -807,6 +844,7 @@ def main(**kw_args):
                     epoch=i,
                     step=step,
                     summary_writer=summary_writer,
+                    num_forward=args.num_forward,
                 )
 
                 # The epoch is done. Now evaluate.

@@ -237,7 +237,7 @@ class DPSetConv:
             )
 
         # Initialise the log-scale and specify whether it is learnable
-        self.log_scale = self.nn.Parameter(
+        self._log_scale = self.nn.Parameter(
             B.log(scale), dtype=dtype, learnable=learnable_scale,
         )
 
@@ -330,6 +330,13 @@ class DPSetConv:
         return 1e-3 + y_bound
 
 
+    @property
+    def log_scale(self):
+        """Return the length scale of the SetConv."""
+
+        return torch.log(self._log_scale.exp() + 2. / 32.)
+
+
     def sample_noise(self, x, sens_per_sigma, num_channels):
         """Sample EQ-GP noise for the density and data channels. The lengthscale
         of the EQ-GP is the same as the scale of the EQ basis function used in
@@ -344,34 +351,48 @@ class DPSetConv:
             torch.Tensor: Sampled noise.
         """
 
-        # Transpose x so that the x-dimensions are the last dimensions
-        xT = B.transpose(x, [0, 2, 1])
+        ## Transpose x so that the x-dimensions are the last dimensions
+        #xT = B.transpose(x, [0, 2, 1])
 
-        # Use double precision for sampling the noise
-        torch.set_default_dtype(torch.float64)
+        ## Use double precision for sampling the noise
+        #torch.set_default_dtype(torch.float64)
 
-        # Initialise the EQ kernel and set its lengthscale
-        kernel = gpytorch.kernels.RBFKernel().to(x.device)
-        kernel.lengthscale = self.log_scale.exp().double()
+        ## Initialise the EQ kernel and set its lengthscale
+        #kernel = gpytorch.kernels.RBFKernel().to(x.device)
+        #kernel.lengthscale = self.log_scale.exp().double()
 
         # Compute the covariance matrix of the EQ-GP
-        kxx = kernel(xT.double()) + 1e-6 * B.eye(
-            xT.dtype,
-            xT.shape[-1],
+        #kxx = kernel(xT.double())
+
+        kxx = torch.exp(
+            -0.5 * torch.sum(
+                (x[:, :, None, :].double() - x[:, :, :, None].double())**2.,
+                dim=1,
+            ) / torch.exp(self.log_scale).double()**2.
+        ) 
+
+        kxx = kxx + 1e-3 * B.eye(
+            x.dtype,
+            x.shape[-1],
         )[None, :, :]
 
-        # Set noise distribution
-        p_noise = gpytorch.distributions.MultivariateNormal(
-            mean=torch.zeros(*kxx.shape[:-1], device=kxx.device),
-            covariance_matrix=kxx,
-        )
+        kxx_chol = torch.linalg.cholesky(kxx)
 
-        # Sample noise for each channel separately and concatenate
-        noise = [p_noise.rsample()[:, None, :] for _ in range(num_channels)]
-        noise = B.cast(x.dtype, B.concat(*noise, axis=1))
+        ## Set noise distribution
+        #p_noise = gpytorch.distributions.MultivariateNormal(
+        #    mean=torch.zeros(*kxx.shape[:-1], device=kxx.device),
+        #    covariance_matrix=kxx,
+        #)
 
-        # Reset the default dtype to the original setting
-        torch.set_default_dtype(x.dtype)
+        ## Sample noise for each channel separately and concatenate
+        #noise = [p_noise.rsample()[:, None, :] for _ in range(num_channels)]
+        #noise = B.cast(x.dtype, B.concat(*noise, axis=1))
+        noise_shape = (x.shape[0], num_channels, x.shape[2])
+        noise = torch.randn(*noise_shape, device=x.device, dtype=kxx.dtype)
+        noise = torch.einsum("bnm, bcm -> bcn", kxx_chol, noise).float()
+
+        ## Reset the default dtype to the original setting
+        #torch.set_default_dtype(x.dtype)
 
         # Compute the noise sigma for the density and data channels
         density_sigma = self.density_sigma(
@@ -461,7 +482,7 @@ def code(
     # Clip the data channel values to the y-bound DP parameter, and apply
     # the SetConv to the clipped data.
     z = B.matmul(
-        coder.clip_data(z, sens_per_sigma),
+        z, # coder.clip_data(z, sens_per_sigma),
         compute_weights(coder, xz, x),
     )
 
