@@ -63,15 +63,7 @@ def visualise_1d(model, gen, *, path, config, predict):
             nps.batch_yc(batch, i)[0],
             label="Context",
             style="train",
-            s=20,
-        )
-
-        plt.scatter(
-            nps.batch_xt(batch, i)[0, 0],
-            nps.batch_yt(batch, i)[0],
-            label="Target",
-            style="test",
-            s=20,
+            s=40,
         )
 
         # Plot prediction.
@@ -101,23 +93,27 @@ def visualise_1d(model, gen, *, path, config, predict):
             f = stheno.GP(gen.kernel)
             # Make sure that everything is of `float64`s and on the GPU.
             noise = B.to_active_device(B.cast(torch.float64, gen.noise))
-            xc = B.cast(torch.float64, nps.batch_xc(batch, 0)[0, 0])
-            yc = B.cast(torch.float64, nps.batch_yc(batch, 0)[0])
-            x = B.cast(torch.float64, x)
+            xc = B.to_active_device(B.cast(torch.float64, nps.batch_xc(batch, 0)[0, 0]))
+            yc = B.to_active_device(B.cast(torch.float64, nps.batch_yc(batch, 0)[0]))
+            x = B.to_active_device(B.cast(torch.float64, x))
             # Compute posterior GP.
             f_post = f | (f(xc, noise), yc)
-            mean, lower, upper = f_post(x).marginal_credible_bounds()
-            plt.plot(x, mean, label="Truth", style="pred2")
-            plt.plot(x, lower, style="pred2")
-            plt.plot(x, upper, style="pred2")
+            kxx = f_post.kernel(x).mat + 1e-6 * B.to_active_device(B.eye(B.dtype(x), len(x)))
+            kxx_chol = torch.linalg.cholesky(torch.tensor(kxx)).double()
+            sample = torch.matmul(kxx_chol, B.to_active_device(torch.randn(len(x), 1)).double())
+            sample = f_post.mean(x) + sample
 
-        for x_axvline in plot_config["axvline"]:
-            plt.axvline(x_axvline, c="k", ls="--", lw=0.5)
+            plt.plot(x, sample[:, 0], ls="--", lw=1.0, color="k")
+            plt.plot(x, f_post.mean(x)[:, 0], ls="-", lw=1.0, color="k")
+            plt.plot(x, f_post.mean(x)[:, 0] + 2. * f_post.kernel(x).diagonal() ** 0.5, ls="-", lw=1.0, color="k")
+            plt.plot(x, f_post.mean(x)[:, 0] - 2. * f_post.kernel(x).diagonal() ** 0.5, ls="-", lw=1.0, color="k")
 
         plt.xlim(B.min(x), B.max(x))
-        tweak()
+        plt.axis("off")
+        #tweak()
 
-    plt.savefig(path)
+    plt.tight_layout()
+    plt.savefig(path, bbox_inches="tight")
     plt.close()
 
 
@@ -219,5 +215,5 @@ def visualise_2d(model, gen, *, path, config, predict):
         plot_imshow(samples[i][1, 0, 0], i, label="Sample")
         tweak(grid=False)
 
-    plt.savefig(path)
+    plt.tight_layout()
     plt.close()

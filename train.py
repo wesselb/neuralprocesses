@@ -78,7 +78,7 @@ def eval(state, model, objective, gen):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_plot_for_rich"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)

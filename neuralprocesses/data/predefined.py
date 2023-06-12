@@ -71,10 +71,10 @@ def construct_predefined_gens(
         name: GPGenerator(
             dtype,
             seed=seed,
-            noise=0.05,
+            noise=1e-6,
             kernel=kernel,
             num_context=UniformDiscrete(0, 30 * dim_x),
-            num_target=UniformDiscrete(50 * dim_x, 50 * dim_x),
+            num_target=UniformDiscrete(500, 500),
             pred_logpdf=pred_logpdf,
             pred_logpdf_diag=pred_logpdf_diag,
             **config,
@@ -84,7 +84,7 @@ def construct_predefined_gens(
     # Previously, the maximum number of context points was `75 * dim_x`. However, if
     # `dim_x == 1`, then this is too high. We therefore change that case, and keep all
     # other cases the same.
-    max_context = 30 if dim_x == 1 else 75 * dim_x
+    max_context = 10
     gens["sawtooth"] = SawtoothGenerator(
         dtype,
         seed=seed,
