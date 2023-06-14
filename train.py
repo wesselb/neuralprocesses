@@ -128,7 +128,7 @@ def eval(state, model, objective, gen, *, epoch, summary_writer):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments_scratch"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_margin_and_arch"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
@@ -796,15 +796,7 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
-        encoder_scale_param = model.encoder.coder[2][0]._log_scale
-        model_params = [param for param in model.parameters() if param is not encoder_scale_param]
-        opt = torch.optim.SGD(
-            [
-                {"params": model_params}, 
-                {"params": encoder_scale_param, "lr": args.rate / 20.}
-            ],
-            args.rate,
-        )
+        opt = torch.optim.Adam(model.parameters(), lr=args.rate)
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
