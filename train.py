@@ -19,6 +19,9 @@ from wbml.experiment import WorkingDirectory
 
 __all__ = ["main"]
 
+# Trains version of DPConvCNP without clipping:
+# python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 16 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000
+
 warnings.filterwarnings("ignore", category=ToDenseWarning)
 
 
