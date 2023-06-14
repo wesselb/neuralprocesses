@@ -241,6 +241,10 @@ class DPSetConv:
             B.log(scale), dtype=dtype, learnable=learnable_scale,
         )
 
+        # Initialise the log-scale and specify whether it is learnable
+        self._fake_log_scale = self.nn.Parameter(
+            B.log(scale), dtype=dtype, learnable=learnable_scale,
+        )
 
     def density_sigma(self, sens_per_sigma):
         """Compuete the density noise sigma for a given sensitivity per sigma.
@@ -333,8 +337,12 @@ class DPSetConv:
     @property
     def log_scale(self):
         """Return the length scale of the SetConv."""
-
         return torch.log(self._log_scale.exp() + 2. / 32.)
+
+    @property
+    def fake_log_scale(self):
+        """Return the length scale of the SetConv."""
+        return torch.log(self._fake_log_scale.exp() + 2. / 32.)
 
 
     def sample_noise(self, x, sens_per_sigma, num_channels):
@@ -482,7 +490,7 @@ def code(
     # Clip the data channel values to the y-bound DP parameter, and apply
     # the SetConv to the clipped data.
     z = B.matmul(
-        z, # coder.clip_data(z, sens_per_sigma),
+        coder.clip_data(z, sens_per_sigma),
         compute_weights(coder, xz, x),
     )
 

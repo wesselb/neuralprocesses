@@ -55,6 +55,7 @@ def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_
 
         summary_writer.add_scalar("train_step_loss", np.sum(losses_logging), step)
         summary_writer.add_scalar("train_step_scale", B.exp(model.encoder.coder[2][0].log_scale), step)
+        summary_writer.add_scalar("train_step_fake_scale", B.exp(model.encoder.coder[2][0].fake_log_scale), step)
         summary_writer.add_scalar("train_step_scale_param_grad", scale_param_grad, step)
 
         if len(scale_param_grads) >= NUM_STEPS_PER_GRAD_BIN:
@@ -796,15 +797,16 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
-        encoder_scale_param = model.encoder.coder[2][0]._log_scale
-        model_params = [param for param in model.parameters() if param is not encoder_scale_param]
-        opt = torch.optim.SGD(
-            [
-                {"params": model_params}, 
-                {"params": encoder_scale_param, "lr": args.rate / 20.}
-            ],
-            args.rate,
-        )
+        #encoder_scale_param = model.encoder.coder[2][0]._log_scale
+        #model_params = [param for param in model.parameters() if param is not encoder_scale_param]
+        #opt = torch.optim.Adam(
+        #    [
+        #        {"params": model_params}, 
+        #        {"params": encoder_scale_param, "lr": args.rate / 20.}
+        #    ],
+        #    args.rate,
+        #)
+        opt = torch.optim.Adam(model.parameters(), args.rate)
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
