@@ -79,7 +79,7 @@ def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_
 
     vals = B.concat(*vals)
     out.kv("Loglik (T)", exp.with_err(vals, and_lower=True))
-    summary_writer.add_scalar("train_epoch_loglik", B.mean(vals), epoch)
+    summary_writer.add_scalar("train_epoch_loglik", -B.mean(vals), epoch)
     return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), step
 
 
@@ -129,7 +129,7 @@ def eval(state, model, objective, gen, *, epoch, summary_writer):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments_scratch"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_margin_and_arch"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
@@ -215,6 +215,7 @@ def main(**kw_args):
     parser.add_argument("--min-scale", type=float)
     parser.add_argument("--max-scale", type=float)
 
+    parser.add_argument("--margin", type=float, default=0.1)
     parser.add_argument("--prefix", type=str, default=None)
     parser.add_argument("--num-forward", type=int, default=1)
     parser.add_argument("--dp-epsilon-min", type=float, default=1.)
@@ -389,6 +390,7 @@ def main(**kw_args):
         "unet_channels": (64,) * 6,
         "unet_strides": (1,) + (2,) * 5,
         "conv_channels": 64,
+        "margin": args.margin,
         "encoder_scales": None or args.encoder_scales,
         "fullconvgnp_kernel_factor": 2,
         "mean_diff": args.mean_diff,
