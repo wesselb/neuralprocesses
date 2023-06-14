@@ -55,7 +55,7 @@ def visualise_1d(model, gen, *, path, config, predict):
     eps_noise = B.to_active_device(torch.randn(len(x), 1)).double()
 
     for j in [0, 1, 2]:
-        plt.figure(figsize=(8, 6 * config["dim_y"]))
+        plt.figure(figsize=(1.75 * 8, 6 * config["dim_y"]))
 
         for i in range(config["dim_y"]):
             plt.subplot(config["dim_y"], 1, 1 + i)
