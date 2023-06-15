@@ -19,10 +19,10 @@ from wbml.experiment import WorkingDirectory
 
 __all__ = ["main"]
 
-# Trains version of DPConvCNP without clipping which EXHIBITS NON-MONOTONIC TRAINING LOSS:
+# Trains version of DPConvCNP which EXHIBITS NON-MONOTONIC TRAINING LOSS:
 # python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 16 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000
 
-# Trains version of DPConvCNP without clipping which EXHIBITS MONOTONIC TRAINING LOSS:
+# Trains version of DPConvCNP which EXHIBITS MONOTONIC TRAINING LOSS:
 # python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 8 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000
 
 warnings.filterwarnings("ignore", category=ToDenseWarning)
@@ -134,7 +134,7 @@ def eval(state, model, objective, gen, *, epoch, summary_writer):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_margin_and_arch"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
