@@ -482,7 +482,7 @@ def code(
     # Clip the data channel values to the y-bound DP parameter, and apply
     # the SetConv to the clipped data.
     z = B.matmul(
-        z, # coder.clip_data(z, sens_per_sigma),
+        coder.clip_data(z, sens_per_sigma),
         compute_weights(coder, xz, x),
     )
 
