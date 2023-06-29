@@ -27,6 +27,38 @@ __all__ = ["main"]
 
 warnings.filterwarnings("ignore", category=ToDenseWarning)
 
+def split_in_two(batch):
+
+    batch_size = batch["contexts"][0][0].shape[0]
+
+    batch_1 = {}
+    batch_2 = {}
+
+    batch_1["contexts"] = [
+        (batch["contexts"][0][0][:batch_size//2], batch["contexts"][0][1][:batch_size//2]),
+    ]
+    batch_1["xt"] = batch["xt"][:batch_size//2]
+    batch_1["yt"] = batch["yt"][:batch_size//2]
+    batch_1["epsilon"] = batch["epsilon"][:batch_size//2]
+    batch_1["delta"] = batch["delta"][:batch_size//2]
+    
+
+    batch_2["contexts"] = [
+        (batch["contexts"][0][0][batch_size//2:], batch["contexts"][0][1][batch_size//2:]),
+    ]
+    batch_2["xt"] = batch["xt"][batch_size//2:]
+    batch_2["yt"] = batch["yt"][batch_size//2:]
+    batch_2["epsilon"] = batch["epsilon"][batch_size//2:]
+    batch_2["delta"] = batch["delta"][batch_size//2:]
+
+    assert batch_1["contexts"][0][0].shape == batch_2["contexts"][0][0].shape
+    assert batch_1["contexts"][0][1].shape == batch_2["contexts"][0][1].shape
+    assert batch_1["xt"].shape == batch_2["xt"].shape
+    assert batch_1["yt"].shape == batch_2["yt"].shape
+    
+    return batch_1, batch_2
+
+
 
 def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_writer, num_forward=1):
     """Train for an epoch."""
@@ -35,52 +67,53 @@ def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_
     scale_param_grads = []
 
     vals = []
-    for batch in gen.epoch():
-        opt.zero_grad(set_to_none=True)
-        losses_logging = []
-        for _ in range(num_forward):
-            state, forward_obj = objective(
-                state,
-                model,
-                batch["contexts"],
-                batch["xt"],
-                batch["yt"],
-                epsilon=batch["epsilon"],
-                delta=batch["delta"],
-                fix_noise=fix_noise,
-            )
-            forward_obj = - B.mean(forward_obj / num_forward)
-            forward_obj.backward()
-            vals.append(B.to_numpy(forward_obj)[None])
-            losses_logging.append(B.to_numpy(forward_obj))
-        #out.kv("Encoder grad scale       ", model.encoder.coder[1][0].log_scale.grad)
-        opt.step()
+    for _batch in gen.epoch():
+        for batch in split_in_two(_batch):
+            opt.zero_grad(set_to_none=True)
+            losses_logging = []
+            for _ in range(num_forward):
+                state, forward_obj = objective(
+                    state,
+                    model,
+                    batch["contexts"],
+                    batch["xt"],
+                    batch["yt"],
+                    epsilon=batch["epsilon"],
+                    delta=batch["delta"],
+                    fix_noise=fix_noise,
+                )
+                forward_obj = - B.mean(forward_obj / num_forward)
+                forward_obj.backward()
+                vals.append(B.to_numpy(forward_obj)[None])
+                losses_logging.append(B.to_numpy(forward_obj))
+            #out.kv("Encoder grad scale       ", model.encoder.coder[1][0].log_scale.grad)
+            opt.step()
 
-        scale_param_grad = model.encoder.coder[2][0]._log_scale.grad
-        scale_param_grads.append(scale_param_grad)
+            scale_param_grad = model.encoder.coder[2][0]._log_scale.grad
+            scale_param_grads.append(scale_param_grad)
 
-        summary_writer.add_scalar("train_step_loss", np.sum(losses_logging), step)
-        summary_writer.add_scalar("train_step_scale", B.exp(model.encoder.coder[2][0].log_scale), step)
-        summary_writer.add_scalar("train_step_scale_param_grad", scale_param_grad, step)
+            summary_writer.add_scalar("train_step_loss", np.sum(losses_logging), step)
+            summary_writer.add_scalar("train_step_scale", B.exp(model.encoder.coder[2][0].log_scale), step)
+            summary_writer.add_scalar("train_step_scale_param_grad", scale_param_grad, step)
 
-        if len(scale_param_grads) >= NUM_STEPS_PER_GRAD_BIN:
-            summary_writer.add_scalar(
-                f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_var",
-                torch.var(torch.tensor(scale_param_grads)),
-                step,
-            )
-            summary_writer.add_scalar(
-                f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_stddev",
-                torch.var(torch.tensor(scale_param_grads))**0.5,
-                step,
-            )
-            summary_writer.add_scalar(
-                f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_mean",
-                torch.mean(torch.tensor(scale_param_grads)),
-                step,
-            )
-            scale_param_grads = []
-        step = step + 1
+            if len(scale_param_grads) >= NUM_STEPS_PER_GRAD_BIN:
+                summary_writer.add_scalar(
+                    f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_var",
+                    torch.var(torch.tensor(scale_param_grads)),
+                    step,
+                )
+                summary_writer.add_scalar(
+                    f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_stddev",
+                    torch.var(torch.tensor(scale_param_grads))**0.5,
+                    step,
+                )
+                summary_writer.add_scalar(
+                    f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_mean",
+                    torch.mean(torch.tensor(scale_param_grads)),
+                    step,
+                )
+                scale_param_grads = []
+            step = step + 1
 
     vals = B.concat(*vals)
     out.kv("Loglik (T)", exp.with_err(vals, and_lower=True))
@@ -134,7 +167,7 @@ def eval(state, model, objective, gen, *, epoch, summary_writer):
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_experiments_debugging"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)

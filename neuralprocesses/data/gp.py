@@ -127,7 +127,7 @@ class GPGenerator(SyntheticGenerator):
                 )
 
                 batch["epsilon"] = epsilon.detach().cpu()
-                batch["delta"] = delta = 10 ** log10_delta.detach().cpu()
+                batch["delta"] = 10 ** log10_delta.detach().cpu()
 
             else:
 
