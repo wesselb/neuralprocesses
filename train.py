@@ -19,11 +19,9 @@ from wbml.experiment import WorkingDirectory
 
 __all__ = ["main"]
 
-# Trains version of DPConvCNP which EXHIBITS NON-MONOTONIC TRAINING LOSS:
-# python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 16 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000
-
-# Trains version of DPConvCNP which EXHIBITS MONOTONIC TRAINING LOSS:
-# python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 8 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000
+# Commands to run:
+# python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 16 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000 --prefix batch-size-16
+# python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 8 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000 --prefix batch-size-8
 
 warnings.filterwarnings("ignore", category=ToDenseWarning)
 
