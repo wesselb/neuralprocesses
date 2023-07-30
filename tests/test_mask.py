@@ -2,7 +2,7 @@ import lab as B
 import pytest
 
 from .test_architectures import generate_data
-from .util import nps, approx  # noqa
+from .util import approx, nps  # noqa
 
 
 @pytest.mark.flaky(reruns=3)
@@ -31,3 +31,23 @@ def test_convgnp_mask(nps):
     # Check that the two ways of doing it coincide.
     approx(pred.mean, pred_masked.mean)
     approx(pred.var, pred_masked.var)
+
+
+@pytest.mark.parametrize("ns", [(10,), (0,), (10, 5), (10, 0), (0, 10), (15, 5, 10)])
+@pytest.mark.parametrize("multiple", [1, 2, 3, 5])
+def test_mask_contexts(nps, ns, multiple):
+    x, y = nps.merge_contexts(
+        *((B.randn(nps.dtype, 2, 3, n), B.randn(nps.dtype, 2, 4, n)) for n in ns),
+        multiple=multiple
+    )
+
+    # Test that the output is of the right shape.
+    if max(ns) == 0:
+        assert B.shape(y.y, 2) == multiple
+    else:
+        assert B.shape(y.y, 2) == ((max(ns) - 1) // multiple + 1) * multiple
+
+    # Test that the mask is right.
+    mask = y.mask == 1  # Convert mask to booleans.
+    assert B.all(B.take(B.flatten(y.y), B.flatten(mask)) != 0)
+    assert B.all(B.take(B.flatten(y.y), B.flatten(~mask)) == 0)

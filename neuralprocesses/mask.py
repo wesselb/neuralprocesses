@@ -40,6 +40,15 @@ def _pad_zeros(x: B.Numeric, up_to: int, axis: int):
         return B.concat(x, B.zeros(B.dtype(x), *shape), axis=axis)
 
 
+def _ceil_to_closest_multiple(n, m):
+    d, r = divmod(n, m)
+    # If `n` is zero, then we must also round up.
+    if n == 0 or r > 0:
+        return (d + 1) * m
+    else:
+        return d * m
+
+
 @_dispatch
 def _determine_ns(xc: tuple, multiple: Union[int, tuple]):
     ns = [B.shape(xci, 2) for xci in xc]
@@ -48,7 +57,7 @@ def _determine_ns(xc: tuple, multiple: Union[int, tuple]):
         multiple = (multiple,) * len(ns)
 
     # Ceil to the closest multiple of `multiple`.
-    ns = [((n - 1) // m + 1) * m for n, m in zip(ns, multiple)]
+    ns = [_ceil_to_closest_multiple(n, m) for n, m in zip(ns, multiple)]
 
     return ns
 
