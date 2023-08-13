@@ -10,7 +10,8 @@ A framework for composing Neural Processes in Python.
 ## Installation
 
 ```
-pip install neuralprocesses
+pip install neuralprocesses tensorflow tensorflow-probability  # For use with TensorFlow
+pip install neuralprocesses torch                              # For use with PyTorch
 ```
 
 If something is not working or unclear, please feel free to open an issue.
