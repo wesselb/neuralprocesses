@@ -3,6 +3,7 @@ from .data import *
 from .eeg import *
 from .gp import *
 from .mixgp import *
+from .scale_mix_gp import *
 from .mixture import *
 from .predefined import *
 from .predprey import *

@@ -4,8 +4,10 @@ from stheno import EQ, Matern52
 from .gp import GPGenerator
 from .mixture import MixtureGenerator
 from .mixgp import MixtureGPGenerator
+from .scale_mix_gp import ScaleMixtureGPGenerator
 from .sawtooth import SawtoothGenerator
 from ..dist.uniform import UniformDiscrete, UniformContinuous
+from ..dist.mixture import Mixture
 
 __all__ = ["construct_predefined_gens"]
 
@@ -18,10 +20,15 @@ def construct_predefined_gens(
     dim_x=1,
     dim_y=1,
     x_range_context=(-2, 2),
-    x_range_target=(-2, 2),
+    x_range_target=(-4, 4),
     mean_diff=0.0,
     pred_logpdf=True,
     pred_logpdf_diag=True,
+    dp_epsilon_range=None,
+    dp_log10_delta_range=None,
+    min_log10_scale=None,
+    max_log10_scale=None,
+    min_ctx=32,
     device="cpu",
 ):
     """Construct a number of predefined data generators.
@@ -73,10 +80,12 @@ def construct_predefined_gens(
             seed=seed,
             noise=0.05,
             kernel=kernel,
-            num_context=UniformDiscrete(0, 30 * dim_x),
-            num_target=UniformDiscrete(50 * dim_x, 50 * dim_x),
+            num_context=UniformDiscrete(min_ctx, 512),#UniformDiscrete(20, 100 * dim_x),
+            num_target=UniformDiscrete(128, 128),
             pred_logpdf=pred_logpdf,
             pred_logpdf_diag=pred_logpdf_diag,
+            dp_epsilon_range=dp_epsilon_range,
+            dp_log10_delta_range=dp_log10_delta_range,
             **config,
         )
         for name, kernel in kernels.items()
@@ -84,15 +93,15 @@ def construct_predefined_gens(
     # Previously, the maximum number of context points was `75 * dim_x`. However, if
     # `dim_x == 1`, then this is too high. We therefore change that case, and keep all
     # other cases the same.
-    max_context = 30 if dim_x == 1 else 75 * dim_x
+    max_context = 100 if dim_x == 1 else 100 * dim_x
     gens["sawtooth"] = SawtoothGenerator(
         dtype,
         seed=seed,
         # The sawtooth is hard already as it is. Do not add noise.
         noise=0,
         dist_freq=UniformContinuous(2 / factor, 4 / factor),
-        num_context=UniformDiscrete(0, max_context),
-        num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+        num_context=UniformDiscrete(min_ctx, 512),#UniformDiscrete(20, max_context),
+        num_target=UniformDiscrete(128, 128),
         **config,
     )
     # Be sure to use different seeds in the mixture components.
@@ -103,10 +112,12 @@ def construct_predefined_gens(
                 seed=seed + i,
                 noise=0.05,
                 kernel=kernel,
-                num_context=UniformDiscrete(0, max_context),
-                num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+                num_context=UniformDiscrete(min_ctx, 512),#UniformDiscrete(20, max_context),
+                num_target=UniformDiscrete(128, 128),
                 pred_logpdf=pred_logpdf,
                 pred_logpdf_diag=pred_logpdf_diag,
+                dp_epsilon_range=dp_epsilon_range,
+                dp_log10_delta_range=dp_log10_delta_range,
                 **config,
             )
             # Make sure that the order of `kernels.items()` is fixed.
@@ -118,8 +129,8 @@ def construct_predefined_gens(
             # The sawtooth is hard already as it is. Do not add noise.
             noise=0,
             dist_freq=UniformContinuous(2 / factor, 4 / factor),
-            num_context=UniformDiscrete(0, max_context),
-            num_target=UniformDiscrete(100 * dim_x, 100 * dim_x),
+            num_context=UniformDiscrete(min_ctx, 512),#UniformDiscrete(20, max_context),
+            num_target=UniformDiscrete(128, 128),
             **config,
         ),
         seed=seed,
@@ -131,11 +142,33 @@ def construct_predefined_gens(
             seed=seed + len(kernels.items()) + i + 1,
             noise=0.05,
             kernel=kernels[kernel],
-            num_context=UniformDiscrete(0, 30 * dim_x),
-            num_target=UniformDiscrete(50 * dim_x, 50 * dim_x),
+            num_context=UniformDiscrete(min_ctx, 512),#UniformDiscrete(0, 30*dim_x),
             pred_logpdf=False,
             pred_logpdf_diag=False,
             mean_diff=mean_diff,
+            **config,
+        )
+
+    kernel_types = {
+        "eq": EQ,
+        "matern": Matern52,
+    }
+
+    for i, (name, kernel_type) in enumerate(kernel_types.items()):
+
+        gens[f"scale-mix-{name}"] = ScaleMixtureGPGenerator(
+            dtype=dtype,
+            seed=seed + i,
+            noise=0.05,
+            kernel_type=kernel_type,
+            num_context=UniformDiscrete(min_ctx, 512), # UniformDiscrete(20, 100 * dim_x),
+            num_target=UniformDiscrete(128, 128),
+            pred_logpdf=pred_logpdf,
+            pred_logpdf_diag=pred_logpdf_diag,
+            dp_epsilon_range=dp_epsilon_range,
+            dp_log10_delta_range=dp_log10_delta_range,
+            min_log10_scale=min_log10_scale,
+            max_log10_scale=max_log10_scale,
             **config,
         )
 

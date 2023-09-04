@@ -2,58 +2,26 @@ import lab as B
 import stheno
 import numpy as np
 
-from .data import SyntheticGenerator, new_batch
+from .data import new_batch
+from .gp import GPGenerator
 from ..dist import UniformContinuous
 
-__all__ = ["GPGenerator"]
+__all__ = ["ScaleMixtureGPGenerator"]
 
 
-class GPGenerator(SyntheticGenerator):
-    """GP generator.
-
-    Further takes in arguments and keyword arguments from the constructor of
-    :class:`.data.SyntheticGenerator`. Moreover, also has the attributes of
-    :class:`.data.SyntheticGenerator`.
-
-    Args:
-        kernel (:class:`stheno.Kernel`, optional): Kernel of the GP. Defaults to an
-            EQ kernel with length scale `0.25`.
-        pred_logpdf (bool, optional): Also compute the logpdf of the target set given
-            the context set under the true GP. Defaults to `True`.
-        pred_logpdf_diag (bool, optional): Also compute the logpdf of the target set
-            given the context set under the true diagonalised GP. Defaults to `True`.
-
-    Attributes:
-        kernel (:class:`stheno.Kernel`): Kernel of the GP.
-        pred_logpdf (bool): Also compute the logpdf of the target set given the context
-            set under the true GP.
-        pred_logpdf_diag (bool): Also compute the logpdf of the target set given the
-            context set under the true diagonalised GP.
-    """
+class ScaleMixtureGPGenerator(GPGenerator):
 
     def __init__(
         self,
         *args,
-        kernel=stheno.EQ().stretch(0.25),
-        pred_logpdf=True,
-        pred_logpdf_diag=True,
-        dp_epsilon_range=None,
-        dp_log10_delta_range=None,
+        min_log10_scale=-1.,
+        max_log10_scale=1.,
+        kernel_type=stheno.EQ,
         **kw_args,
     ):
-        self.kernel = kernel
-        self.pred_logpdf = pred_logpdf
-        self.pred_logpdf_diag = pred_logpdf_diag
-        self.dp_epsilon_range = dp_epsilon_range
-        self.dp_log10_delta_range = dp_log10_delta_range 
 
-        if ((self.dp_epsilon_range is None) ^ (self.dp_log10_delta_range is None)):
-            raise ValueError(
-                f"Found dp_epsilon_range={dp_epsilon_range} and dp_log10_delta_range={dp_log10_delta_range}."
-            )
-
-        else:
-            self.sample_dp_params = self.dp_epsilon_range is not None or self.dp_log10_delta_range is not None
+        self.log10_scale = (min_log10_scale, max_log10_scale)
+        self.kernel_type = kernel_type
 
         super().__init__(*args, **kw_args)
 
@@ -67,18 +35,26 @@ class GPGenerator(SyntheticGenerator):
         with B.on_device(self.device):
             set_batch, xcs, xc, nc, xts, xt, nt = new_batch(self, self.dim_y)
 
+            self.state, log10_scale = UniformContinuous(*self.log10_scale).sample(
+                self.state,
+                xc.dtype,
+            )
+
+            scale = 10 ** log10_scale
+            kernel = self.kernel_type().stretch(scale)
+
             # If `self.h` is specified, then we create a multi-output GP. Otherwise, we
             # use a simple regular GP.
             if self.h is None:
                 with stheno.Measure() as prior:
-                    f = stheno.GP(self.kernel)
+                    f = stheno.GP(kernel)
                     # Construct FDDs for the context and target points.
                     fc = f(xc, self.noise)
                     ft = f(xt, self.noise)
             else:
                 with stheno.Measure() as prior:
                     # Construct latent processes and initialise output processes.
-                    us = [stheno.GP(self.kernel) for _ in range(self.dim_y_latent)]
+                    us = [stheno.GP(kernel) for _ in range(self.dim_y_latent)]
                     fs = [0 for _ in range(self.dim_y)]
                     # Perform matrix multiplication.
                     for i in range(self.dim_y):
@@ -102,6 +78,9 @@ class GPGenerator(SyntheticGenerator):
             # Make the new batch.
             batch = {}
             set_batch(batch, yc, yt)
+
+            # Store scale used to generate data
+            batch["scale"] = scale
 
             # Compute predictive logpdfs.
             if self.pred_logpdf or self.pred_logpdf_diag:
@@ -127,7 +106,7 @@ class GPGenerator(SyntheticGenerator):
                 )
 
                 batch["epsilon"] = epsilon.detach().cpu()
-                batch["delta"] = 10 ** log10_delta.detach().cpu()
+                batch["delta"] = delta = 10 ** log10_delta.detach().cpu()
 
             else:
 

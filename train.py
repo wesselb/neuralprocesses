@@ -1,9 +1,12 @@
 import argparse
 import os
+import shutil
 import sys
 import time
 import warnings
 from functools import partial
+
+from tensorboardX import SummaryWriter
 
 import experiment as exp
 import lab as B
@@ -16,44 +19,120 @@ from wbml.experiment import WorkingDirectory
 
 __all__ = ["main"]
 
+# Commands to run:
+# python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 16 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000 --prefix batch-size-16
+# python train.py --model dpconvcnp --data eq --min-scale 0.25 --max-scale 0.25 --encoder-scales 0.2 --batch-size 8 --dp-epsilon-min 3 --dp-epsilon-max 3 --epochs 1000 --prefix batch-size-8
+
 warnings.filterwarnings("ignore", category=ToDenseWarning)
 
+def split_in_two(batch):
 
-def train(state, model, opt, objective, gen, *, fix_noise):
+    batch_size = batch["contexts"][0][0].shape[0]
+
+    batch_1 = {}
+    batch_2 = {}
+
+    batch_1["contexts"] = [
+        (batch["contexts"][0][0][:batch_size//2], batch["contexts"][0][1][:batch_size//2]),
+    ]
+    batch_1["xt"] = batch["xt"][:batch_size//2]
+    batch_1["yt"] = batch["yt"][:batch_size//2]
+    batch_1["epsilon"] = batch["epsilon"][:batch_size//2]
+    batch_1["delta"] = batch["delta"][:batch_size//2]
+    
+
+    batch_2["contexts"] = [
+        (batch["contexts"][0][0][batch_size//2:], batch["contexts"][0][1][batch_size//2:]),
+    ]
+    batch_2["xt"] = batch["xt"][batch_size//2:]
+    batch_2["yt"] = batch["yt"][batch_size//2:]
+    batch_2["epsilon"] = batch["epsilon"][batch_size//2:]
+    batch_2["delta"] = batch["delta"][batch_size//2:]
+
+    assert batch_1["contexts"][0][0].shape == batch_2["contexts"][0][0].shape
+    assert batch_1["contexts"][0][1].shape == batch_2["contexts"][0][1].shape
+    assert batch_1["xt"].shape == batch_2["xt"].shape
+    assert batch_1["yt"].shape == batch_2["yt"].shape
+    
+    return batch_1, batch_2
+
+
+
+def train(state, model, opt, objective, gen, *, fix_noise, epoch, step, summary_writer, num_forward=1):
     """Train for an epoch."""
+
+    NUM_STEPS_PER_GRAD_BIN = 1000
+    scale_param_grads = []
+
     vals = []
-    for batch in gen.epoch():
-        state, obj = objective(
-            state,
-            model,
-            batch["contexts"],
-            batch["xt"],
-            batch["yt"],
-            fix_noise=fix_noise,
-        )
-        vals.append(B.to_numpy(obj))
-        # Be sure to negate the output of `objective`.
-        val = -B.mean(obj)
-        opt.zero_grad(set_to_none=True)
-        val.backward()
-        opt.step()
+    for _batch in gen.epoch():
+        for batch in split_in_two(_batch):
+            opt.zero_grad(set_to_none=True)
+            losses_logging = []
+            for _ in range(num_forward):
+                state, forward_obj = objective(
+                    state,
+                    model,
+                    batch["contexts"],
+                    batch["xt"],
+                    batch["yt"],
+                    epsilon=batch["epsilon"],
+                    delta=batch["delta"],
+                    fix_noise=fix_noise,
+                )
+                forward_obj = - B.mean(forward_obj / num_forward)
+                forward_obj.backward()
+                vals.append(B.to_numpy(forward_obj)[None])
+                losses_logging.append(B.to_numpy(forward_obj))
+            #out.kv("Encoder grad scale       ", model.encoder.coder[1][0].log_scale.grad)
+            opt.step()
+
+            scale_param_grad = model.encoder.coder[2][0]._log_scale.grad
+            scale_param_grads.append(scale_param_grad)
+
+            summary_writer.add_scalar("train_step_loss", np.sum(losses_logging), step)
+            summary_writer.add_scalar("train_step_scale", B.exp(model.encoder.coder[2][0].log_scale), step)
+            summary_writer.add_scalar("train_step_scale_param_grad", scale_param_grad, step)
+
+            if len(scale_param_grads) >= NUM_STEPS_PER_GRAD_BIN:
+                summary_writer.add_scalar(
+                    f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_var",
+                    torch.var(torch.tensor(scale_param_grads)),
+                    step,
+                )
+                summary_writer.add_scalar(
+                    f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_stddev",
+                    torch.var(torch.tensor(scale_param_grads))**0.5,
+                    step,
+                )
+                summary_writer.add_scalar(
+                    f"{NUM_STEPS_PER_GRAD_BIN}_step_scale_param_grad_mean",
+                    torch.mean(torch.tensor(scale_param_grads)),
+                    step,
+                )
+                scale_param_grads = []
+            step = step + 1
 
     vals = B.concat(*vals)
     out.kv("Loglik (T)", exp.with_err(vals, and_lower=True))
-    return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
+    summary_writer.add_scalar("train_epoch_loglik", B.mean(vals), epoch)
+    return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), step
 
 
-def eval(state, model, objective, gen):
+def eval(state, model, objective, gen, *, epoch, summary_writer):
     """Perform evaluation."""
     with torch.no_grad():
         vals, kls, kls_diag = [], [], []
         for batch in gen.epoch():
+
             state, obj = objective(
                 state,
                 model,
                 batch["contexts"],
                 batch["xt"],
                 batch["yt"],
+                epsilon=batch["epsilon"],
+                delta=batch["delta"],
             )
 
             # Save numbers.
@@ -66,19 +145,27 @@ def eval(state, model, objective, gen):
 
         # Report numbers.
         vals = B.concat(*vals)
-        out.kv("Loglik (V)", exp.with_err(vals, and_lower=True))
+        metrics = {"loglik_val": exp.with_err(vals, and_lower=True)}
+        out.kv("Loglik (V)", metrics["loglik_val"])
         if kls:
-            out.kv("KL (full)", exp.with_err(B.concat(*kls), and_upper=True))
+            metrics["kl_full"] = exp.with_err(B.concat(*kls), and_upper=True)
+            out.kv("KL (full)", metrics["kl_full"])
         if kls_diag:
-            out.kv("KL (diag)", exp.with_err(B.concat(*kls_diag), and_upper=True))
+            metrics["kl_diag"] = exp.with_err(B.concat(*kls_diag), and_upper=True)
+            out.kv("KL (diag)", metrics["kl_diag"])
+            
+        #out.kv("Encoder scale       ", torch.exp(model.encoder.coder[1][0].log_scale))
+        summary_writer.add_scalar("val_epoch_loglik", np.mean(-vals), epoch)
+        summary_writer.add_scalar("val_epoch_kl_full", np.mean(kls), epoch)
+        summary_writer.add_scalar("val_epoch_kl_diag", np.mean(kls_diag), epoch)
 
-        return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals))
+        return state, B.mean(vals) - 1.96 * B.std(vals) / B.sqrt(len(vals)), metrics
 
 
 def main(**kw_args):
     # Setup arguments.
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, nargs="*", default=["_experiments"])
+    parser.add_argument("--root", type=str, nargs="*", default=["_experiments_debugging"])
     parser.add_argument("--subdir", type=str, nargs="*")
     parser.add_argument("--device", type=str)
     parser.add_argument("--gpu", type=int)
@@ -106,6 +193,7 @@ def main(**kw_args):
             "convgnp-mlp",
             "convcnp-multires",
             "convgnp-multires",
+            "dpconvcnp",
         ],
         default="convcnp",
     )
@@ -158,6 +246,22 @@ def main(**kw_args):
         choices=["random", "interpolation", "forecasting", "reconstruction"],
     )
     parser.add_argument("--patch", type=str)
+    parser.add_argument("--encoder-scales", type=float, default=None)
+
+    parser.add_argument("--min-scale", type=float)
+    parser.add_argument("--max-scale", type=float)
+
+    parser.add_argument("--prefix", type=str, default=None)
+    parser.add_argument("--num-forward", type=int, default=1)
+    parser.add_argument("--dp-epsilon-min", type=float, default=1.)
+    parser.add_argument("--dp-epsilon-max", type=float, default=9.)
+    parser.add_argument("--dp-log10-delta-min", type=float, default=-3.)
+    parser.add_argument("--dp-log10-delta-max", type=float, default=-3.)
+    parser.add_argument("--dp-y-bound", type=float, default=2.)
+    parser.add_argument("--dp-t", type=float, default=0.5)
+    parser.add_argument("--dp-learn-params", default=False, action="store_true")
+    parser.add_argument("--dp-amortise-params", default=False, action="store_true")
+    parser.add_argument("--dp-use-noise-channels", default=False, action="store_true")
 
     if kw_args:
         # Load the arguments from the keyword arguments passed to the function.
@@ -211,6 +315,7 @@ def main(**kw_args):
         "convgnp",
         "convnp",
         "fullconvgnp",
+        "dpconvcnp",
     }:
         del args.arch
 
@@ -240,6 +345,30 @@ def main(**kw_args):
     data_dir = args.data if args.mean_diff is None else f"{args.data}-{args.mean_diff}"
     data_dir = data_dir if args.eeg_mode is None else f"{args.data}-{args.eeg_mode}"
 
+    if args.model == "dpconvcnp":
+
+        dp_epsilon_range = (args.dp_epsilon_min, args.dp_epsilon_max)
+        dp_log10_delta_range = (args.dp_log10_delta_min, args.dp_log10_delta_max)
+
+        if args.dp_amortise_params:
+            dp_param_prefix = "a_"
+
+        elif args.dp_learn_params:
+            dp_param_prefix = f"l-{args.dp_y_bound:.2f}-{args.dp_t}_"
+
+        else:
+            dp_param_prefix = f"f-{args.dp_y_bound:.2f}-{args.dp_t}_"
+
+        model_name = args.prefix + "_dpconvcnp_"
+        model_name = model_name + dp_param_prefix
+        model_name = model_name + (f"nc_" if args.dp_use_noise_channels else "")
+        model_name = model_name + f"s-{args.min_scale:.2f}-{args.max_scale:.2f}_"
+        model_name = model_name + f"e-{dp_epsilon_range[0]:.0f}-{dp_epsilon_range[1]:.0f}_"
+        model_name = model_name + f"d-{dp_log10_delta_range[0]:.0f}-{dp_log10_delta_range[1]:.0f}"
+
+    else:
+        model_name = args.model
+
     # Setup script.
     if not observe:
         out.report_time = True
@@ -248,13 +377,19 @@ def main(**kw_args):
         *(args.subdir or ()),
         data_dir,
         *((f"x{args.dim_x}_y{args.dim_y}",) if hasattr(args, "dim_x") else ()),
-        args.model,
+        model_name,
         *((args.arch,) if hasattr(args, "arch") else ()),
         args.objective,
         log=f"log{suffix}.txt",
         diff=f"diff{suffix}.txt",
         observe=observe,
     )
+
+    # Create summary writer
+    if os.path.exists(f"{wd.root}/metrics"):
+        shutil.rmtree(f"{wd.root}/metrics")
+    
+    summary_writer = SummaryWriter(log_dir=f"{wd.root}/metrics")
 
     # Determine which device to use. Try to use a GPU if one is available.
     if args.device:
@@ -290,7 +425,7 @@ def main(**kw_args):
         "unet_channels": (64,) * 6,
         "unet_strides": (1,) + (2,) * 5,
         "conv_channels": 64,
-        "encoder_scales": None,
+        "encoder_scales": None or args.encoder_scales,
         "fullconvgnp_kernel_factor": 2,
         "mean_diff": args.mean_diff,
         # Performance of the ConvGNP is sensitive to this parameter. Moreover, it
@@ -298,6 +433,10 @@ def main(**kw_args):
         # the CNN architecture. We therefore set it to 64.
         "num_basis_functions": 64,
         "eeg_mode": args.eeg_mode,
+        "dp_epsilon_range": dp_epsilon_range,
+        "dp_log10_delta_range": dp_log10_delta_range,
+        "min_log10_scale": np.log10(args.min_scale),
+        "max_log10_scale": np.log10(args.max_scale),
     }
 
     # Setup data generators for training and for evaluation.
@@ -306,7 +445,7 @@ def main(**kw_args):
         config,
         num_tasks_train=2**6 if args.train_fast else 2**14,
         num_tasks_cv=2**6 if args.train_fast else 2**12,
-        num_tasks_eval=2**6 if args.evaluate_fast else 2**12,
+        num_tasks_eval=2**6 if args.evaluate_fast else 2**14,
         device=device,
     )
 
@@ -492,6 +631,31 @@ def main(**kw_args):
                 encoder_scales=config["encoder_scales"],
                 transform=config["transform"],
             )
+        elif args.model == "dpconvcnp":
+
+            model = nps.construct_convgnp(
+                points_per_unit=config["points_per_unit"],
+                dim_x=config["dim_x"],
+                dim_yc=(1,) * config["dim_y"],
+                dim_yt=config["dim_y"],
+                likelihood="het",
+                conv_arch=args.arch,
+                unet_channels=config["unet_channels"],
+                unet_strides=config["unet_strides"],
+                conv_channels=config["conv_channels"],
+                conv_layers=config["num_layers"],
+                conv_receptive_field=config["conv_receptive_field"],
+                margin=config["margin"],
+                encoder_scales=config["encoder_scales"],
+                transform=config["transform"],
+                divide_by_density=False,
+                use_dp=True,
+                dp_learn_params=args.dp_learn_params,
+                dp_amortise_params=args.dp_amortise_params,
+                dp_use_noise_channels=args.dp_use_noise_channels,
+                dp_y_bound=args.dp_y_bound,
+                dp_t=args.dp_t,
+            )
         else:
             raise ValueError(f'Invalid model "{args.model}".')
 
@@ -618,7 +782,7 @@ def main(**kw_args):
                 with out.Section(objecive_name):
                     for gen_name, gen in gens_eval():
                         with out.Section(gen_name.capitalize()):
-                            state, _ = eval(state, model, objective_eval, gen)
+                            state, _, metrics = eval(state, model, objective_eval, gen)
 
         # Always run AR evaluation for the conditional models.
         if not args.no_ar and (
@@ -638,7 +802,7 @@ def main(**kw_args):
             with out.Section("AR"):
                 for name, gen in gens_eval():
                     with out.Section(name.capitalize()):
-                        state, _ = eval(
+                        state, _, metrics = eval(
                             state,
                             model,
                             partial(
@@ -669,11 +833,13 @@ def main(**kw_args):
             best_eval_lik = -np.inf
 
         # Setup training loop.
-        opt = torch.optim.Adam(model.parameters(), args.rate)
+        opt = torch.optim.Adam(model.parameters(), lr=args.rate)
 
         # Set regularisation high for the first epochs.
         original_epsilon = B.epsilon
         B.epsilon = config["epsilon_start"]
+
+        step = 0
 
         for i in range(start, args.epochs):
             with out.Section(f"Epoch {i + 1}"):
@@ -697,17 +863,21 @@ def main(**kw_args):
                     fix_noise = 1e-4
                 else:
                     fix_noise = None
-                state, _ = train(
+                state, _, step = train(
                     state,
                     model,
                     opt,
                     objective,
                     gen_train,
                     fix_noise=fix_noise,
+                    epoch=i,
+                    step=step,
+                    summary_writer=summary_writer,
+                    num_forward=args.num_forward,
                 )
 
                 # The epoch is done. Now evaluate.
-                state, val = eval(state, model, objective_cv, gen_cv())
+                state, val, metrics = eval(state, model, objective_cv, gen_cv(), epoch=i, summary_writer=summary_writer)
 
                 # Save current model.
                 torch.save(
@@ -731,6 +901,11 @@ def main(**kw_args):
                         },
                         wd.file(f"model-best.torch"),
                     )
+                    
+                    for metric_name, metric_value in metrics.items():
+                        file = open(f"{wd.file(metric_name)}.txt", "w")
+                        file.write(metric_value)
+                        file.close()
 
                 # Visualise a few predictions by the model.
                 gen = gen_cv()

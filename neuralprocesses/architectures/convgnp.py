@@ -40,8 +40,14 @@ def _convgnp_construct_encoder_setconvs(
     dim_yc,
     disc,
     dtype=None,
+    learnable_scale=True,
+    use_dp=False,
+    dp_learn_params=True,
+    dp_amortise_params=True,
+    dp_use_noise_channels=False,
+    dp_y_bound=None,
+    dp_t=None,
     init_factor=1,
-    encoder_scales_learnable=True,
 ):
     # Initialise scale.
     if encoder_scales is not None:
@@ -51,13 +57,33 @@ def _convgnp_construct_encoder_setconvs(
     # Ensure that there is one for every context set.
     if not isinstance(encoder_scales, (tuple, list)):
         encoder_scales = (encoder_scales,) * len(dim_yc)
-    # Construct set convs.
-    return nps.Parallel(
-        *(
-            nps.SetConv(s, dtype=dtype, learnable=encoder_scales_learnable)
-            for s in encoder_scales
+        
+    if use_dp:
+        # Construct DP set convs.
+        return nps.Parallel(
+            *(
+                nps.DPSetConv(
+                    s,
+                    y_bound=dp_y_bound,
+                    t=dp_t,
+                    dp_learn_params=dp_learn_params,
+                    dp_amortise_params=dp_amortise_params,
+                    learnable_scale=learnable_scale,
+                    dp_use_noise_channels=dp_use_noise_channels,
+                    dtype=dtype,
+                )
+                for s in encoder_scales
+            )
         )
-    )
+        
+    else:
+        # Construct set convs.
+        return nps.Parallel(
+            *(
+                nps.SetConv(s, dtype=dtype, learnable=learnable_scale)
+                for s in encoder_scales
+            )
+        )
 
 
 def _convgnp_assert_form_contexts(nps, dim_yc):
@@ -116,7 +142,7 @@ def construct_convgnp(
     dim_lv=0,
     lv_likelihood="het",
     encoder_scales=None,
-    encoder_scales_learnable=True,
+    encoder_scale_learnable=True,
     decoder_scale=None,
     decoder_scale_learnable=True,
     aux_t_mlp_layers=(128,) * 3,
@@ -125,6 +151,12 @@ def construct_convgnp(
     transform=None,
     dtype=None,
     nps=nps,
+    use_dp=False,
+    dp_learn_params=True,
+    dp_amortise_params=False,
+    dp_use_noise_channels=True,
+    dp_y_bound=None,
+    dp_t=None,
 ):
     """A Convolutional Gaussian Neural Process.
 
@@ -275,7 +307,7 @@ def construct_convgnp(
         in_channels = dim_lv
         out_channels = conv_out_channels  # These must be equal!
     else:
-        in_channels = conv_in_channels
+        in_channels = 2 * conv_in_channels if use_dp and dp_use_noise_channels else conv_in_channels
         out_channels = conv_out_channels  # These must be equal!
     if "unet" in conv_arch:
         if dim_lv > 0:
@@ -352,6 +384,14 @@ def construct_convgnp(
         margin=margin,
         dim=dim_x,
     )
+    
+    if use_dp and divide_by_density:
+
+        raise ValueError(
+            f"If use_dp=True, divide_by_density should be False, "
+            f"found {divide_by_density}."
+        )
+            
 
     # Construct model.
     model = nps.Model(
@@ -366,7 +406,13 @@ def construct_convgnp(
                     dim_yc,
                     disc,
                     dtype,
-                    encoder_scales_learnable=encoder_scales_learnable,
+                    use_dp=use_dp,
+                    learnable_scale=encoder_scale_learnable,
+                    dp_learn_params=dp_learn_params,
+                    dp_amortise_params=dp_amortise_params,
+                    dp_use_noise_channels=dp_use_noise_channels,
+                    dp_y_bound=dp_y_bound,
+                    dp_t=dp_t,
                 ),
                 _convgnp_optional_division_by_density(nps, divide_by_density, epsilon),
                 nps.Concatenate(),

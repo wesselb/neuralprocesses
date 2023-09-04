@@ -2,6 +2,7 @@ from .beta import *
 from .dirac import *
 from .dist import *
 from .geom import *
+from .mixture import *
 from .normal import *
 from .spikeslab import *
 from .transformed import *

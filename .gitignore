@@ -24,4 +24,7 @@ cover
 *.swp
 .vscode/*
 venv-np
-_experiments
+_experiments*
+*.ipynb_checkpoints
+*__pycache__
+_*

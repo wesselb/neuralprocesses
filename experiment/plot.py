@@ -50,6 +50,8 @@ def visualise_1d(model, gen, *, path, config, predict):
             nps.AggregateInput(
                 *((x[None, None, :], i) for i in range(config["dim_y"]))
             ),
+            epsilon=batch["epsilon"],
+            delta=batch["delta"],
         )
 
     plt.figure(figsize=(8, 6 * config["dim_y"]))
@@ -66,13 +68,13 @@ def visualise_1d(model, gen, *, path, config, predict):
             s=20,
         )
 
-        plt.scatter(
-            nps.batch_xt(batch, i)[0, 0],
-            nps.batch_yt(batch, i)[0],
-            label="Target",
-            style="test",
-            s=20,
-        )
+        # plt.scatter(
+        #     nps.batch_xt(batch, i)[0, 0],
+        #     nps.batch_yt(batch, i)[0],
+        #     label="Target",
+        #     style="test",
+        #     s=20,
+        # )
 
         # Plot prediction.
         err = 1.96 * B.sqrt(var[i][0, 0])
@@ -97,8 +99,14 @@ def visualise_1d(model, gen, *, path, config, predict):
         )
 
         # Plot prediction by ground truth.
-        if hasattr(gen, "kernel") and config["dim_y"] == 1:
-            f = stheno.GP(gen.kernel)
+        if (hasattr(gen, "kernel") or hasattr(gen, "kernel_type")) and config["dim_y"] == 1:
+
+            if hasattr(gen, "kernel_type"):
+                f = stheno.GP(gen.kernel_type().stretch(batch["scale"]))
+
+            else:
+                f = stheno.GP(gen.kernel)
+
             # Make sure that everything is of `float64`s and on the GPU.
             noise = B.to_active_device(B.cast(torch.float64, gen.noise))
             xc = B.cast(torch.float64, nps.batch_xc(batch, 0)[0, 0])
@@ -107,12 +115,32 @@ def visualise_1d(model, gen, *, path, config, predict):
             # Compute posterior GP.
             f_post = f | (f(xc, noise), yc)
             mean, lower, upper = f_post(x).marginal_credible_bounds()
+
+            lower = mean - 1.96 * (((mean - lower)/1.96)**2. + noise)**0.5
+            upper = mean + 1.96 * (((upper - mean)/1.96)**2. + noise)**0.5
+
             plt.plot(x, mean, label="Truth", style="pred2")
             plt.plot(x, lower, style="pred2")
             plt.plot(x, upper, style="pred2")
 
         for x_axvline in plot_config["axvline"]:
             plt.axvline(x_axvline, c="k", ls="--", lw=0.5)
+
+            nps.batch_yt(batch, i)[0],
+            
+        N = nps.batch_yc(batch, i)[0].shape[0]
+        ell = 0.25 if 'scale' not in batch else batch['scale'].detach().cpu().numpy()[0]
+        epsilon = batch['epsilon'][i].numpy()[0]
+        delta = batch['delta'][i].numpy()[0]
+        
+        plt.gca().set_title(
+            f"$N = {N:.0f}$  " + \
+            f"$\\ell = {ell:.3f}$  " + \
+            f"$\\epsilon = {epsilon:.2f}$  " + \
+            f"$N\\ell\\epsilon \\approx {N*ell*epsilon:.0f}$  " + \
+            f"$\\delta = {delta:.3f}$",
+            fontsize=24,
+        )
 
         plt.xlim(B.min(x), B.max(x))
         tweak()
@@ -149,6 +177,8 @@ def visualise_2d(model, gen, *, path, config, predict):
             nps.AggregateInput(
                 *((x_list[None, :, :], i) for i in range(config["dim_y"]))
             ),
+            epsilon=batch["epsilon"],
+            delta=batch["delta"],
             num_samples=2,
         )
 
