@@ -1,12 +1,93 @@
 [build-system]
-requires = [
-    "setuptools>=50.0",
-    "setuptools_scm[toml]>=6.0",
-    "setuptools_scm_git_archive",
-    "wheel>=0.33",
+requires = ["hatchling>=1.8.0", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "NeuralProcesses"
+description = "A framework for composing Neural Processes in Python"
+authors = [
+    {name="Wessel Bruinsma", email="wessel.p.bruinsma@gmail.com"},
+]
+license = {text="MIT"}
+readme = "README.md"
+dynamic = ["version"]
+
+requires-python = ">=3.8"
+dependencies = [
     "numpy>=1.16",
-    "cython>=0.29",
+    "backends>=1.4.31",
+    "backends-matrix>=1.2.10",
+    "plum-dispatch>=2",
+    "stheno>=1.3.10",
+    "wbml>=0.3.18",
 ]
 
-[tool.setuptools_scm]
-write_to = "neuralprocesses/_version.py"
+[project.optional-dependencies]
+dev = [
+    "numpy",
+    "pytest>=6",
+    "pytest-cov",
+    "coveralls",
+    "pre-commit",
+    "IPython",
+    "black==23.7.0",
+    "ghp-import",
+    "wheel",
+    "build",
+    "tox",
+    "jupyter-book",
+    "mypy",
+    "pyright",
+    "torch",
+    "tensorflow",
+    "tensorflow-probability",
+]
+
+[project.urls]
+repository = "https://github.com/wesselb/neuralprocesses"
+
+[tool.hatch.build]
+include = ["neuralprocesses*"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "skeleton_name/_version.py"
+
+# Tests:
+
+[tool.coverage.run]
+branch = true
+command_line = "-m pytest --verbose test"
+source = ["neuralprocesses"]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+
+# Formatting tools:
+
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+src_paths = ["neuralprocesses", "tests"]
