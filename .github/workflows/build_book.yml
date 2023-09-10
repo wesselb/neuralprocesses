@@ -24,14 +24,14 @@ jobs:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
-        pip install -r requirements.txt
+        python -m pip install -e '.[dev]'
 
     # Build the book.
     - name: Build
       run: |
         jupyter-book build docs
 
-    # Deploy the book's HTML to gh-pages branch.
+    # Deploy the book's HTML to the branch `gh-pages`.
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3.6.1
       with:
