@@ -8,13 +8,38 @@ from .util import approx, generate_data, nps  # noqa
 
 @pytest.mark.parametrize("dim_lv", [0, 4])
 def test_loglik_batching(nps, dim_lv):
-    model = nps.construct_gnp(dim_lv=dim_lv)
     xc, yc, xt, yt = generate_data(nps)
+    model = nps.construct_gnp(dim_lv=dim_lv, dtype=nps.dtype)
     # Test a high number of samples, a number which also isn't a multiple of the batch
     # size.
     logpdfs = B.mean(
         nps.loglik(model, xc, yc, xt, yt, num_samples=4000, batch_size=128)
     )
+    assert np.isfinite(B.to_numpy(logpdfs))
+
+
+@pytest.mark.parametrize("dim_lv", [0, 4])
+@pytest.mark.parametrize("dtype_lik", [None, "dtype32", "dtype64"])
+@pytest.mark.parametrize("objective", ["loglik", "elbo"])
+@pytest.mark.parametrize("normalise", [True, False])
+def test_loglik_dtype_lik(nps, dim_lv, dtype_lik, objective, normalise):
+    xc, yc, xt, yt = generate_data(nps)
+    dtype_lik = None if dtype_lik is None else getattr(nps, dtype_lik)
+    model = nps.construct_gnp(dim_lv=dim_lv, dtype=nps.dtype)
+
+    logpdfs = B.mean(
+        getattr(nps, objective)(
+            model,
+            xc,
+            yc,
+            xt,
+            yt,
+            normalise=normalise,
+            dtype_lik=dtype_lik,
+        )
+    )
+    if dtype_lik:
+        assert B.dtype(logpdfs) == dtype_lik
     assert np.isfinite(B.to_numpy(logpdfs))
 
 

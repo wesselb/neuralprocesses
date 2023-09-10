@@ -1,10 +1,10 @@
 import lab as B
 import numpy as np
 
-from .model import Model
-from .util import fix_noise as fix_noise_in_pred
 from .. import _dispatch
 from ..numdata import num_data
+from .model import Model
+from .util import fix_noise as fix_noise_in_pred
 
 __all__ = ["loglik"]
 
@@ -21,6 +21,7 @@ def loglik(
     batch_size=16,
     normalise=False,
     fix_noise=None,
+    dtype_lik=None,
     **kw_args,
 ):
     """Log-likelihood objective.
@@ -37,6 +38,8 @@ def loglik(
         normalise (bool, optional): Normalise the objective by the number of targets.
             Defaults to `False`.
         fix_noise (float, optional): Fix the likelihood variance to this value.
+        dtype_lik (dtype, optional): Data type to use for the likelihood computation.
+            Defaults to the 64-bit variant of the data type of `yt`.
 
     Returns:
         random state, optional: Random state.
@@ -44,6 +47,11 @@ def loglik(
     """
     float = B.dtype_float(yt)
     float64 = B.promote_dtypes(float, np.float64)
+
+    # For the likelihood computation, default to using a 64-bit version of the data
+    # type of `yt`.
+    if not dtype_lik:
+        dtype_lik = float64
 
     # Sample in batches to alleviate memory requirements.
     logpdfs = None
@@ -59,11 +67,11 @@ def loglik(
             xt,
             num_samples=this_num_samples,
             dtype_enc_sample=float,
-            dtype_lik=float64,
+            dtype_lik=dtype_lik,
             **kw_args,
         )
         pred = fix_noise_in_pred(pred, fix_noise)
-        this_logpdfs = pred.logpdf(B.cast(float64, yt))
+        this_logpdfs = pred.logpdf(B.cast(dtype_lik, yt))
 
         # If the number of samples is equal to one but `num_samples > 1`, then the
         # encoding was a `Dirac`, so we can stop batching. Also, set `num_samples = 1`
@@ -85,11 +93,11 @@ def loglik(
         done_num_samples += this_num_samples
 
     # Average over samples. Sample dimension should always be the first.
-    logpdfs = B.logsumexp(logpdfs, axis=0) - B.log(num_samples)
+    logpdfs = B.logsumexp(logpdfs, axis=0) - B.cast(dtype_lik, B.log(num_samples))
 
     if normalise:
         # Normalise by the number of targets.
-        logpdfs = logpdfs / B.cast(float64, num_data(xt, yt))
+        logpdfs = logpdfs / B.cast(dtype_lik, num_data(xt, yt))
 
     return state, logpdfs
 

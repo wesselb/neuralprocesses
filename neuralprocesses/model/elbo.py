@@ -27,6 +27,7 @@ def elbo(
     normalise=False,
     subsume_context=False,
     fix_noise=None,
+    dtype_lik=None,
     **kw_args,
 ):
     """ELBO objective.
@@ -44,6 +45,8 @@ def elbo(
         subsume_context (bool, optional): Subsume the context set into the target set.
             Defaults to `False`.
         fix_noise (float, optional): Fix the likelihood variance to this value.
+        dtype_lik (dtype, optional): Data type to use for the likelihood computation.
+            Defaults to the 64-bit variant of the data type of `yt`.
 
     Returns:
         random state, optional: Random state.
@@ -51,6 +54,11 @@ def elbo(
     """
     float = B.dtype_float(yt)
     float64 = B.promote_dtypes(float, np.float64)
+
+    # For the likelihood computation, default to using a 64-bit version of the data
+    # type of `yt`.
+    if not dtype_lik:
+        dtype_lik = float64
 
     if subsume_context:
         # Only here also update the targets.
@@ -64,7 +72,7 @@ def elbo(
         *compress_contexts(contexts),
         xt,
         root=True,
-        dtype_lik=float64,
+        dtype_lik=dtype_lik,
         **kw_args,
     )
 
@@ -75,7 +83,7 @@ def elbo(
         *compress_contexts(contexts_q),
         h,
         root=True,
-        dtype_lik=float64,
+        dtype_lik=dtype_lik,
         **kw_args,
     )
 
@@ -90,18 +98,18 @@ def elbo(
         xz,
         z,
         xt,
-        dtype_lik=float64,
+        dtype_lik=dtype_lik,
         root=True,
         **kw_args,
     )
     d = fix_noise_in_pred(d, fix_noise)
 
     # Compute the ELBO.
-    elbos = B.mean(d.logpdf(B.cast(float64, yt)), axis=0) - _kl(qz, pz)
+    elbos = B.mean(d.logpdf(B.cast(dtype_lik, yt)), axis=0) - _kl(qz, pz)
 
     if normalise:
         # Normalise by the number of targets.
-        elbos = elbos / B.cast(float64, num_data(xt, yt))
+        elbos = elbos / B.cast(dtype_lik, num_data(xt, yt))
 
     return state, elbos
 
