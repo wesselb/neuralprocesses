@@ -30,7 +30,7 @@ jobs:
           COVERALLS_PARALLEL: true
         run: |
           PRAGMA_VERSION=`python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))"` \
-            pytest -v --cov=skeleton_name --cov-report term-missing
+            pytest -v --cov=neuralprocesses --cov-report term-missing
           coveralls --service=github
 
   coveralls:
