@@ -1,4 +1,4 @@
-name: Check Formatting
+name: Code style
 on:
   - push
   - pull_request
