@@ -53,7 +53,7 @@ include = ["neuralprocesses*"]
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "skeleton_name/_version.py"
+version-file = "neuralprocesses/_version.py"
 
 # Tests:
 
