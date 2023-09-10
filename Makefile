@@ -3,8 +3,9 @@
 PACKAGE := neuralprocesses
 
 install:
-	pip install -r requirements.txt -e .
+	pip install -e '.[dev]'
 
 test:
-	python setup.py --version
-	pytest -v --cov=$(PACKAGE) --cov-report html:cover --cov-report term-missing
+	pre-commit run --all-files
+	PRAGMA_VERSION=`python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))"` \
+		pytest tests -v --cov=$(PACKAGE) --cov-report html:cover --cov-report term-missing
