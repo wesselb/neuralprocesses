@@ -3,9 +3,9 @@ from lab import B
 from plum import convert
 from wbml.data.eeg import load_full as load_eeg
 
+from ..dist import AbstractDistribution, UniformContinuous, UniformDiscrete
 from .data import DataGenerator, apply_task
 from .util import cache
-from ..dist import AbstractDistribution, UniformContinuous, UniformDiscrete
 
 __all__ = ["EEGGenerator"]
 

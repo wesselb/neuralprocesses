@@ -1,7 +1,7 @@
 from matrix.util import indent
 
 from . import _dispatch
-from .util import register_module, is_framework_module
+from .util import is_framework_module, register_module
 
 __all__ = ["Chain"]
 

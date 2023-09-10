@@ -5,8 +5,8 @@ import lab as B
 import numpy as np
 from plum import convert
 
-from ..aggregate import AggregateInput, Aggregate
-from ..dist import UniformDiscrete, UniformContinuous, AbstractDistribution
+from ..aggregate import Aggregate, AggregateInput
+from ..dist import AbstractDistribution, UniformContinuous, UniformDiscrete
 from ..util import split
 
 __all__ = [

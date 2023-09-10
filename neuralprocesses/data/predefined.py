@@ -1,11 +1,11 @@
 import lab as B
 from stheno import EQ, Matern52
 
+from ..dist.uniform import UniformContinuous, UniformDiscrete
 from .gp import GPGenerator
-from .mixture import MixtureGenerator
 from .mixgp import MixtureGPGenerator
+from .mixture import MixtureGenerator
 from .sawtooth import SawtoothGenerator
-from ..dist.uniform import UniformDiscrete, UniformContinuous
 
 __all__ = ["construct_predefined_gens"]
 

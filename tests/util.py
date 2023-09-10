@@ -2,12 +2,13 @@ import socket
 from typing import Union
 
 import lab as B
-import neuralprocesses
 import pytest
 import tensorflow as tf
 import torch
 from numpy.testing import assert_allclose
 from plum import Dispatcher
+
+import neuralprocesses
 
 __all__ = ["approx", "nps", "generate_data", "remote_xfail", "remote_skip"]
 
@@ -32,7 +33,7 @@ def approx(a: None, b: None, **kw_args):
 def approx(
     a: Union[neuralprocesses.Parallel, tuple],
     b: Union[neuralprocesses.Parallel, tuple],
-    **kw_args
+    **kw_args,
 ):
     assert len(a) == len(b)
     for ai, bi in zip(a, b):

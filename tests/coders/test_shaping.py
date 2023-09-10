@@ -2,6 +2,7 @@ import pytest
 from plum import Dispatcher
 
 import neuralprocesses as nps_
+
 from ..util import nps  # noqa
 
 _dispatch = Dispatcher()

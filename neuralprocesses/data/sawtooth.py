@@ -1,7 +1,7 @@
 import lab as B
 
-from .data import SyntheticGenerator, new_batch
 from ..dist import UniformContinuous
+from .data import SyntheticGenerator, new_batch
 
 __all__ = ["SawtoothGenerator"]
 

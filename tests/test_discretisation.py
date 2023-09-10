@@ -1,6 +1,6 @@
 import lab as B
 
-from .util import nps, approx  # noqa
+from .util import approx, nps  # noqa
 
 
 def test_discretisation(nps):

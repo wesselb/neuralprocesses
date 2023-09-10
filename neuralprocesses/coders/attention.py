@@ -1,7 +1,7 @@
 import lab as B
 
 from .. import _dispatch
-from ..util import register_module, batch
+from ..util import batch, register_module
 
 __all__ = ["Attention", "SelfAttention"]
 

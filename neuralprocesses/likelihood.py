@@ -5,9 +5,9 @@ import lab as B
 from lab.util import resolve_axis
 
 from . import _dispatch
-from .aggregate import AggregateInput, Aggregate
+from .aggregate import Aggregate, AggregateInput
 from .datadims import data_dims
-from .dist import MultiOutputNormal, Dirac, SpikesSlab, Beta
+from .dist import Beta, Dirac, MultiOutputNormal, SpikesSlab
 from .parallel import Parallel
 from .util import register_module, split, split_dimension
 

@@ -3,9 +3,10 @@ from itertools import product
 import lab as B
 import numpy as np
 import pytest
+from plum import isinstance
+
 from neuralprocesses.aggregate import Aggregate, AggregateInput
 from neuralprocesses.parallel import Parallel
-from plum import isinstance
 
 from .util import approx, generate_data
 from .util import nps as nps_fixed_dtype  # noqa

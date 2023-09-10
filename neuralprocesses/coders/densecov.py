@@ -3,11 +3,7 @@ import numpy as np
 
 from .. import _dispatch
 from ..datadims import data_dims
-from ..util import (
-    register_module,
-    split_dimension,
-    batch,
-)
+from ..util import batch, register_module, split_dimension
 
 __all__ = [
     "ToDenseCovariance",

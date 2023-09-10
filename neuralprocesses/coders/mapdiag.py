@@ -3,8 +3,8 @@ import matrix  # noqa
 
 from .. import _dispatch
 from ..aggregate import AggregateInput
-from ..util import register_module, register_composite_coder
 from ..parallel import Parallel
+from ..util import register_composite_coder, register_module
 
 __all__ = ["MapDiagonal"]
 

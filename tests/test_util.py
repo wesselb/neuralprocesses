@@ -1,4 +1,4 @@
-from .util import nps, generate_data  # noqa
+from .util import generate_data, nps  # noqa
 
 
 def test_num_params(nps):

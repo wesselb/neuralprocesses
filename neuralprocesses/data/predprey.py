@@ -4,9 +4,9 @@ import wbml.util
 from plum import convert
 from wbml.data.predprey import load
 
-from .data import DataGenerator, apply_task
 from ..dist import AbstractDistribution
-from ..dist.uniform import UniformDiscrete, UniformContinuous
+from ..dist.uniform import UniformContinuous, UniformDiscrete
+from .data import DataGenerator, apply_task
 
 __all__ = ["PredPreyGenerator", "PredPreyRealGenerator"]
 

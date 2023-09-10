@@ -1,8 +1,8 @@
 import lab as B
 import stheno
 
-from .gp import GPGenerator, new_batch
 from ..dist import UniformDiscrete
+from .gp import GPGenerator, new_batch
 
 __all__ = ["MixtureGPGenerator"]
 

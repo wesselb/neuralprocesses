@@ -1,8 +1,8 @@
 import lab.torch  # noqa
 
-from .nn import *
 from .. import *  # noqa
-from ..util import modules, models, wrapped_partial
+from ..util import models, modules, wrapped_partial
+from .nn import *
 
 
 def create_init(module):

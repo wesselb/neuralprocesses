@@ -25,25 +25,19 @@ def _dispatch(f=None, **kw_args):
         return _internal_dispatch(f, **kw_args)
 
 
-from .dist import *
-from .coding import *
-from .parallel import *
-from .chain import *
-from .materialise import *
-from .likelihood import *
-from .disc import *
-from .datadims import *
-from .numdata import *
-
-from .augment import *
-from .mask import *
-from .augment import *
 from .aggregate import *
-
-from .model import *
-
-from .coders import *
-
 from .architectures import *
-
+from .augment import *
+from .chain import *
+from .coders import *
+from .coding import *
 from .data import *
+from .datadims import *
+from .disc import *
+from .dist import *
+from .likelihood import *
+from .mask import *
+from .materialise import *
+from .model import *
+from .numdata import *
+from .parallel import *

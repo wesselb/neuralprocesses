@@ -38,7 +38,7 @@ def test_convgnp_mask(nps):
 def test_mask_contexts(nps, ns, multiple):
     x, y = nps.merge_contexts(
         *((B.randn(nps.dtype, 2, 3, n), B.randn(nps.dtype, 2, 4, n)) for n in ns),
-        multiple=multiple
+        multiple=multiple,
     )
 
     # Test that the output is of the right shape.

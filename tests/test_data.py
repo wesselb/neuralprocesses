@@ -5,7 +5,8 @@ from plum import Dispatcher
 
 from neuralprocesses.augment import AugmentedInput
 from neuralprocesses.mask import Masked
-from .util import nps, remote_xfail, remote_skip  # noqa
+
+from .util import nps, remote_skip, remote_xfail  # noqa
 
 _dispatch = Dispatcher()
 

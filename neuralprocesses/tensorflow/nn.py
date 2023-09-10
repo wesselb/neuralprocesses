@@ -7,6 +7,7 @@ import tensorflow as tf
 from plum import convert
 
 import neuralprocesses as nps
+
 from .. import _dispatch
 from ..util import compress_batch_dimensions, is_framework_module
 

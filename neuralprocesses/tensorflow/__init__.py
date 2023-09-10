@@ -1,9 +1,9 @@
 import lab.tensorflow  # noqa
 from plum import convert
 
-from .nn import *
 from .. import *  # noqa
-from ..util import modules, models, wrapped_partial
+from ..util import models, modules, wrapped_partial
+from .nn import *
 
 
 def create_init(module):

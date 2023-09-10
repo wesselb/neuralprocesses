@@ -2,8 +2,8 @@ import lab as B
 
 from . import _dispatch
 from .aggregate import Aggregate, AggregateInput
-from .parallel import Parallel
 from .augment import AugmentedInput
+from .parallel import Parallel
 
 __all__ = ["data_dims"]
 

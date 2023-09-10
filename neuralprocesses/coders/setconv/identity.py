@@ -2,7 +2,7 @@ import lab as B
 
 from ... import _dispatch
 from ...datadims import data_dims
-from ...util import register_module, batch
+from ...util import batch, register_module
 
 __all__ = ["PrependIdentityChannel"]
 

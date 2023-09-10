@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import griddata
 
-from .data import DataGenerator
-from .util import cache
 from ..augment import AugmentedInput
 from ..dist import TruncatedGeometric
 from ..mask import Masked
+from .data import DataGenerator
+from .util import cache
 
 __all__ = ["TemperatureGenerator"]
 

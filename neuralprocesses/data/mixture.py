@@ -1,8 +1,8 @@
 import lab as B
 import numpy as np
 
-from .data import AbstractGenerator, DataGenerator
 from .. import _dispatch
+from .data import AbstractGenerator, DataGenerator
 
 __all__ = ["MixtureGenerator"]
 

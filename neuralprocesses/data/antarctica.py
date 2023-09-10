@@ -1,20 +1,17 @@
+from datetime import date as datetime_date
+
+import netCDF4 as nc
 import numpy as np
-import torch
-
 import pandas as pd
-
+import torch
 from lab import B
 from plum import convert
 from wbml.data.eeg import load_full as load_eeg
 
+from ..aggregate import Aggregate, AggregateInput
+from ..dist import AbstractDistribution, UniformContinuous, UniformDiscrete
 from .data import DataGenerator, apply_task
 from .util import cache
-from ..dist import AbstractDistribution, UniformContinuous, UniformDiscrete
-from ..aggregate import AggregateInput, Aggregate
-
-import netCDF4 as nc
-
-from datetime import date as datetime_date
 
 __all__ = ["AntarcticaGenerator"]
 

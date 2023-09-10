@@ -1,5 +1,6 @@
-import neuralprocesses as nps  # This fixes inspection below.
 from plum import convert
+
+import neuralprocesses as nps  # This fixes inspection below.
 
 from ..util import register_model
 from .util import construct_likelihood, parse_transform

@@ -1,8 +1,9 @@
 import lab as B
 import pytest
-from ..util import nps, approx  # noqa
+
 from neuralprocesses.dist import MultiOutputNormal
 
+from ..util import approx, nps  # noqa
 
 _missing_dists = []
 

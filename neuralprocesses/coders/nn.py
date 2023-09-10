@@ -1,13 +1,13 @@
 import math
 from functools import partial
-from typing import Tuple, Union, Optional
+from typing import Optional, Tuple, Union
 
 import lab as B
 from plum import convert
 
 from .. import _dispatch
 from ..datadims import data_dims
-from ..util import register_module, compress_batch_dimensions, with_first_last
+from ..util import compress_batch_dimensions, register_module, with_first_last
 
 __all__ = ["Linear", "MLP", "UNet", "ConvNet", "Conv", "ResidualBlock"]
 

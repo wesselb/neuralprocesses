@@ -1,7 +1,7 @@
 import neuralprocesses as nps  # This fixes inspection below.
 
-from .util import construct_likelihood
 from ..util import register_model
+from .util import construct_likelihood
 
 __all__ = ["construct_climate_convgnp_mlp", "construct_climate_convgnp_multires"]
 

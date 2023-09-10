@@ -1,5 +1,6 @@
-import neuralprocesses as nps  # This fixes inspection below.
 import wbml.out as out
+
+import neuralprocesses as nps  # This fixes inspection below.
 
 from ..util import register_model
 from .convgnp import (

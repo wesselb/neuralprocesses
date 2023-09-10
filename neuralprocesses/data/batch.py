@@ -2,8 +2,8 @@ import lab as B
 
 from .. import _dispatch
 from ..aggregate import Aggregate, AggregateInput
-from ..mask import Masked
 from ..augment import AugmentedInput
+from ..mask import Masked
 
 __all__ = [
     "batch_index",

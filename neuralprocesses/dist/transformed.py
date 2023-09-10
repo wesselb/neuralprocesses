@@ -3,11 +3,11 @@ from functools import partial
 import lab as B
 from wbml.util import indented_kv
 
-from .dist import AbstractDistribution, shape_batch
-from .normal import _map_sample_output
 from .. import _dispatch
 from ..aggregate import Aggregate
 from ..util import register_module
+from .dist import AbstractDistribution, shape_batch
+from .normal import _map_sample_output
 
 __all__ = ["Transform", "TransformedMultiOutputDistribution"]
 
