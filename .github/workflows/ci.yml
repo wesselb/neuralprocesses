@@ -9,38 +9,39 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9]
+        python-version: [3.8, 3.9, "3.10", "3.11"]
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+
       - name: Install dependencies
         run: |
-          sudo apt-get install gfortran
-          pip install --upgrade pip setuptools 'setuptools_scm[toml]' setuptools_scm_git_archive numpy Cython
-          python setup.py --version
-          pip install --no-cache-dir -U -r requirements.txt | cat
-          pip install --upgrade numpy
+          python -m pip install --upgrade pip
+          python -m pip install --upgrade --no-cache-dir -e '.[dev]'
+
       - name: Test
-        run: |
-          pytest -v --cov=neuralprocesses --cov-report term-missing
-          coveralls --service=github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_FLAG_NAME: ${{ matrix.test-name }}
+          COVERALLS_FLAG_NAME: ${{ matrix.python-version }}
           COVERALLS_PARALLEL: true
+        run: |
+          PRAGMA_VERSION=`python -c "import sys; print('.'.join(map(str, sys.version_info[:2])))"` \
+            pytest -v --cov=skeleton_name --cov-report term-missing
+          coveralls --service=github
 
-  finish:
-    name: Finish Coveralls
+  coveralls:
+    name: Finish coverage
     needs: test
     runs-on: ubuntu-latest
+    container: python:3-slim
     steps:
-    - name: Finish Coveralls
-      uses: coverallsapp/github-action@v1
-      with:
-        github-token: ${{ secrets.github_token }}
-        parallel-finished: true
+    - name: Finished
+      run: |
+        pip3 install --upgrade coveralls
+        coveralls --finish
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
