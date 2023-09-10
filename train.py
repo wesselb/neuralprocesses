@@ -5,15 +5,15 @@ import time
 import warnings
 from functools import partial
 
+import experiment as exp
 import lab as B
 import numpy as np
-import torch
 import wbml.out as out
 from matrix.util import ToDenseWarning
 from wbml.experiment import WorkingDirectory
 
-import experiment as exp
 import neuralprocesses.torch as nps
+import torch
 
 __all__ = ["main"]
 

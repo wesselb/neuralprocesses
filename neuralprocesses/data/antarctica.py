@@ -3,10 +3,11 @@ from datetime import date as datetime_date
 import netCDF4 as nc
 import numpy as np
 import pandas as pd
-import torch
 from lab import B
 from plum import convert
 from wbml.data.eeg import load_full as load_eeg
+
+import torch
 
 from ..aggregate import Aggregate, AggregateInput
 from ..dist import AbstractDistribution, UniformContinuous, UniformDiscrete

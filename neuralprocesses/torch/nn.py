@@ -3,11 +3,11 @@ from typing import Optional, Union
 
 import lab.torch as B
 import numpy as np
-import torch
 from plum import convert
 from wbml.util import inv_perm
 
 import neuralprocesses as nps
+import torch
 
 from .. import _dispatch
 from ..util import is_framework_module

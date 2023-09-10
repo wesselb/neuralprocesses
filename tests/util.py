@@ -3,12 +3,12 @@ from typing import Union
 
 import lab as B
 import pytest
-import tensorflow as tf
-import torch
 from numpy.testing import assert_allclose
 from plum import Dispatcher
 
 import neuralprocesses
+import tensorflow as tf
+import torch
 
 __all__ = ["approx", "nps", "generate_data", "remote_xfail", "remote_skip"]
 

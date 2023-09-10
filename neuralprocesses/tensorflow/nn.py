@@ -3,10 +3,10 @@ from typing import Optional, Union
 
 import lab.tensorflow as B
 import numpy as np
-import tensorflow as tf
 from plum import convert
 
 import neuralprocesses as nps
+import tensorflow as tf
 
 from .. import _dispatch
 from ..util import compress_batch_dimensions, is_framework_module

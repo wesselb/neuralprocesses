@@ -1,8 +1,8 @@
 import lab.torch as B
 import pytest
-import torch
 
 import neuralprocesses.gnp as gnp
+import torch
 
 # noinspection PyUnresolvedReferences
 from .util import context_set, target_set
