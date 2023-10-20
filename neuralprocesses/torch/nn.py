@@ -200,6 +200,7 @@ class Interface:
     """PyTorch interface."""
 
     ReLU = torch.nn.ReLU
+    LeakyReLU = torch.nn.LeakyReLU    
 
     Sequential = torch.nn.Sequential
 

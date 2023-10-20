@@ -270,6 +270,7 @@ class Interface:
     """TensorFlow interface."""
 
     ReLU = tf.keras.layers.ReLU
+    LeakyReLU = tf.keras.layers.LeakyReLU
 
     @staticmethod
     def Sequential(*modules):
