@@ -16,6 +16,9 @@ class Attention:
         dim_embedding (int): Dimensionality of the embedding.
         num_heads (int): Number of heads.
         num_enc_layers (int): Number of layers in the encoders.
+        nonlinearity (string, optional): Nonlinearity in the encoders. Valid
+        values are None (defaults to ReLU), 'ReLU', and 'LeakyReLU'. Not
+        case-sensitive.
         dtype (dtype, optional): Data type.
 
     Attributes:
@@ -37,6 +40,7 @@ class Attention:
         dim_embedding,
         num_heads,
         num_enc_layers,
+        nonlinearity=None,
         dtype=None,
         _self=False,
     ):
@@ -49,12 +53,14 @@ class Attention:
             in_dim=dim_x,
             layers=(self.dim_head * num_heads,) * num_enc_layers,
             out_dim=self.dim_head * num_heads,
+            nonlinearity=nonlinearity,
             dtype=dtype,
         )
         self.encoder_xy = self.nps.MLP(
             in_dim=dim_x + dim_y,
             layers=(self.dim_head * num_heads,) * num_enc_layers,
             out_dim=self.dim_head * num_heads,
+            nonlinearity=nonlinearity,
             dtype=dtype,
         )
 
@@ -62,12 +68,14 @@ class Attention:
             in_dim=self.dim_head * num_heads,
             layers=(),
             out_dim=dim_embedding,
+            nonlinearity=nonlinearity,
             dtype=dtype,
         )
         self.mlp1 = self.nps.MLP(
             in_dim=self.dim_head * num_heads,
             layers=(),
             out_dim=dim_embedding,
+            nonlinearity=nonlinearity,
             dtype=dtype,
         )
         self.ln1 = self.nn.LayerNorm(dim_embedding, None, dtype=dtype)
@@ -75,6 +83,7 @@ class Attention:
             in_dim=dim_embedding,
             layers=(dim_embedding,),
             out_dim=dim_embedding,
+            nonlinearity=nonlinearity,
             dtype=dtype,
         )
         self.ln2 = self.nn.LayerNorm(dim_embedding, None, dtype=dtype)
@@ -140,6 +149,9 @@ class SelfAttention(Attention):
         dim_embedding (int): Dimensionality of the embedding.
         num_heads (int): Number of heads.
         num_enc_layers (int): Number of layers in the encoders.
+        nonlinearity (string, optional): Nonlinearity in the encoders. Valid
+        values are None (defaults to ReLU), 'ReLU', and 'LeakyReLU'.Not
+        case-sensitive.
         dtype (dtype, optional): Data type.
 
     Attributes:
