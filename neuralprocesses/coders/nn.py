@@ -39,8 +39,8 @@ class MLP:
         layers (tuple[int, ...], optional): Width of every hidden layer.
         num_layers (int, optional): Number of hidden layers.
         width (int, optional): Width of the hidden layers
-        nonlinearity (string, optional): Nonlinearity. Valid values are None
-        (defaults to ReLU), 'ReLU', and 'LeakyReLU'. Not case-sensitive.
+        nonlinearity (string, optional): Nonlinearity. Must be one of
+        `"ReLU"`, and `"LeakyReLU"`. Defaults to `"ReLU"`.        
         dtype (dtype, optional): Data type.
 
     Attributes:
@@ -54,7 +54,7 @@ class MLP:
         layers: Optional[Tuple[int, ...]] = None,
         num_layers: Optional[int] = None,
         width: Optional[int] = None,
-        nonlinearity=None,
+        nonlinearity="ReLU",
         dtype=None,
     ):
         # Check that one of the two specifications is given.
@@ -75,7 +75,7 @@ class MLP:
             nonlinearity = self.nn.LeakyReLU()
         else:
             raise ValueError(
-                "'nonlinearity' must be either None, 'ReLU', or 'LeakyReLU'"
+                """'nonlinearity' must be either `ReLU`, or `LeakyReLU`"""
             )
             
         # Build layers.
