@@ -75,7 +75,7 @@ class MLP:
             nonlinearity = self.nn.LeakyReLU()
         else:
             raise ValueError(
-                "'nonlinearity' must be either [None], 'ReLU', or 'LeakyReLU'"
+                "'nonlinearity' must be either None, 'ReLU', or 'LeakyReLU'"
             )
             
         # Build layers.
