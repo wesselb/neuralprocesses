@@ -16,9 +16,8 @@ class Attention:
         dim_embedding (int): Dimensionality of the embedding.
         num_heads (int): Number of heads.
         num_enc_layers (int): Number of layers in the encoders.
-        nonlinearity (string, optional): Nonlinearity in the encoders. Valid
-        values are None (defaults to ReLU), 'ReLU', and 'LeakyReLU'. Not
-        case-sensitive.
+        nonlinearity (string, optional): Nonlinearity in the encoders. Must be
+        one of `"ReLU"`, and `"LeakyReLU"`. Defaults to `"ReLU"`.
         dtype (dtype, optional): Data type.
 
     Attributes:
@@ -40,7 +39,7 @@ class Attention:
         dim_embedding,
         num_heads,
         num_enc_layers,
-        nonlinearity=None,
+        nonlinearity="ReLU",
         dtype=None,
         _self=False,
     ):
