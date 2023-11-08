@@ -22,6 +22,7 @@ def construct_gnp(
     enc_same=False,
     num_dec_layers=6,
     width=512,
+    nonlinearity="ReLU",
     likelihood="lowrank",
     num_basis_functions=512,
     dim_lv=0,
@@ -54,6 +55,8 @@ def construct_gnp(
             `False`.
         num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
+        nonlinearity (string, optional): Nonlinearity in the MLP layers. Must be one of
+        `"ReLU"`, and `"LeakyReLU"`. Defaults to `"ReLU"`.
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
             Defaults to `"lowrank"`.
         num_basis_functions (int, optional): Number of basis functions for the
@@ -101,6 +104,7 @@ def construct_gnp(
                 dim_embedding=dim_embedding,
                 num_heads=attention_num_heads,
                 num_enc_layers=num_enc_layers,
+                nonlinearity=nonlinearity,
                 dtype=dtype,
             )
 
@@ -126,6 +130,7 @@ def construct_gnp(
                 out_dim=dim_embedding,
                 num_layers=num_enc_layers,
                 width=width,
+                nonlinearity=nonlinearity,
                 dtype=dtype,
             )
 
@@ -158,6 +163,7 @@ def construct_gnp(
                 out_dim=dim_embedding,
                 num_layers=num_enc_layers,
                 width=width,
+                nonlinearity=nonlinearity,
                 dtype=dtype,
             )
 
@@ -179,6 +185,7 @@ def construct_gnp(
                 # The capacity of this MLP should increase with the number of outputs,
                 # but multiplying by `len(dim_yc)` is too aggressive.
                 width=width * min(len(dim_yc), 2),
+                nonlinearity=nonlinearity,
                 dtype=dtype,
             ),
             lv_likelihood,
@@ -211,6 +218,7 @@ def construct_gnp(
                     # The capacity of this MLP should increase with the number of
                     # outputs, but multiplying by `len(dim_yc)` is too aggressive.
                     width=width * min(len(dim_yc), 2),
+                    nonlinearity=nonlinearity,
                     dtype=dtype,
                 ),
                 selector,  # Select the right target output.

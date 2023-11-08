@@ -29,6 +29,8 @@ def construct_agnp(*args, nps=nps, num_heads=8, **kw_args):
             `False`.
         num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
+        nonlinearity (string, optional): Nonlinearity in the MLP layers. Must be one of
+        `"ReLU"`, and `"LeakyReLU"`. Defaults to `"ReLU"`.
         likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
             Defaults to `"lowrank"`.
         num_basis_functions (int, optional): Number of basis functions for the
