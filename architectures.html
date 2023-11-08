@@ -414,9 +414,8 @@ only works if all context sets have the same dimensionality. Defaults to
 <cite>False</cite>.</p></li>
 <li><p><strong>num_dec_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of layers in the decoder. Defaults to 6.</p></li>
 <li><p><strong>width</strong> (<em>int</em><em>, </em><em>optional</em>) – Widths of all intermediate MLPs. Defaults to 512.</p></li>
-<li><p><strong>nonlinearity</strong> (<em>string</em><em>, </em><em>optional</em>) – Nonlinearity in the MLP layers. Must be one of</p></li>
-<li><p><strong>&quot;ReLU&quot;</strong> – </p></li>
-<li><p><strong>&quot;ReLU&quot;.</strong> (<em>and &quot;LeakyReLU&quot;. Defaults to</em>) – </p></li>
+<li><p><strong>nonlinearity</strong> (<em>Callable</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – Nonlinearity. Can also be specified
+as a string: <cite>“ReLU”</cite> or <cite>“LeakyReLU”</cite>. Defaults to ReLUs.</p></li>
 <li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”</cite>.
 Defaults to <cite>“lowrank”</cite>.</p></li>
 <li><p><strong>num_basis_functions</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of basis functions for the
@@ -470,9 +469,8 @@ only works if all context sets have the same dimensionality. Defaults to
 <cite>False</cite>.</p></li>
 <li><p><strong>num_dec_layers</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of layers in the decoder. Defaults to 6.</p></li>
 <li><p><strong>width</strong> (<em>int</em><em>, </em><em>optional</em>) – Widths of all intermediate MLPs. Defaults to 512.</p></li>
-<li><p><strong>nonlinearity</strong> (<em>string</em><em>, </em><em>optional</em>) – Nonlinearity in the MLP layers. Must be one of</p></li>
-<li><p><strong>&quot;ReLU&quot;</strong> – </p></li>
-<li><p><strong>&quot;ReLU&quot;.</strong> (<em>and &quot;LeakyReLU&quot;. Defaults to</em>) – </p></li>
+<li><p><strong>nonlinearity</strong> (<em>Callable</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – Nonlinearity. Can also be specified
+as a string: <cite>“ReLU”</cite> or <cite>“LeakyReLU”</cite>. Defaults to ReLUs.</p></li>
 <li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”</cite>.
 Defaults to <cite>“lowrank”</cite>.</p></li>
 <li><p><strong>num_basis_functions</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of basis functions for the

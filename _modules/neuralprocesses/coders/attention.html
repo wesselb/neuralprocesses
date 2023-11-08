@@ -336,8 +336,8 @@ document.write(`
 <span class="sd">        dim_embedding (int): Dimensionality of the embedding.</span>
 <span class="sd">        num_heads (int): Number of heads.</span>
 <span class="sd">        num_enc_layers (int): Number of layers in the encoders.</span>
-<span class="sd">        nonlinearity (string, optional): Nonlinearity in the encoders. Must be</span>
-<span class="sd">        one of `&quot;ReLU&quot;`, and `&quot;LeakyReLU&quot;`. Defaults to `&quot;ReLU&quot;`.</span>
+<span class="sd">        nonlinearity (Callable or str, optional): Nonlinearity. Can also be specified</span>
+<span class="sd">            as a string: `&quot;ReLU&quot;` or `&quot;LeakyReLU&quot;`. Defaults to ReLUs.</span>
 <span class="sd">        dtype (dtype, optional): Data type.</span>
 
 <span class="sd">    Attributes:</span>

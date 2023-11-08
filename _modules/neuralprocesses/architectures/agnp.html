@@ -349,8 +349,8 @@ document.write(`
 <span class="sd">            `False`.</span>
 <span class="sd">        num_dec_layers (int, optional): Number of layers in the decoder. Defaults to 6.</span>
 <span class="sd">        width (int, optional): Widths of all intermediate MLPs. Defaults to 512.</span>
-<span class="sd">        nonlinearity (string, optional): Nonlinearity in the MLP layers. Must be one of</span>
-<span class="sd">        `&quot;ReLU&quot;`, and `&quot;LeakyReLU&quot;`. Defaults to `&quot;ReLU&quot;`.</span>
+<span class="sd">        nonlinearity (Callable or str, optional): Nonlinearity. Can also be specified</span>
+<span class="sd">            as a string: `&quot;ReLU&quot;` or `&quot;LeakyReLU&quot;`. Defaults to ReLUs.</span>
 <span class="sd">        likelihood (str, optional): Likelihood. Must be one of `&quot;het&quot;` or `&quot;lowrank&quot;`.</span>
 <span class="sd">            Defaults to `&quot;lowrank&quot;`.</span>
 <span class="sd">        num_basis_functions (int, optional): Number of basis functions for the</span>

@@ -320,7 +320,7 @@ document.write(`
   <h1>Source code for neuralprocesses.coders.nn</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">math</span>
 <span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">import</span> <span class="nn">lab</span> <span class="k">as</span> <span class="nn">B</span>
 <span class="kn">from</span> <span class="nn">plum</span> <span class="kn">import</span> <span class="n">convert</span>
@@ -349,6 +349,12 @@ document.write(`
         <span class="bp">self</span><span class="o">.</span><span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_channels</span><span class="p">,</span> <span class="n">out_channels</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span></div>
 
 
+<span class="n">_nonlinearity_name_map</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;relu&quot;</span><span class="p">:</span> <span class="s2">&quot;ReLU&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;leakyrelu&quot;</span><span class="p">:</span> <span class="s2">&quot;LeakyReLU&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
 <div class="viewcode-block" id="MLP"><a class="viewcode-back" href="../../../coders.html#neuralprocesses.coders.nn.MLP">[docs]</a><span class="nd">@register_module</span>
 <span class="k">class</span> <span class="nc">MLP</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;MLP.</span>
@@ -359,8 +365,8 @@ document.write(`
 <span class="sd">        layers (tuple[int, ...], optional): Width of every hidden layer.</span>
 <span class="sd">        num_layers (int, optional): Number of hidden layers.</span>
 <span class="sd">        width (int, optional): Width of the hidden layers</span>
-<span class="sd">        nonlinearity (string, optional): Nonlinearity. Must be one of</span>
-<span class="sd">        `&quot;ReLU&quot;`, and `&quot;LeakyReLU&quot;`. Defaults to `&quot;ReLU&quot;`.        </span>
+<span class="sd">        nonlinearity (Callable or str, optional): Nonlinearity. Can also be specified</span>
+<span class="sd">            as a string: `&quot;ReLU&quot;` or `&quot;LeakyReLU&quot;`. Defaults to ReLUs.</span>
 <span class="sd">        dtype (dtype, optional): Data type.</span>
 
 <span class="sd">    Attributes:</span>
@@ -374,7 +380,7 @@ document.write(`
         <span class="n">layers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">num_layers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">width</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">nonlinearity</span><span class="o">=</span><span class="s2">&quot;ReLU&quot;</span><span class="p">,</span>
+        <span class="n">nonlinearity</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">Callable</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ReLU&quot;</span><span class="p">,</span>
         <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="c1"># Check that one of the two specifications is given.</span>
@@ -382,22 +388,25 @@ document.write(`
         <span class="n">num_layers_given</span> <span class="o">=</span> <span class="n">num_layers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">layers_given</span> <span class="ow">or</span> <span class="n">num_layers_given</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Must specify either `layers` or `num_layers` and `width`.&quot;</span>
+                <span class="s2">&quot;Must specify either `layers` or `num_layers` and `width`.&quot;</span>
             <span class="p">)</span>
         <span class="c1"># Make sure that `layers` is a tuple of various widths.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">layers_given</span> <span class="ow">and</span> <span class="n">num_layers_given</span><span class="p">:</span>
             <span class="n">layers</span> <span class="o">=</span> <span class="p">(</span><span class="n">width</span><span class="p">,)</span> <span class="o">*</span> <span class="n">num_layers</span>
 
-        <span class="c1"># Default to ReLUs.</span>
-        <span class="k">if</span> <span class="n">nonlinearity</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="n">nonlinearity</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;relu&#39;</span><span class="p">:</span>
-            <span class="n">nonlinearity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span>
-        <span class="k">elif</span> <span class="nb">str</span><span class="p">(</span><span class="n">nonlinearity</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s1">&#39;leakyrelu&#39;</span><span class="p">:</span>
-            <span class="n">nonlinearity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">LeakyReLU</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-<span class="w">                </span><span class="sd">&quot;&quot;&quot;&#39;nonlinearity&#39; must be either `ReLU`, or `LeakyReLU`&quot;&quot;&quot;</span>
-            <span class="p">)</span>
-            
+        <span class="c1"># Resolve string-form `nonlinearity`.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nonlinearity</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">resolved_name</span> <span class="o">=</span> <span class="n">_nonlinearity_name_map</span><span class="p">[</span><span class="n">nonlinearity</span><span class="o">.</span><span class="n">lower</span><span class="p">()]</span>
+                <span class="n">nonlinearity</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nn</span><span class="p">,</span> <span class="n">resolved_name</span><span class="p">)()</span>
+            <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Nonlinearity `</span><span class="si">{</span><span class="n">resolved_name</span><span class="si">}</span><span class="s2">` invalid. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Must be one of &quot;</span>
+                    <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;`</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">`&quot;</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">_nonlinearity_name_map</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                    <span class="o">+</span> <span class="s2">&quot;.&quot;</span>
+                <span class="p">)</span>
+
         <span class="c1"># Build layers.</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">layers</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">net</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_dim</span><span class="p">,</span> <span class="n">out_dim</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
