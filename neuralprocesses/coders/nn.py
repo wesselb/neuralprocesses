@@ -1,6 +1,6 @@
 import math
 from functools import partial
-from typing import Optional, Tuple, Union
+from typing import Callable, Optional, Tuple, Union
 
 import lab as B
 from plum import convert
@@ -29,6 +29,12 @@ class Linear:
         self.net = self.nn.Linear(in_channels, out_channels, dtype=dtype)
 
 
+_nonlinearity_name_map = {
+    "relu": "ReLU",
+    "leakyrelu": "LeakyReLU",
+}
+
+
 @register_module
 class MLP:
     """MLP.
@@ -39,8 +45,8 @@ class MLP:
         layers (tuple[int, ...], optional): Width of every hidden layer.
         num_layers (int, optional): Number of hidden layers.
         width (int, optional): Width of the hidden layers
-        nonlinearity (string, optional): Nonlinearity. Must be one of
-        `"ReLU"`, and `"LeakyReLU"`. Defaults to `"ReLU"`.
+        nonlinearity (Callable or str, optional): Nonlinearity. Can also be specified
+            as a string: `"ReLU"` or `"LeakyReLU"`. Defaults to ReLUs.
         dtype (dtype, optional): Data type.
 
     Attributes:
@@ -54,7 +60,7 @@ class MLP:
         layers: Optional[Tuple[int, ...]] = None,
         num_layers: Optional[int] = None,
         width: Optional[int] = None,
-        nonlinearity="ReLU",
+        nonlinearity: Union[Callable, str] = "ReLU",
         dtype=None,
     ):
         # Check that one of the two specifications is given.
@@ -62,19 +68,24 @@ class MLP:
         num_layers_given = num_layers is not None and width is not None
         if not (layers_given or num_layers_given):
             raise ValueError(
-                f"Must specify either `layers` or `num_layers` and `width`."
+                "Must specify either `layers` or `num_layers` and `width`."
             )
         # Make sure that `layers` is a tuple of various widths.
         if not layers_given and num_layers_given:
             layers = (width,) * num_layers
 
-        # Default to ReLUs.
-        if nonlinearity is None or str(nonlinearity).lower() == "relu":
-            nonlinearity = self.nn.ReLU()
-        elif str(nonlinearity).lower() == "leakyrelu":
-            nonlinearity = self.nn.LeakyReLU()
-        else:
-            raise ValueError("""'nonlinearity' must be either `ReLU`, or `LeakyReLU`""")
+        # Resolve string-form `nonlinearity`.
+        if isinstance(nonlinearity, str):
+            try:
+                resolved_name = _nonlinearity_name_map[nonlinearity.lower()]
+                nonlinearity = getattr(self.nn, resolved_name)()
+            except KeyError:
+                raise ValueError(
+                    f"Nonlinearity `{resolved_name}` invalid. "
+                    f"Must be one of "
+                    + ", ".join(f"`{k}`" for k in _nonlinearity_name_map.keys())
+                    + "."
+                )
 
         # Build layers.
         if len(layers) == 0:
