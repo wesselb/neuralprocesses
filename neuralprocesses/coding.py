@@ -31,10 +31,10 @@ def code(coder, xz, z, x, **kw_args):
     """
     if any(
         [
-            isinstance(coder, s.types[0])
-            and issubclass(s.types[0], object)
-            and not issubclass(object, s.types[0])
-            for s in code.methods
+            isinstance(coder, method.signature.types[0])
+            and issubclass(method.signature.types[0], object)
+            and not issubclass(object, method.signature.types[0])
+            for method in code.methods
         ]
     ):
         raise RuntimeError(
