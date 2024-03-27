@@ -97,7 +97,6 @@ def predict(
 
         done_num_samples += this_num_samples
 
-
     # Stack samples.
     ft = B.concat(*ft, axis=0)
     yt = B.concat(*yt, axis=0)
