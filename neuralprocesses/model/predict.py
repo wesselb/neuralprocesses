@@ -31,7 +31,7 @@ def predict(
         num_samples (int, optional): Number of samples to produce. Defaults to 50.
         batch_size (int, optional): Batch size. Defaults to 16.
         dtype_lik (dtype, optional): Data type to use for the likelihood computation.
-            Defaults to the 64-bit variant of the data type of `yt`.
+            Defaults to the 64-bit variant of the data type of `xt`.
 
     Returns:
         random state, optional: Random state.
@@ -43,7 +43,7 @@ def predict(
     float = B.dtype_float(xt)
 
     # For the likelihood computation, default to using a 64-bit version of the data
-    # type of `yt`.
+    # type of `xt`.
     if not dtype_lik:
         dtype_lik = B.promote_dtypes(float, np.float64)
 
