@@ -18,6 +18,7 @@ def predict(
     *,
     num_samples=50,
     batch_size=16,
+    dtype_lik=None
 ):
     """Use a model to predict.
 
@@ -29,6 +30,8 @@ def predict(
         xt (input): Inputs of the target set.
         num_samples (int, optional): Number of samples to produce. Defaults to 50.
         batch_size (int, optional): Batch size. Defaults to 16.
+        dtype_lik (dtype, optional): Data type to use for the likelihood computation.
+            Defaults to the 64-bit variant of the data type of `xt`.
 
     Returns:
         random state, optional: Random state.
@@ -38,7 +41,11 @@ def predict(
         tensor: `num_samples` noisy samples.
     """
     float = B.dtype_float(xt)
-    float64 = B.promote_dtypes(float, np.float64)
+
+    # For the likelihood computation, default to using a 64-bit version of the data
+    # type of `xt`.
+    if not dtype_lik:
+        dtype_lik = B.promote_dtypes(float, np.float64)
 
     # Collect noiseless samples, noisy samples, first moments, and second moments.
     ft, yt = [], []
@@ -54,8 +61,7 @@ def predict(
             contexts,
             xt,
             dtype_enc_sample=float,
-            # Run likelihood with `float64`s to ease the numerics as much as possible.
-            dtype_lik=float64,
+            dtype_lik=dtype_lik,
             num_samples=this_num_samples,
         )
 
