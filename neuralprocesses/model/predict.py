@@ -41,12 +41,11 @@ def predict(
         tensor: `num_samples` noisy samples.
     """
     float = B.dtype_float(xt)
-    float64 = B.promote_dtypes(float, np.float64)
 
     # For the likelihood computation, default to using a 64-bit version of the data
     # type of `yt`.
     if not dtype_lik:
-        dtype_lik = float64
+        dtype_lik = B.promote_dtypes(float, np.float64)
 
     # Collect noiseless samples, noisy samples, first moments, and second moments.
     ft, yt = [], []
