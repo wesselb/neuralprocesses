@@ -40,7 +40,7 @@ dev = [
     "pyright",
     "torch",
     "tensorflow",
-    "tensorflow-probability",
+    "tensorflow-probability[tf]",
 ]
 
 [project.urls]
