@@ -18,7 +18,7 @@ def predict(
     *,
     num_samples=50,
     batch_size=16,
-    dtype_lik=None
+    dtype_lik=None,
 ):
     """Use a model to predict.
 
