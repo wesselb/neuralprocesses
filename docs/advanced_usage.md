@@ -116,3 +116,9 @@ xc_grid_merged, yc_grid_merged = nps.merge_contexts(
     B.concat(xt, xt, axis=0)
 )
 ```
+
+## Equivalence of PyTorch and TensorFlow Architectures
+
+Jonny Taylor has a created a very helpful [Gist](https://gist.github.com/DrJonnyT/c946044591fb4ce922b0f5e7fd0f047a)
+which can be used to verify the equivalence of PyTorch and TensorFlow versions of architectures.
+
