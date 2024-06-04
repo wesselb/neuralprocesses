@@ -14,11 +14,11 @@ def test_convgnp_mask(nps):
         conv_receptive_field=0.5,
         conv_layers=1,
         conv_channels=1,
-        # Dividing by the density channel makes the forward very sensitive to the
-        # numerics.
-        divide_by_density=False,
+        # A large margin and `float64`s help with numerical stability.
+        margin=2,
+        dtype=nps.dtype64,
     )
-    xc, yc, xt, yt = generate_data(nps)
+    xc, yc, xt, yt = generate_data(nps, dtype=nps.dtype64)
 
     # Predict without the final three points.
     pred = model(xc[:, :, :-3], yc[:, :, :-3], xt)

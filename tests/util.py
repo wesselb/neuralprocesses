@@ -51,7 +51,7 @@ nps_tf.dtype32 = tf.float32
 nps_tf.dtype64 = tf.float64
 
 
-@pytest.fixture(params=[nps_torch, nps_tf], scope="module")
+@pytest.fixture(params=[nps_tf, nps_torch], scope="module")
 def nps(request):
     return request.param
 
@@ -64,14 +64,17 @@ def generate_data(
     n_context=5,
     n_target=7,
     binary=False,
+    dtype=None,
 ):
-    xc = B.randn(nps.dtype, batch_size, dim_x, n_context)
-    yc = B.randn(nps.dtype, batch_size, dim_y, n_context)
-    xt = B.randn(nps.dtype, batch_size, dim_x, n_target)
-    yt = B.randn(nps.dtype, batch_size, dim_y, n_target)
+    if dtype is None:
+        dtype = nps.dtype
+    xc = B.randn(dtype, batch_size, dim_x, n_context)
+    yc = B.randn(dtype, batch_size, dim_y, n_context)
+    xt = B.randn(dtype, batch_size, dim_x, n_target)
+    yt = B.randn(dtype, batch_size, dim_y, n_target)
     if binary:
-        yc = B.cast(nps.dtype, yc >= 0)
-        yt = B.cast(nps.dtype, yt >= 0)
+        yc = B.cast(dtype, yc >= 0)
+        yt = B.cast(dtype, yt >= 0)
     return xc, yc, xt, yt
 
 
