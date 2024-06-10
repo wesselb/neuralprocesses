@@ -66,7 +66,7 @@ def product_kw_args(config, **kw_args):
         },
         dim_x=[1, 2],
         dim_y=[1, 2],
-        likelihood=["het", "lowrank", "spikes-beta"],
+        likelihood=["het", "lowrank", "spikes-beta", "bernoulli-gamma"],
     )
     # NP:
     + product_kw_args(
@@ -79,7 +79,7 @@ def product_kw_args(config, **kw_args):
         },
         dim_x=[1, 2],
         dim_y=[1, 2],
-        likelihood=["het", "lowrank", "spikes-beta"],
+        likelihood=["het", "lowrank", "spikes-beta", "bernoulli-gamma"],
         lv_likelihood=["het", "dense"],
     )
     # ACNP:
@@ -94,7 +94,7 @@ def product_kw_args(config, **kw_args):
         },
         dim_x=[1, 2],
         dim_y=[1, 2],
-        likelihood=["het", "lowrank", "spikes-beta"],
+        likelihood=["het", "lowrank", "spikes-beta", "bernoulli-gamma"],
     )
     # ANP:
     + product_kw_args(
@@ -108,7 +108,7 @@ def product_kw_args(config, **kw_args):
         },
         dim_x=[1, 2],
         dim_y=[1, 2],
-        likelihood=["het", "lowrank", "spikes-beta"],
+        likelihood=["het", "lowrank", "spikes-beta", "bernoulli-gamma"],
         lv_likelihood=["het", "dense"],
     )
     # ConvCNP and ConvGNP:
@@ -122,7 +122,7 @@ def product_kw_args(config, **kw_args):
             },
             dim_x=[1, 2],
             dim_y=[1, 2],
-            likelihood=["het", "lowrank", "spikes-beta"],
+            likelihood=["het", "lowrank", "spikes-beta", "bernoulli-gamma"],
             encoder_scales_learnable=[True, False],
             decoder_scale_learnable=[True, False],
         )
@@ -138,7 +138,7 @@ def product_kw_args(config, **kw_args):
             },
             dim_x=[1, 2],
             dim_y=[1, 2],
-            likelihood=["het", "lowrank", "spikes-beta"],
+            likelihood=["het", "lowrank", "spikes-beta", "bernoulli-gamma"],
             lv_likelihood=["het", "lowrank"],
         )
     )
@@ -219,7 +219,7 @@ def model_sample(request, nps, config):
 
     def sample():
         if "likelihood" in config:
-            binary = config["likelihood"] == "spikes-beta"
+            binary = config["likelihood"] in {"spikes-beta", "bernoulli-gamma"}
         else:
             binary = False
         return generate_data(

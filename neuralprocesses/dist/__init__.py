@@ -1,6 +1,7 @@
 from .beta import *
 from .dirac import *
 from .dist import *
+from .gamma import *
 from .geom import *
 from .normal import *
 from .spikeslab import *

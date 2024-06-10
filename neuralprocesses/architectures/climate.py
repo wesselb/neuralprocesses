@@ -27,8 +27,8 @@ def construct_climate_convgnp_mlp(
             to 128.
         lr_deg (float, optional): Resolution of the low-resolution grid. Defaults to
             0.75.
-        likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank".
-            Defaults to `"lowrank"`.
+        likelihood (str, optional): Likelihood. Must be one of `"het"`, `"lowrank"`,
+            `"spikes-beta"`, or `"bernoulli-gamma"`. Defaults to `"lowrank"`.
         dtype (dtype, optional): Data type.
     """
     mlp_width = 128

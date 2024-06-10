@@ -150,7 +150,7 @@ def construct_convgnp(
         margin (float, optional): Margin of the internal discretisation. Defaults to
             0.1.
         likelihood (str, optional): Likelihood. Must be one of `"het"`, `"lowrank"`,
-            or `"spikes-beta"`. Defaults to `"lowrank"`.
+            `"spikes-beta"`, or `"bernoulli-gamma"`. Defaults to `"lowrank"`.
         conv_arch (str, optional): Convolutional architecture to use. Must be one of
             `"unet[-res][-sep]"` or `"conv[-res][-sep]"`. Defaults to `"unet"`.
         unet_channels (tuple[int], optional): Channels of every layer of the UNet.

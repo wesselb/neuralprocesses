@@ -7,7 +7,7 @@ from lab.util import resolve_axis
 from . import _dispatch
 from .aggregate import Aggregate, AggregateInput
 from .datadims import data_dims
-from .dist import Beta, Dirac, MultiOutputNormal, SpikesSlab
+from .dist import Beta, Dirac, Gamma, MultiOutputNormal, SpikesSlab
 from .parallel import Parallel
 from .util import register_module, split, split_dimension
 
@@ -16,6 +16,8 @@ __all__ = [
     "HeterogeneousGaussianLikelihood",
     "LowRankGaussianLikelihood",
     "DenseGaussianLikelihood",
+    "SpikesBetaLikelihood",
+    "BernoulliGammaLikelihood",
 ]
 
 
@@ -359,7 +361,7 @@ def _dense_var(coder: DenseGaussianLikelihood, xz, z: B.Numeric):
 
 @register_module
 class SpikesBetaLikelihood(AbstractLikelihood):
-    """Gaussian likelihood with heterogeneous noise.
+    """Mixture of a beta distribution, a Dirac delta at zero, and a Dirac delta at one.
 
     Args:
         epsilon (float, optional): Tolerance for equality checking. Defaults to `1e-6`.
@@ -451,3 +453,94 @@ def _spikesbeta(coder: SpikesBetaLikelihood, xz, z: B.Numeric):
     logps = z_logps
 
     return alpha, beta, logp0, logp1, logps, d + 1
+
+
+@register_module
+class BernoulliGammaLikelihood(AbstractLikelihood):
+    """Mixture of a gamma distribution and a Dirac delta at zero.
+
+    Args:
+        epsilon (float, optional): Tolerance for equality checking. Defaults to `1e-6`.
+
+    Args:
+        epsilon (float): Tolerance for equality checking.
+    """
+
+    @_dispatch
+    def __init__(self, epsilon: float = 1e-6):
+        self.epsilon = epsilon
+
+    def __str__(self):
+        return repr(self)
+
+    def __repr__(self):
+        return f"BernoulliGammaLikelihood(epsilon={self.epsilon!r})"
+
+
+@_dispatch
+def code(
+    coder: BernoulliGammaLikelihood,
+    xz,
+    z,
+    x,
+    *,
+    dtype_lik=None,
+    **kw_args,
+):
+    k, scale, logp0, logps, d = _bernoulligamma(coder, xz, z)
+
+    # Cast parameters to the right data type.
+    if dtype_lik:
+        k = B.cast(dtype_lik, k)
+        scale = B.cast(dtype_lik, scale)
+        logp0 = B.cast(dtype_lik, logp0)
+        logps = B.cast(dtype_lik, logps)
+
+    # Create the spikes vector.
+    with B.on_device(z):
+        dtype = dtype_lik or B.dtype(z)
+        spikes = B.stack(B.zero(dtype))
+
+    return xz, SpikesSlab(
+        spikes,
+        Gamma(k, scale, d),
+        B.stack(logp0, logps, axis=-1),
+        d,
+        epsilon=coder.epsilon,
+    )
+
+
+@_dispatch
+def _bernoulligamma(
+    coder: BernoulliGammaLikelihood,
+    xz: AggregateInput,
+    z: Aggregate,
+):
+    ks, scales, logp0s, logpss, ds = zip(
+        *[_bernoulligamma(coder, xzi, zi) for (xzi, _), zi in zip(xz, z)]
+    )
+
+    # Concatenate into one big distribution.
+    k = Aggregate(*ks)
+    scale = Aggregate(*scales)
+    logp0 = Aggregate(*logp0s)
+    logps = Aggregate(*logpss)
+    d = Aggregate(*ds)
+
+    return k, scale, logp0, logps, d
+
+
+@_dispatch
+def _bernoulligamma(coder: BernoulliGammaLikelihood, xz, z: B.Numeric):
+    d = data_dims(xz)
+    dim_y = B.shape(z, -d - 1) // 4
+
+    z_k, z_scale, z_logp0, z_logps = split(z, (dim_y, dim_y, dim_y, dim_y), -d - 1)
+
+    # Transform into parameters.
+    k = 1e-3 + B.softplus(z_k)
+    scale = 1e-3 + B.softplus(z_scale)
+    logp0 = z_logp0
+    logps = z_logps
+
+    return k, scale, logp0, logps, d + 1

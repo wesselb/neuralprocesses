@@ -31,13 +31,13 @@ def construct_agnp(*args, nps=nps, num_heads=8, **kw_args):
         width (int, optional): Widths of all intermediate MLPs. Defaults to 512.
         nonlinearity (Callable or str, optional): Nonlinearity. Can also be specified
             as a string: `"ReLU"` or `"LeakyReLU"`. Defaults to ReLUs.
-        likelihood (str, optional): Likelihood. Must be one of `"het"` or `"lowrank"`.
-            Defaults to `"lowrank"`.
+        likelihood (str, optional): Likelihood. Must be one of `"het"`, `"lowrank"`,
+            `"spikes-beta"`, or `"bernoulli-gamma"`. Defaults to `"lowrank"`.
         num_basis_functions (int, optional): Number of basis functions for the
             low-rank likelihood. Defaults to 512.
         dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.
         lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of
-            `"het"`, `"dense"`, or `"spikes-beta"`. Defaults to `"het"`.
+            `"het"` or `"dense"`. Defaults to `"het"`.
         transform (str or tuple[float, float]): Bijection applied to the
             output of the model. This can help deal with positive of bounded data.
             Must be either `"positive"`, `"exp"`, `"softplus"`, or
