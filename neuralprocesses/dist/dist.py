@@ -31,6 +31,7 @@ class AbstractDistribution(metaclass=abc.ABCMeta):
             state (random state, optional): Random state.
             tensor: Samples of shape `(*shape, *d)` where typically `d = (*b, c, n)`.
         """
+        print(type(self), type(state), type(dtype), *shape)
         raise NotImplementedError(f"{self} cannot be sampled.")
 
     @_dispatch

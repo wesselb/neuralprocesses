@@ -90,7 +90,11 @@ class Beta(AbstractDistribution):
     def logpdf(self: "Beta[B.Numeric, B.Numeric, B.Int]", x: B.Numeric, *, mask=1):
         logz = B.logbeta(self.alpha, self.beta)
         logpdf = (self.alpha - 1) * B.log(x) + (self.beta - 1) * B.log(1 - x) - logz
-        return B.sum(mask * logpdf, axis=tuple(range(B.rank(logpdf)))[-self.d :])
+        logpdf = logpdf * mask
+        if self.d == 0:
+            return logpdf
+        else:
+            return B.sum(logpdf, axis=tuple(range(B.rank(logpdf)))[-self.d :])
 
     def __str__(self):
         return f"Beta({self.alpha}, {self.beta})"
