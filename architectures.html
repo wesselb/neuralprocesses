@@ -419,13 +419,13 @@ only works if all context sets have the same dimensionality. Defaults to
 <li><p><strong>width</strong> (<em>int</em><em>, </em><em>optional</em>) – Widths of all intermediate MLPs. Defaults to 512.</p></li>
 <li><p><strong>nonlinearity</strong> (<em>Callable</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – Nonlinearity. Can also be specified
 as a string: <cite>“ReLU”</cite> or <cite>“LeakyReLU”</cite>. Defaults to ReLUs.</p></li>
-<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”</cite>.
-Defaults to <cite>“lowrank”</cite>.</p></li>
+<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite>, <cite>“lowrank”</cite>,
+<cite>“spikes-beta”</cite>, or <cite>“bernoulli-gamma”</cite>. Defaults to <cite>“lowrank”</cite>.</p></li>
 <li><p><strong>num_basis_functions</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of basis functions for the
 low-rank likelihood. Defaults to 512.</p></li>
 <li><p><strong>dim_lv</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the latent variable. Defaults to 0.</p></li>
 <li><p><strong>lv_likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood of the latent variable. Must be one of
-<cite>“het”</cite>, <cite>“dense”</cite>, or <cite>“spikes-beta”</cite>. Defaults to <cite>“het”</cite>.</p></li>
+<cite>“het”</cite> or <cite>“dense”</cite>. Defaults to <cite>“het”</cite>.</p></li>
 <li><p><strong>transform</strong> (<em>str</em><em> or </em><em>tuple</em><em>[</em><em>float</em><em>, </em><em>float</em><em>]</em>) – Bijection applied to the
 output of the model. This can help deal with positive of bounded data.
 Must be either <cite>“positive”</cite>, <cite>“exp”</cite>, <cite>“softplus”</cite>, or
@@ -474,13 +474,13 @@ only works if all context sets have the same dimensionality. Defaults to
 <li><p><strong>width</strong> (<em>int</em><em>, </em><em>optional</em>) – Widths of all intermediate MLPs. Defaults to 512.</p></li>
 <li><p><strong>nonlinearity</strong> (<em>Callable</em><em> or </em><em>str</em><em>, </em><em>optional</em>) – Nonlinearity. Can also be specified
 as a string: <cite>“ReLU”</cite> or <cite>“LeakyReLU”</cite>. Defaults to ReLUs.</p></li>
-<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”</cite>.
-Defaults to <cite>“lowrank”</cite>.</p></li>
+<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite>, <cite>“lowrank”</cite>,
+<cite>“spikes-beta”</cite>, or <cite>“bernoulli-gamma”</cite>. Defaults to <cite>“lowrank”</cite>.</p></li>
 <li><p><strong>num_basis_functions</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of basis functions for the
 low-rank likelihood. Defaults to 512.</p></li>
 <li><p><strong>dim_lv</strong> (<em>int</em><em>, </em><em>optional</em>) – Dimensionality of the latent variable. Defaults to 0.</p></li>
 <li><p><strong>lv_likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood of the latent variable. Must be one of
-<cite>“het”</cite>, <cite>“dense”</cite>, or <cite>“spikes-beta”</cite>. Defaults to <cite>“het”</cite>.</p></li>
+<cite>“het”</cite> or <cite>“dense”</cite>. Defaults to <cite>“het”</cite>.</p></li>
 <li><p><strong>transform</strong> (<em>str</em><em> or </em><em>tuple</em><em>[</em><em>float</em><em>, </em><em>float</em><em>]</em>) – Bijection applied to the
 output of the model. This can help deal with positive of bounded data.
 Must be either <cite>“positive”</cite>, <cite>“exp”</cite>, <cite>“softplus”</cite>, or
@@ -527,7 +527,7 @@ Defaults to 64.</p></li>
 <li><p><strong>margin</strong> (<em>float</em><em>, </em><em>optional</em>) – Margin of the internal discretisation. Defaults to
 0.1.</p></li>
 <li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite>, <cite>“lowrank”</cite>,
-or <cite>“spikes-beta”</cite>. Defaults to <cite>“lowrank”</cite>.</p></li>
+<cite>“spikes-beta”</cite>, or <cite>“bernoulli-gamma”</cite>. Defaults to <cite>“lowrank”</cite>.</p></li>
 <li><p><strong>conv_arch</strong> (<em>str</em><em>, </em><em>optional</em>) – Convolutional architecture to use. Must be one of
 <cite>“unet[-res][-sep]”</cite> or <cite>“conv[-res][-sep]”</cite>. Defaults to <cite>“unet”</cite>.</p></li>
 <li><p><strong>unet_channels</strong> (<em>tuple</em><em>[</em><em>int</em><em>]</em><em>, </em><em>optional</em>) – Channels of every layer of the UNet.
@@ -685,8 +685,8 @@ Geoscientific Model Development 15(1), pages 251–268. URL:
 to 128.</p></li>
 <li><p><strong>lr_deg</strong> (<em>float</em><em>, </em><em>optional</em>) – Resolution of the low-resolution grid. Defaults to
 0.75.</p></li>
-<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite> or <cite>“lowrank”.
-Defaults to `”lowrank”</cite>.</p></li>
+<li><p><strong>likelihood</strong> (<em>str</em><em>, </em><em>optional</em>) – Likelihood. Must be one of <cite>“het”</cite>, <cite>“lowrank”</cite>,
+<cite>“spikes-beta”</cite>, or <cite>“bernoulli-gamma”</cite>. Defaults to <cite>“lowrank”</cite>.</p></li>
 <li><p><strong>dtype</strong> (<em>dtype</em><em>, </em><em>optional</em>) – Data type.</p></li>
 </ul>
 </dd>

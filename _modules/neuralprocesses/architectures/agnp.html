@@ -354,13 +354,13 @@ document.write(`
 <span class="sd">        width (int, optional): Widths of all intermediate MLPs. Defaults to 512.</span>
 <span class="sd">        nonlinearity (Callable or str, optional): Nonlinearity. Can also be specified</span>
 <span class="sd">            as a string: `&quot;ReLU&quot;` or `&quot;LeakyReLU&quot;`. Defaults to ReLUs.</span>
-<span class="sd">        likelihood (str, optional): Likelihood. Must be one of `&quot;het&quot;` or `&quot;lowrank&quot;`.</span>
-<span class="sd">            Defaults to `&quot;lowrank&quot;`.</span>
+<span class="sd">        likelihood (str, optional): Likelihood. Must be one of `&quot;het&quot;`, `&quot;lowrank&quot;`,</span>
+<span class="sd">            `&quot;spikes-beta&quot;`, or `&quot;bernoulli-gamma&quot;`. Defaults to `&quot;lowrank&quot;`.</span>
 <span class="sd">        num_basis_functions (int, optional): Number of basis functions for the</span>
 <span class="sd">            low-rank likelihood. Defaults to 512.</span>
 <span class="sd">        dim_lv (int, optional): Dimensionality of the latent variable. Defaults to 0.</span>
 <span class="sd">        lv_likelihood (str, optional): Likelihood of the latent variable. Must be one of</span>
-<span class="sd">            `&quot;het&quot;`, `&quot;dense&quot;`, or `&quot;spikes-beta&quot;`. Defaults to `&quot;het&quot;`.</span>
+<span class="sd">            `&quot;het&quot;` or `&quot;dense&quot;`. Defaults to `&quot;het&quot;`.</span>
 <span class="sd">        transform (str or tuple[float, float]): Bijection applied to the</span>
 <span class="sd">            output of the model. This can help deal with positive of bounded data.</span>
 <span class="sd">            Must be either `&quot;positive&quot;`, `&quot;exp&quot;`, `&quot;softplus&quot;`, or</span>
