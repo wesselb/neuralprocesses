@@ -18,7 +18,7 @@ dependencies = [
     "backends>=1.6.2",
     "backends-matrix>=1.2.10",
     "plum-dispatch>=2.3.0",
-    "stheno>=1.3.10",
+    "stheno>=1.4.2",
     "wbml>=0.3.18",
 ]
 
